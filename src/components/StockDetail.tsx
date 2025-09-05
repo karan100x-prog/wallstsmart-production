@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 
@@ -67,13 +67,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
     <div>
       {/* Header */}
       <div className="mb-8">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-gray-400 hover:text-white transition mb-4"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          Back to Search
-        </button>
         
         <div className="flex items-start justify-between">
           <div>
