@@ -1,5 +1,4 @@
-//import SEOHead from './SEOHead';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
@@ -50,11 +49,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
 
   return (
     <div>
-      <SEOHead 
-        symbol={symbol} 
-        companyName={company?.Name} 
-        price={price} 
-      />
       {/* Header */}
       <div className="mb-8">
         <button
