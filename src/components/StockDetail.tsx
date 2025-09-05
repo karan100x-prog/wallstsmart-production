@@ -3,11 +3,6 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 
-interface StockDetailProps {
-  symbol: string;
-  onBack: () => void;
-}
-
 const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
   const [quote, setQuote] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
