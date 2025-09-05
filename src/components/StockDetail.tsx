@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+//import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users, Percent, Building2, Calendar, Target, Briefcase, LineChart } from 'lucide-react';
 import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users, Percent, Building2, Calendar, Target, Briefcase, LineChart } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
