@@ -3,7 +3,11 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 
-const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
+interface StockDetailProps {
+  symbol: string;
+}
+
+const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
   const [quote, setQuote] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +66,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
     <div>
       {/* Header */}
       <div className="mb-8">
-        
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2">{symbol}</h1>
