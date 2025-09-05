@@ -85,7 +85,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
 
       {/* Chart */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-8">
-        <h2 className="text-xl font-bold mb-4">Price Chart (30 Days)</h2>
         <StockChartAdvanced symbol={symbol} />
       </div>
 
