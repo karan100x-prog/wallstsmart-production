@@ -109,7 +109,6 @@ function App() {
         <Navigation />
 <Routes>
   <Route path="/" element={<HomePage />} />
-  <Route path="/stock" element={<HomePage />} />
   <Route path="/stock/:symbol" element={<StockPage />} />
 </Routes>
       </div>
