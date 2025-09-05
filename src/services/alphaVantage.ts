@@ -79,7 +79,7 @@ export const getCompanyOverview = async (symbol: string) => {
   }
 };
 
-export const getDailyPrices = async (symbol: string) => {
+export const getDailyPrices = async (symbol: string, outputsize: string = 'compact') => {
   checkRateLimit();
   try {
     const response = await axios.get(BASE_URL, {
@@ -87,7 +87,7 @@ export const getDailyPrices = async (symbol: string) => {
         function: 'TIME_SERIES_DAILY',
         symbol,
         apikey: API_KEY,
-        outputsize: 'compact'
+        outputsize: outputsize
       }
     });
     
@@ -102,6 +102,86 @@ export const getDailyPrices = async (symbol: string) => {
     }));
   } catch (error) {
     console.error('Daily prices error:', error);
+    return [];
+  }
+};
+
+export const getIntradayPrices = async (symbol: string, interval: string = '5min') => {
+  checkRateLimit();
+  try {
+    const response = await axios.get(BASE_URL, {
+      params: {
+        function: 'TIME_SERIES_INTRADAY',
+        symbol,
+        interval,
+        apikey: API_KEY,
+        outputsize: 'full'
+      }
+    });
+    
+    const timeSeries = response.data[`Time Series (${interval})`] || {};
+    return Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
+      date,
+      open: values['1. open'],
+      high: values['2. high'],
+      low: values['3. low'],
+      close: values['4. close'],
+      volume: values['5. volume']
+    }));
+  } catch (error) {
+    console.error('Intraday prices error:', error);
+    return [];
+  }
+};
+
+export const getWeeklyPrices = async (symbol: string) => {
+  checkRateLimit();
+  try {
+    const response = await axios.get(BASE_URL, {
+      params: {
+        function: 'TIME_SERIES_WEEKLY',
+        symbol,
+        apikey: API_KEY
+      }
+    });
+    
+    const timeSeries = response.data['Weekly Time Series'] || {};
+    return Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
+      date,
+      open: values['1. open'],
+      high: values['2. high'],
+      low: values['3. low'],
+      close: values['4. close'],
+      volume: values['5. volume']
+    }));
+  } catch (error) {
+    console.error('Weekly prices error:', error);
+    return [];
+  }
+};
+
+export const getMonthlyPrices = async (symbol: string) => {
+  checkRateLimit();
+  try {
+    const response = await axios.get(BASE_URL, {
+      params: {
+        function: 'TIME_SERIES_MONTHLY',
+        symbol,
+        apikey: API_KEY
+      }
+    });
+    
+    const timeSeries = response.data['Monthly Time Series'] || {};
+    return Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
+      date,
+      open: values['1. open'],
+      high: values['2. high'],
+      low: values['3. low'],
+      close: values['4. close'],
+      volume: values['5. volume']
+    }));
+  } catch (error) {
+    console.error('Monthly prices error:', error);
     return [];
   }
 };
