@@ -6,6 +6,12 @@ interface SEOHeadProps {
   price?: number;
 }
 
+declare global {
+  interface Window {
+    gtag?: any;
+  }
+}
+
 const SEOHead: React.FC<SEOHeadProps> = ({ symbol, companyName, price }) => {
   useEffect(() => {
     if (symbol) {
@@ -20,8 +26,8 @@ const SEOHead: React.FC<SEOHeadProps> = ({ symbol, companyName, price }) => {
       }
 
       // Track page view in Google Analytics
-      if (window.gtag) {
-        window.gtag('config', 'G-XXXXXXXXXX', {
+      if (typeof window !== 'undefined' && window.gtag) {
+        window.gtag('config', 'G-7C58KGCPBF', {
           page_path: `/stock/${symbol}`,
           page_title: `${symbol} Stock Analysis`
         });
