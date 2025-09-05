@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-//import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users, Percent, Building2, Calendar, Target, Briefcase, LineChart } from 'lucide-react';
-import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users, Percent, Building2, Calendar, Target, Briefcase, LineChart } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 
@@ -98,10 +97,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
 
       {/* Valuation Metrics */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-green-500" />
-          Valuation Metrics
-        </h3>
+        <h3 className="text-xl font-bold mb-4">Valuation Metrics</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <span className="text-gray-400 text-sm">Market Cap</span>
@@ -148,10 +144,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
 
       {/* Profitability Metrics */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Percent className="h-5 w-5 text-blue-500" />
-          Profitability Metrics
-        </h3>
+        <h3 className="text-xl font-bold mb-4">Profitability Metrics</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <span className="text-gray-400 text-sm">Profit Margin</span>
@@ -186,10 +179,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
 
       {/* Income Statement Data */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <DollarSign className="h-5 w-5 text-yellow-500" />
-          Income Statement
-        </h3>
+        <h3 className="text-xl font-bold mb-4">Income Statement</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <span className="text-gray-400 text-sm">Revenue (TTM)</span>
@@ -223,10 +213,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
       {/* Dividend Information */}
       {company?.DividendYield && parseFloat(company?.DividendYield) > 0 && (
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
-          <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-purple-500" />
-            Dividend Information
-          </h3>
+          <h3 className="text-xl font-bold mb-4">Dividend Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <span className="text-gray-400 text-sm">Dividend Yield</span>
@@ -258,10 +245,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
 
       {/* Trading Metrics */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <LineChart className="h-5 w-5 text-orange-500" />
-          Trading Metrics
-        </h3>
+        <h3 className="text-xl font-bold mb-4">Trading Metrics</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <span className="text-gray-400 text-sm">Beta</span>
@@ -292,10 +276,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
 
       {/* Ownership & Short Interest */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Users className="h-5 w-5 text-indigo-500" />
-          Ownership & Short Interest
-        </h3>
+        <h3 className="text-xl font-bold mb-4">Ownership & Short Interest</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <span className="text-gray-400 text-sm">Institutional Ownership</span>
@@ -337,10 +318,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
       {/* Company Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-cyan-500" />
-            Company Information
-          </h3>
+          <h3 className="text-xl font-bold mb-4">Company Information</h3>
           <div className="space-y-3">
             <div>
               <span className="text-gray-400">Exchange:</span>
@@ -366,10 +344,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
         </div>
 
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Target className="h-5 w-5 text-red-500" />
-            Analyst Targets
-          </h3>
+          <h3 className="text-xl font-bold mb-4">Analyst Targets</h3>
           <div className="space-y-3">
             <div>
               <span className="text-gray-400">Target Price:</span>
