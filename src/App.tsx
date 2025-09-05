@@ -76,7 +76,7 @@ function App() {
         {selectedStock ? (
           <StockDetail symbol={selectedStock} onBack={() => setSelectedStock(null)} />
         ) : (
-          <StockSearch onSelectStock={handleSelectedStock} />
+          <StockSearch onSelectStock={handleSelectStock} />
         )}
       </div>
     </div>
