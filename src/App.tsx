@@ -5,7 +5,11 @@ import StockDetail from './components/StockDetail';
 
 function App() {
   const [selectedStock, setSelectedStock] = useState<string | null>(null);
-
+  
+  const handleSelectStock = (symbol: string) => {
+  console.log('Stock selected:', symbol);
+  setSelectedStock(symbol);
+};
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Navigation */}
