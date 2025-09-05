@@ -53,6 +53,11 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
 
   return (
     <div>
+      <SEOHead 
+      symbol={symbol} 
+      companyName={company?.Name} 
+      price={price} 
+    />
       {/* Header */}
       <div className="mb-8">
         <button
