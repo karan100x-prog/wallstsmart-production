@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { TrendingUp, Search, Activity, DollarSign, BarChart3 } from 'lucide-react';
 import StockSearch from './components/StockSearch';
