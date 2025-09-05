@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/stock/",
+      "destination": "/",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
