@@ -1,7 +1,7 @@
 import SEOHead from './SEOHead';
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users } from 'lucide-react';
-import { getQuote, getCompanyOverview, getDailyPrices } from '../services/alphaVantage';
+import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 
 interface StockDetailProps {
@@ -12,7 +12,6 @@ interface StockDetailProps {
 const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
   const [quote, setQuote] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
-  const [dailyData, setDailyData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,15 +21,13 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
   const loadStockData = async () => {
     setLoading(true);
     try {
-      const [quoteData, companyData, priceData] = await Promise.all([
+      const [quoteData, companyData] = await Promise.all([
         getQuote(symbol),
-        getCompanyOverview(symbol),
-        getDailyPrices(symbol)
+        getCompanyOverview(symbol)
       ]);
       
       setQuote(quoteData);
       setCompany(companyData);
-      setDailyData(priceData);
     } catch (error) {
       console.error('Error loading stock data:', error);
     } finally {
@@ -54,10 +51,10 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol, onBack }) => {
   return (
     <div>
       <SEOHead 
-      symbol={symbol} 
-      companyName={company?.Name} 
-      price={price} 
-    />
+        symbol={symbol} 
+        companyName={company?.Name} 
+        price={price} 
+      />
       {/* Header */}
       <div className="mb-8">
         <button
