@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users } from 'lucide-react';
 import { getQuote, getCompanyOverview, getDailyPrices } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
-//import StockChart from './StockChart';
 
 interface StockDetailProps {
   symbol: string;
