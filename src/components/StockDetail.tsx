@@ -1,3 +1,4 @@
+import SEOHead from './SEOHead';
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users } from 'lucide-react';
 import { getQuote, getCompanyOverview, getDailyPrices } from '../services/alphaVantage';
