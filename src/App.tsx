@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { TrendingUp, Search, Activity, DollarSign, BarChart3 } from 'lucide-react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
