@@ -4,7 +4,7 @@ import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
 
 function App() {
-  const [selectedStock, setSelectedStock] = useState<string | null>('AAPL');
+  const [selectedStock, setSelectedStock] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
