@@ -2,7 +2,7 @@ import SEOHead from './SEOHead';
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Activity, BarChart3, DollarSign, Users } from 'lucide-react';
 import { getQuote, getCompanyOverview, getDailyPrices } from '../services/alphaVantage';
-import StockChart from './StockChart';
+import StockChartAdvanced from './StockChartAdvanced';
 
 interface StockDetailProps {
   symbol: string;
