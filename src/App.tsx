@@ -80,7 +80,6 @@ function HomePage() {
   );
 }
 
-import { useEffect } from 'react';
 
 function StockPage() {
   const { symbol } = useParams<{ symbol: string }>();
