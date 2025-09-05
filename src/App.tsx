@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { TrendingUp, Search, Activity, DollarSign, BarChart3 } from 'lucide-react';
+import { useEffect } from 'react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
 
@@ -79,12 +80,19 @@ function HomePage() {
   );
 }
 
+import { useEffect } from 'react';
+
 function StockPage() {
   const { symbol } = useParams<{ symbol: string }>();
   const navigate = useNavigate();
   
+  useEffect(() => {
+    if (!symbol) {
+      navigate('/', { replace: true });
+    }
+  }, [symbol, navigate]);
+  
   if (!symbol) {
-    navigate('/');
     return null;
   }
   
