@@ -241,10 +241,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
               <span className="text-lg font-semibold">{company?.LatestQuarter || 'N/A'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Fiscal Year End</span>
-              <span className="text-lg font-semibold">{company?.FiscalYearEnd || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-gray-400 text-sm">52 Week High</span>
               <span className="text-lg font-semibold">{formatCurrency(company?.['52WeekHigh'])}</span>
             </div>
