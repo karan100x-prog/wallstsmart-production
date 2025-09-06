@@ -461,58 +461,28 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
       </div>
 
       {/* Company Info */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4">Company Information</h3>
-          <div className="space-y-3">
-            <div>
-              <span className="text-gray-400">Exchange:</span>
-              <span className="ml-2">{company?.Exchange || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Sector:</span>
-              <span className="ml-2">{company?.Sector || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Industry:</span>
-              <span className="ml-2">{company?.Industry || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Country:</span>
-              <span className="ml-2">{company?.Country || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Employees:</span>
-              <span className="ml-2">{formatLargeNumber(parseFloat(company?.FullTimeEmployees || '0'))}</span>
-            </div>
+      <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+        <h3 className="text-xl font-bold mb-4">Company Information</h3>
+        <div className="space-y-3">
+          <div>
+            <span className="text-gray-400">Exchange:</span>
+            <span className="ml-2">{company?.Exchange || 'N/A'}</span>
           </div>
-        </div>
-
-        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4">Analyst Targets</h3>
-          <div className="space-y-3">
-            <div>
-              <span className="text-gray-400">Target Price:</span>
-              <span className="ml-2 text-xl font-bold text-green-500">
-                ${company?.AnalystTargetPrice || 'N/A'}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-400">Forward P/E:</span>
-              <span className="ml-2">{company?.ForwardPE || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Trailing P/E:</span>
-              <span className="ml-2">{company?.TrailingPE || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Latest Quarter:</span>
-              <span className="ml-2">{company?.LatestQuarter || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Fiscal Year End:</span>
-              <span className="ml-2">{company?.FiscalYearEnd || 'N/A'}</span>
-            </div>
+          <div>
+            <span className="text-gray-400">Sector:</span>
+            <span className="ml-2">{company?.Sector || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Industry:</span>
+            <span className="ml-2">{company?.Industry || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Country:</span>
+            <span className="ml-2">{company?.Country || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Employees:</span>
+            <span className="ml-2">{formatLargeNumber(parseFloat(company?.FullTimeEmployees || '0'))}</span>
           </div>
         </div>
       </div>
