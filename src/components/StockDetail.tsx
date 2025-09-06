@@ -11,6 +11,8 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
   const [quote, setQuote] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+const [newsData, setNewsData] = useState<any[]>([]);
+const [newsLoading, setNewsLoading] = useState(false);
 
   useEffect(() => {
     loadStockData();
