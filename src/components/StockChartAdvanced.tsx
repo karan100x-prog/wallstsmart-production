@@ -71,10 +71,14 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           break;
       }
       
-      // Format data for chart
+      // ✅ FIXED: Format data for chart with adjusted prices
       const formattedData = data.reverse().map((item) => ({
         date: formatDate(item.date, range),
-        price: parseFloat(item.close)
+        price: parseFloat(item.adjustedClose || item.close), // ✅ NOW USES ADJUSTED PRICE
+        // Optional: Add these for debugging
+        originalClose: parseFloat(item.close),
+        splitCoefficient: item.splitCoefficient || 1,
+        hasSplit: item.splitCoefficient && item.splitCoefficient !== 1
       }));
       
       setChartData(formattedData);
@@ -99,6 +103,27 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   const timeRanges: TimeRange[] = ['7D', '1M', '6M', '1Y', '3Y', '5Y', '10Y', 'MAX'];
 
+  // ✅ ENHANCED: Custom tooltip to show if price is adjusted
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload[0]) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
+          <p className="text-gray-400">{label}</p>
+          <p className="text-green-400 font-semibold">
+            ${payload[0].value.toFixed(2)}
+          </p>
+          {data.hasSplit && (
+            <p className="text-yellow-400 text-xs mt-1">
+              ⚠️ Stock split on this date
+            </p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
@@ -120,6 +145,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         </div>
       </div>
 
+      {/* ✅ NEW: Info banner about adjusted prices */}
+      <div className="mb-4 p-2 bg-blue-900/20 border border-blue-900/50 rounded text-xs text-blue-400">
+        ℹ️ Prices are adjusted for stock splits and dividends
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center h-[300px]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
@@ -139,6 +169,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
               domain={['dataMin - 5', 'dataMax + 5']}
             />
             <Tooltip 
+              content={<CustomTooltip />}
               contentStyle={{ 
                 backgroundColor: '#1F2937', 
                 border: '1px solid #374151',
