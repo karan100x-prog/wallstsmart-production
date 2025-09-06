@@ -6,9 +6,10 @@ interface StockChartProps {
 }
 
 const StockChart: React.FC<StockChartProps> = ({ data }) => {
+  // ✅ FIXED: Now uses adjustedClose for split-adjusted prices
   const chartData = data.slice(0, 30).reverse().map((item) => ({
     date: item.date.split('-').slice(1).join('/'),
-    price: parseFloat(item.close)
+    price: parseFloat(item.adjustedClose || item.close) // ✅ CHANGED: Uses adjusted price
   }));
 
   return (
