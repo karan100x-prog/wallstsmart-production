@@ -175,6 +175,10 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
               <span className="text-lg font-semibold">{company?.PEGRatio || 'N/A'}</span>
             </div>
             <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Price/Sales (TTM)</span>
+              <span className="text-lg font-semibold">{company?.PriceToSalesRatioTTM || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Book Value</span>
               <span className="text-lg font-semibold">${company?.BookValue || 'N/A'}</span>
             </div>
@@ -187,10 +191,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
               <span className="text-lg font-semibold">
                 ${formatLargeNumber(parseFloat(company?.EnterpriseValue || '0'))}
               </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">EV/Revenue</span>
-              <span className="text-lg font-semibold">{company?.EnterpriseValueToRevenue || 'N/A'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">EV/EBITDA</span>
