@@ -3,7 +3,7 @@ import { TrendingUp, Search, Activity, DollarSign, BarChart3 } from 'lucide-reac
 import { useEffect } from 'react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
-import InstitutionalFlow from './components/InstitutionalFlow';
+//import InstitutionalFlow from './components/InstitutionalFlow';
 
 function Navigation() {
   const navigate = useNavigate();
