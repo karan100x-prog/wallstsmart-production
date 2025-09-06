@@ -61,11 +61,15 @@ const STOCK_SPLITS: Record<string, Array<{date: string, ratio: number}>> = {
 // Function to manually adjust prices for splits
 function adjustPricesForSplits(data: any[], symbol: string): any[] {
   const splits = STOCK_SPLITS[symbol.toUpperCase()];
+  
+  // If no splits defined, return original data
   if (!splits || splits.length === 0) {
-    return data; // No splits to adjust
+    return data;
   }
 
-  return data.map(item => {
+  console.log(`Adjusting splits for ${symbol}`, splits);
+
+  return data.map((item, index) => {
     const itemDate = new Date(item.date);
     let adjustmentFactor = 1;
 
@@ -77,20 +81,21 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
       }
     }
 
-    // If we have adjustedClose and it seems wrong, fix it
-    const hasAdjustedClose = item.adjustedClose !== undefined && item.adjustedClose !== null;
-    const adjustedSeemsBroken = hasAdjustedClose && Math.abs(item.adjustedClose - item.close) < 0.01;
+    // Always use close price and manually adjust it
+    const closePrice = parseFloat(item.close) || 0;
+    const adjustedPrice = closePrice / adjustmentFactor;
+
+    // Log first few adjustments for debugging
+    if (index < 3 && adjustmentFactor > 1) {
+      console.log(`Date: ${item.date}, Close: ${closePrice}, Factor: ${adjustmentFactor}, Adjusted: ${adjustedPrice}`);
+    }
 
     return {
       ...item,
-      // Always provide an adjusted close
-      adjustedClose: adjustedSeemsBroken || !hasAdjustedClose 
-        ? parseFloat((item.close / adjustmentFactor).toFixed(2))
-        : item.adjustedClose,
-      // Keep original close for reference
-      originalClose: item.close,
-      // Track if we manually adjusted
-      manuallyAdjusted: adjustmentFactor > 1
+      close: closePrice,
+      adjustedClose: adjustedPrice,
+      adjustmentFactor: adjustmentFactor,
+      isAdjusted: adjustmentFactor > 1
     };
   });
 }
@@ -158,15 +163,15 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           break;
       }
       
-      // Apply manual split adjustments
+      // Apply manual split adjustments - CRITICAL FIX
       data = adjustPricesForSplits(data, symbol);
       
-      // Format data for chart - now using our manually adjusted prices
+      // Format data for chart - use the adjusted price we calculated
       const formattedData = data.reverse().map((item) => ({
         date: formatDate(item.date, range),
-        price: parseFloat(item.adjustedClose || item.close),
-        originalClose: parseFloat(item.originalClose || item.close),
-        manuallyAdjusted: item.manuallyAdjusted || false
+        price: item.adjustedClose, // Use our manually calculated adjusted price
+        originalPrice: item.close,
+        isAdjusted: item.isAdjusted || false
       }));
       
       setChartData(formattedData);
@@ -199,9 +204,9 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
           <p className="text-gray-400">{label}</p>
           <p className="text-green-400 font-semibold">
-            ${payload[0].value.toFixed(2)}
+            ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
           </p>
-          {data.manuallyAdjusted && (
+          {data.isAdjusted && (
             <p className="text-yellow-400 text-xs mt-1">
               Split-adjusted
             </p>
@@ -211,6 +216,9 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     }
     return null;
   };
+
+  // Show split info for known stocks
+  const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
 
   return (
     <div>
@@ -234,9 +242,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       </div>
 
       {/* Info banner about adjusted prices */}
-      <div className="mb-4 p-2 bg-blue-900/20 border border-blue-900/50 rounded text-xs text-blue-400">
-        ℹ️ Prices are adjusted for stock splits and dividends
-      </div>
+      {hasSplits && (
+        <div className="mb-4 p-2 bg-blue-900/20 border border-blue-900/50 rounded text-xs text-blue-400">
+          ℹ️ Historical prices are adjusted for stock splits
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-[300px]">
@@ -254,7 +264,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             <YAxis 
               stroke="#9CA3AF"
               tick={{ fill: '#9CA3AF', fontSize: 12 }}
-              domain={['dataMin - 5', 'dataMax + 5']}
+              domain={['dataMin * 0.95', 'dataMax * 1.05']}
             />
             <Tooltip 
               content={<CustomTooltip />}
