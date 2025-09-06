@@ -79,12 +79,13 @@ export const getCompanyOverview = async (symbol: string) => {
   }
 };
 
+// ✅ FIXED: Now using TIME_SERIES_DAILY_ADJUSTED for split-adjusted prices
 export const getDailyPrices = async (symbol: string, outputsize: string = 'compact') => {
   checkRateLimit();
   try {
     const response = await axios.get(BASE_URL, {
       params: {
-        function: 'TIME_SERIES_DAILY',
+        function: 'TIME_SERIES_DAILY_ADJUSTED', // ✅ CHANGED FROM TIME_SERIES_DAILY
         symbol,
         apikey: API_KEY,
         outputsize: outputsize
@@ -94,11 +95,14 @@ export const getDailyPrices = async (symbol: string, outputsize: string = 'compa
     const timeSeries = response.data['Time Series (Daily)'] || {};
     return Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
       date,
-      open: values['1. open'],
-      high: values['2. high'],
-      low: values['3. low'],
-      close: values['4. close'],
-      volume: values['5. volume']
+      open: parseFloat(values['1. open']),
+      high: parseFloat(values['2. high']),
+      low: parseFloat(values['3. low']),
+      close: parseFloat(values['4. close']),
+      adjustedClose: parseFloat(values['5. adjusted close']), // ✅ NEW FIELD
+      volume: parseInt(values['6. volume']), // ✅ CHANGED FROM 5 to 6
+      dividendAmount: parseFloat(values['7. dividend amount']), // ✅ NEW FIELD
+      splitCoefficient: parseFloat(values['8. split coefficient']) // ✅ NEW FIELD
     }));
   } catch (error) {
     console.error('Daily prices error:', error);
@@ -106,6 +110,7 @@ export const getDailyPrices = async (symbol: string, outputsize: string = 'compa
   }
 };
 
+// ✅ FIXED: Intraday with adjusted parameter
 export const getIntradayPrices = async (symbol: string, interval: string = '5min') => {
   checkRateLimit();
   try {
@@ -115,18 +120,19 @@ export const getIntradayPrices = async (symbol: string, interval: string = '5min
         symbol,
         interval,
         apikey: API_KEY,
-        outputsize: 'full'
+        outputsize: 'full',
+        adjusted: 'true' // ✅ NEW PARAMETER for split adjustment
       }
     });
     
     const timeSeries = response.data[`Time Series (${interval})`] || {};
     return Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
       date,
-      open: values['1. open'],
-      high: values['2. high'],
-      low: values['3. low'],
-      close: values['4. close'],
-      volume: values['5. volume']
+      open: parseFloat(values['1. open']),
+      high: parseFloat(values['2. high']),
+      low: parseFloat(values['3. low']),
+      close: parseFloat(values['4. close']),
+      volume: parseInt(values['5. volume'])
     }));
   } catch (error) {
     console.error('Intraday prices error:', error);
@@ -134,25 +140,28 @@ export const getIntradayPrices = async (symbol: string, interval: string = '5min
   }
 };
 
+// ✅ FIXED: Weekly adjusted prices
 export const getWeeklyPrices = async (symbol: string) => {
   checkRateLimit();
   try {
     const response = await axios.get(BASE_URL, {
       params: {
-        function: 'TIME_SERIES_WEEKLY',
+        function: 'TIME_SERIES_WEEKLY_ADJUSTED', // ✅ CHANGED FROM TIME_SERIES_WEEKLY
         symbol,
         apikey: API_KEY
       }
     });
     
-    const timeSeries = response.data['Weekly Time Series'] || {};
+    const timeSeries = response.data['Weekly Adjusted Time Series'] || {}; // ✅ CHANGED KEY NAME
     return Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
       date,
-      open: values['1. open'],
-      high: values['2. high'],
-      low: values['3. low'],
-      close: values['4. close'],
-      volume: values['5. volume']
+      open: parseFloat(values['1. open']),
+      high: parseFloat(values['2. high']),
+      low: parseFloat(values['3. low']),
+      close: parseFloat(values['4. close']),
+      adjustedClose: parseFloat(values['5. adjusted close']), // ✅ NEW FIELD
+      volume: parseInt(values['6. volume']), // ✅ CHANGED FROM 5 to 6
+      dividendAmount: parseFloat(values['7. dividend amount']) // ✅ NEW FIELD
     }));
   } catch (error) {
     console.error('Weekly prices error:', error);
@@ -160,25 +169,28 @@ export const getWeeklyPrices = async (symbol: string) => {
   }
 };
 
+// ✅ FIXED: Monthly adjusted prices
 export const getMonthlyPrices = async (symbol: string) => {
   checkRateLimit();
   try {
     const response = await axios.get(BASE_URL, {
       params: {
-        function: 'TIME_SERIES_MONTHLY',
+        function: 'TIME_SERIES_MONTHLY_ADJUSTED', // ✅ CHANGED FROM TIME_SERIES_MONTHLY
         symbol,
         apikey: API_KEY
       }
     });
     
-    const timeSeries = response.data['Monthly Time Series'] || {};
+    const timeSeries = response.data['Monthly Adjusted Time Series'] || {}; // ✅ CHANGED KEY NAME
     return Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
       date,
-      open: values['1. open'],
-      high: values['2. high'],
-      low: values['3. low'],
-      close: values['4. close'],
-      volume: values['5. volume']
+      open: parseFloat(values['1. open']),
+      high: parseFloat(values['2. high']),
+      low: parseFloat(values['3. low']),
+      close: parseFloat(values['4. close']),
+      adjustedClose: parseFloat(values['5. adjusted close']), // ✅ NEW FIELD
+      volume: parseInt(values['6. volume']), // ✅ CHANGED FROM 5 to 6
+      dividendAmount: parseFloat(values['7. dividend amount']) // ✅ NEW FIELD
     }));
   } catch (error) {
     console.error('Monthly prices error:', error);
@@ -216,6 +228,30 @@ export const getNews = async () => {
     return response.data.feed || [];
   } catch (error) {
     console.error('News error:', error);
+    return [];
+  }
+};
+
+// ✅ NEW FUNCTION: Get stock splits history
+export const getStockSplits = async (symbol: string) => {
+  checkRateLimit();
+  try {
+    const response = await axios.get(BASE_URL, {
+      params: {
+        function: 'SPLITS',
+        symbol,
+        apikey: API_KEY
+      }
+    });
+    
+    const data = response.data.data || [];
+    return data.map((split: any) => ({
+      date: split.split_date,
+      ratio: split.split_ratio,
+      symbol: split.symbol
+    }));
+  } catch (error) {
+    console.error('Splits error:', error);
     return [];
   }
 };
