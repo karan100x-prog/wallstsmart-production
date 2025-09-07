@@ -46,7 +46,7 @@ function HomePage() {
             <span className="text-green-500"> Made Simple</span>
           </h1>
           <p className="text-xl text-gray-400 mb-8">
-            Real-time data powered by Premium Alpha Vantage API
+            Smarter Decision Smarter Returns
           </p>
         </div>
 
