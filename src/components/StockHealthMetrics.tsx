@@ -1,4 +1,4 @@
-// StockHealthMetrics.tsx - Enhanced Version
+// StockHealthMetrics.tsx - Fixed Version
 import React, { useEffect, useState } from 'react';
 import metricsCalculator from '../services/metricsCalculator';
 import { 
@@ -17,7 +17,6 @@ interface MetricCardProps {
   value: string | number;
   maxValue?: number;
   interpretation?: string;
-  color?: string;
   showProgress?: boolean;
   benchmark?: string;
 }
@@ -28,7 +27,6 @@ const MetricCard: React.FC<MetricCardProps> = ({
   value, 
   maxValue = 10, 
   interpretation, 
-  color = 'blue',
   showProgress = false,
   benchmark
 }) => {
@@ -151,7 +149,6 @@ const GaugeChart: React.FC<{ value: number; title: string }> = ({ value, title }
 export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => {
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [industryAvg, setIndustryAvg] = useState<any>(null);
 
   useEffect(() => {
@@ -241,7 +238,7 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-white">
-            🏥 Advanced Financial Health Metrics
+            Advanced Financial Health Metrics
           </h3>
           <div className="text-sm text-gray-400">
             Industry: {metrics?.industry || 'N/A'}
@@ -336,7 +333,7 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
       {industryAvg && (
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
           <h3 className="text-xl font-bold text-white mb-4">
-            📊 Industry Comparison
+            Industry Comparison
           </h3>
           <div className="space-y-4">
             {Object.keys(industryAvg).map(key => {
