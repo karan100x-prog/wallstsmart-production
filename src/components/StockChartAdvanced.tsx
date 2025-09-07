@@ -1,236 +1,202 @@
+// StockChartAdvanced.tsx - Updated with correct time ranges
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getIntradayPrices, getDailyPrices, getWeeklyPrices, getMonthlyPrices } from '../services/alphaVantage';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  Legend
+} from 'recharts';
 
 interface StockChartAdvancedProps {
   symbol: string;
 }
 
-type TimeRange = '7D' | '1M' | '6M' | '1Y' | '3Y' | '5Y' | '10Y' | 'MAX';
-
-// Stock split data for major companies
-const STOCK_SPLITS: Record<string, Array<{date: string, ratio: number}>> = {
-  'NVDA': [
-    { date: '2024-06-10', ratio: 10 },  // 10-for-1 split
-    { date: '2021-07-20', ratio: 4 },   // 4-for-1 split
-    { date: '2007-09-11', ratio: 1.5 }, // 3-for-2 split
-    { date: '2006-04-07', ratio: 2 },   // 2-for-1 split
-    { date: '2001-09-17', ratio: 2 },   // 2-for-1 split
-    { date: '2000-06-27', ratio: 2 },   // 2-for-1 split
-  ],
-  'AAPL': [
-    { date: '2020-08-31', ratio: 4 },   // 4-for-1 split
-    { date: '2014-06-09', ratio: 7 },   // 7-for-1 split
-    { date: '2005-02-28', ratio: 2 },   // 2-for-1 split
-    { date: '2000-06-21', ratio: 2 },   // 2-for-1 split
-    { date: '1987-06-16', ratio: 2 },   // 2-for-1 split
-  ],
-  'TSLA': [
-    { date: '2022-08-25', ratio: 3 },   // 3-for-1 split
-    { date: '2020-08-31', ratio: 5 },   // 5-for-1 split
-  ],
-  'AMZN': [
-    { date: '2022-06-06', ratio: 20 },  // 20-for-1 split
-    { date: '1999-09-02', ratio: 2 },   // 2-for-1 split
-    { date: '1999-01-05', ratio: 3 },   // 3-for-1 split
-    { date: '1998-06-02', ratio: 2 },   // 2-for-1 split
-  ],
-  'GOOGL': [
-    { date: '2022-07-18', ratio: 20 },  // 20-for-1 split
-    { date: '2014-04-03', ratio: 2 },   // 2-for-1 split
-  ],
-  'GOOG': [
-    { date: '2022-07-18', ratio: 20 },  // 20-for-1 split
-    { date: '2014-04-03', ratio: 2 },   // 2-for-1 split
-  ],
-  'MSFT': [
-    { date: '2003-02-18', ratio: 2 },   // 2-for-1 split
-    { date: '1999-03-29', ratio: 2 },   // 2-for-1 split
-    { date: '1998-02-23', ratio: 2 },   // 2-for-1 split
-    { date: '1996-12-09', ratio: 2 },   // 2-for-1 split
-  ],
-  'META': [
-    // No splits for META/Facebook
-  ],
-  'NFLX': [
-    { date: '2015-07-15', ratio: 7 },   // 7-for-1 split
-    { date: '2004-02-12', ratio: 2 },   // 2-for-1 split
-  ]
-};
-
-// Function to manually adjust prices for splits
-function adjustPricesForSplits(data: any[], symbol: string): any[] {
-  const splits = STOCK_SPLITS[symbol.toUpperCase()];
-  
-  // If no splits defined, return original data
-  if (!splits || splits.length === 0) {
-    return data;
-  }
-
-  console.log(`Adjusting splits for ${symbol}`, splits);
-
-  return data.map((item, index) => {
-    const itemDate = new Date(item.date);
-    let adjustmentFactor = 1;
-
-    // Calculate cumulative adjustment factor for all splits after this date
-    for (const split of splits) {
-      const splitDate = new Date(split.date);
-      if (splitDate > itemDate) {
-        adjustmentFactor *= split.ratio;
-      }
-    }
-
-    // Always use close price and manually adjust it
-    const closePrice = parseFloat(item.close) || 0;
-    const adjustedPrice = closePrice / adjustmentFactor;
-
-    // Log first few adjustments for debugging
-    if (index < 3 && adjustmentFactor > 1) {
-      console.log(`Date: ${item.date}, Close: ${closePrice}, Factor: ${adjustmentFactor}, Adjusted: ${adjustedPrice}`);
-    }
-
-    return {
-      ...item,
-      close: closePrice,
-      adjustedClose: adjustedPrice,
-      adjustmentFactor: adjustmentFactor,
-      isAdjusted: adjustmentFactor > 1
-    };
-  });
+interface ChartDataPoint {
+  date: string;
+  price: number;
+  volume: number;
+  sma50?: number;
 }
 
+type TimeRange = '7D' | '1M' | '6M' | '1Y' | '3Y' | '5Y' | '10Y' | 'MAX';
+
 const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
-  const [selectedRange, setSelectedRange] = useState<TimeRange>('1M');
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<TimeRange>('6M');
+  
+  // Toggle states
+  const [showVolume, setShowVolume] = useState(true);
+  const [showSMA50, setShowSMA50] = useState(false);
 
   useEffect(() => {
-    loadChartData(selectedRange);
-  }, [symbol, selectedRange]);
+    loadChartData();
+  }, [symbol, timeRange]);
 
-  const loadChartData = async (range: TimeRange) => {
+  useEffect(() => {
+    if (showSMA50 && chartData.length > 0) {
+      loadSMA50();
+    }
+  }, [showSMA50]);
+
+  const loadChartData = async () => {
     setLoading(true);
-    let data: any[] = [];
-    
     try {
-      switch (range) {
-        case '7D':
-          // Use intraday data for 7 days
-          data = await getIntradayPrices(symbol, '30min');
-          data = data.slice(0, 56); // 7 days * 8 data points per day
-          break;
+      const response = await fetch(
+        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=NMSRS0ZDIOWF3CLL`
+      );
+      const data = await response.json();
+      
+      if (data?.['Time Series (Daily)']) {
+        const timeSeries = data['Time Series (Daily)'];
+        const dates = Object.keys(timeSeries).reverse();
         
-        case '1M':
-          // Daily data for 1 month
-          data = await getDailyPrices(symbol);
-          data = data.slice(0, 30);
-          break;
+        // Calculate days to show based on time range
+        const rangeMap: Record<TimeRange, number> = {
+          '7D': 7,
+          '1M': 30,
+          '6M': 180,
+          '1Y': 365,
+          '3Y': 365 * 3,
+          '5Y': 365 * 5,
+          '10Y': 365 * 10,
+          'MAX': dates.length
+        };
         
-        case '6M':
-          // Daily data for 6 months
-          data = await getDailyPrices(symbol);
-          data = data.slice(0, 180);
-          break;
+        const daysToShow = rangeMap[timeRange];
+        const filteredDates = dates.slice(-daysToShow);
         
-        case '1Y':
-          // Weekly data for 1 year
-          data = await getWeeklyPrices(symbol);
-          data = data.slice(0, 52);
-          break;
+        const formattedData = filteredDates.map(date => ({
+          date: formatDate(date, timeRange),
+          fullDate: date,
+          price: parseFloat(timeSeries[date]['4. close']),
+          volume: parseInt(timeSeries[date]['5. volume'])
+        }));
         
-        case '3Y':
-          // Weekly data for 3 years
-          data = await getWeeklyPrices(symbol);
-          data = data.slice(0, 156);
-          break;
-        
-        case '5Y':
-          // Monthly data for 5 years
-          data = await getMonthlyPrices(symbol);
-          data = data.slice(0, 60);
-          break;
-        
-        case '10Y':
-          // Monthly data for 10 years
-          data = await getMonthlyPrices(symbol);
-          data = data.slice(0, 120);
-          break;
-        
-        case 'MAX':
-          // All available monthly data
-          data = await getMonthlyPrices(symbol);
-          break;
+        setChartData(formattedData);
       }
-      
-      // Apply manual split adjustments - CRITICAL FIX
-      data = adjustPricesForSplits(data, symbol);
-      
-      // Format data for chart - use the adjusted price we calculated
-      const formattedData = data.reverse().map((item) => ({
-        date: formatDate(item.date, range),
-        price: item.adjustedClose, // Use our manually calculated adjusted price
-        originalPrice: item.close,
-        isAdjusted: item.isAdjusted || false
-      }));
-      
-      setChartData(formattedData);
     } catch (error) {
-      console.error('Chart data error:', error);
+      console.error('Error loading chart data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSMA50 = async () => {
+    try {
+      const response = await fetch(
+        `https://www.alphavantage.co/query?function=SMA&symbol=${symbol}&interval=daily&time_period=50&series_type=close&apikey=NMSRS0ZDIOWF3CLL`
+      );
+      const data = await response.json();
+      
+      if (data?.['Technical Analysis: SMA']) {
+        const smaData = data['Technical Analysis: SMA'];
+        
+        // Merge SMA data with existing chart data
+        const updatedChartData = chartData.map(point => {
+          // Match by full date for accuracy
+          const smaValue = smaData[point.fullDate];
+          
+          if (smaValue) {
+            return {
+              ...point,
+              sma50: parseFloat(smaValue.SMA)
+            };
+          }
+          return point;
+        });
+        
+        setChartData(updatedChartData);
+      }
+    } catch (error) {
+      console.error('Error loading SMA 50:', error);
     }
   };
 
   const formatDate = (dateStr: string, range: TimeRange) => {
     const date = new Date(dateStr);
     
+    // Different date formats based on time range
     if (range === '7D' || range === '1M') {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } else if (range === '6M' || range === '1Y') {
-      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } else {
-      return date.toLocaleDateString('en-US', { year: 'numeric' });
+      // For longer ranges, show month and year
+      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
     }
   };
 
-  const timeRanges: TimeRange[] = ['7D', '1M', '6M', '1Y', '3Y', '5Y', '10Y', 'MAX'];
+  const formatVolume = (value: number) => {
+    if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
+    if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
+    if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
+    return value.toString();
+  };
 
-  // Enhanced tooltip to show split adjustment info
   const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload[0]) {
-      const data = payload[0].payload;
+    if (active && payload && payload.length) {
       return (
-        <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
-          <p className="text-gray-400">{label}</p>
-          <p className="text-green-400 font-semibold">
-            ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
-          </p>
-          {data.isAdjusted && (
-            <p className="text-yellow-400 text-xs mt-1">
-              Split-adjusted
+        <div className="bg-gray-900 border border-gray-700 rounded p-3">
+          <p className="text-white font-semibold mb-1">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {
+                entry.name === 'Volume' 
+                  ? formatVolume(entry.value)
+                  : entry.value 
+                  ? `$${entry.value.toFixed(2)}`
+                  : 'N/A'
+              }
             </p>
-          )}
+          ))}
         </div>
       );
     }
     return null;
   };
 
-  // Show split info for known stocks
-  const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  const maxVolume = Math.max(...chartData.map(d => d.volume));
+  const minPrice = Math.min(...chartData.map(d => d.price));
+  const maxPrice = Math.max(...chartData.map(d => d.price));
+  const priceRange = maxPrice - minPrice;
+
+  // Calculate interval for x-axis labels based on time range
+  const getXAxisInterval = () => {
+    const dataPoints = chartData.length;
+    if (timeRange === '7D') return 0;
+    if (timeRange === '1M') return Math.floor(dataPoints / 6);
+    if (timeRange === '6M') return Math.floor(dataPoints / 6);
+    if (timeRange === '1Y') return Math.floor(dataPoints / 12);
+    return Math.floor(dataPoints / 10);
+  };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Price Chart</h2>
-        <div className="flex gap-2">
-          {timeRanges.map((range) => (
+    <div className="space-y-4">
+      {/* Control Panel */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* Time Range Buttons */}
+        <div className="flex gap-1">
+          {(['7D', '1M', '6M', '1Y', '3Y', '5Y', '10Y', 'MAX'] as TimeRange[]).map(range => (
             <button
               key={range}
-              onClick={() => setSelectedRange(range)}
-              className={`px-3 py-1 rounded transition ${
-                selectedRange === range
+              onClick={() => setTimeRange(range)}
+              className={`px-3 py-1 rounded text-sm transition-colors ${
+                timeRange === range
                   ? 'bg-green-600 text-white'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
@@ -239,53 +205,118 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             </button>
           ))}
         </div>
+
+        {/* Indicator Toggles */}
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showVolume}
+              onChange={(e) => setShowVolume(e.target.checked)}
+              className="w-4 h-4 text-green-600 bg-gray-800 border-gray-600 rounded focus:ring-green-500"
+            />
+            <span className="text-sm text-gray-400">Volume</span>
+          </label>
+          
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showSMA50}
+              onChange={(e) => setShowSMA50(e.target.checked)}
+              className="w-4 h-4 text-green-600 bg-gray-800 border-gray-600 rounded focus:ring-green-500"
+            />
+            <span className="text-sm text-gray-400">SMA 50</span>
+          </label>
+        </div>
       </div>
 
-      {/* Info banner about adjusted prices */}
-      {hasSplits && (
-        <div className="mb-4 p-2 bg-blue-900/20 border border-blue-900/50 rounded text-xs text-blue-400">
-          ℹ️ Historical prices are adjusted for stock splits
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex items-center justify-center h-[300px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
+      {/* Main Chart */}
+      <div className="h-96">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="date" 
+            <XAxis
+              dataKey="date"
               stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
+              tick={{ fontSize: 12 }}
+              interval={getXAxisInterval()}
             />
-            <YAxis 
+            <YAxis
+              yAxisId="price"
+              domain={[minPrice - priceRange * 0.1, maxPrice + priceRange * 0.1]}
               stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
-              domain={['dataMin * 0.95', 'dataMax * 1.05']}
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => `$${value.toFixed(0)}`}
             />
-            <Tooltip 
-              content={<CustomTooltip />}
-              contentStyle={{ 
-                backgroundColor: '#1F2937', 
-                border: '1px solid #374151',
-                borderRadius: '0.5rem'
-              }}
-              labelStyle={{ color: '#9CA3AF' }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="price" 
-              stroke="#10B981" 
+            {showVolume && (
+              <YAxis
+                yAxisId="volume"
+                orientation="right"
+                stroke="#9CA3AF"
+                tick={{ fontSize: 12 }}
+                tickFormatter={formatVolume}
+                domain={[0, maxVolume * 1.2]}
+              />
+            )}
+            <Tooltip content={<CustomTooltip />} />
+            <Legend />
+            
+            {/* Volume Bars */}
+            {showVolume && (
+              <Bar
+                yAxisId="volume"
+                dataKey="volume"
+                fill="#4B5563"
+                opacity={0.3}
+                name="Volume"
+              />
+            )}
+            
+            {/* Price Line */}
+            <Line
+              yAxisId="price"
+              type="monotone"
+              dataKey="price"
+              stroke="#10B981"
               strokeWidth={2}
               dot={false}
-              activeDot={{ r: 6 }}
+              name="Price"
+              animationDuration={500}
             />
-          </LineChart>
+            
+            {/* SMA 50 */}
+            {showSMA50 && (
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="sma50"
+                stroke="#F59E0B"
+                strokeWidth={1.5}
+                dot={false}
+                name="SMA 50"
+                strokeDasharray="5 5"
+              />
+            )}
+          </ComposedChart>
         </ResponsiveContainer>
-      )}
+      </div>
+
+      {/* Chart Info Footer */}
+      <div className="flex justify-between text-xs text-gray-400 px-2">
+        <div>
+          Latest: ${chartData[chartData.length - 1]?.price.toFixed(2)}
+        </div>
+        {showSMA50 && chartData[chartData.length - 1]?.sma50 && (
+          <div>
+            SMA 50: ${chartData[chartData.length - 1].sma50.toFixed(2)}
+          </div>
+        )}
+        {showVolume && (
+          <div>
+            Volume: {formatVolume(chartData[chartData.length - 1]?.volume || 0)}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
