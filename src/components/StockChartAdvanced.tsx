@@ -398,8 +398,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             <Tooltip content={<CustomTooltip />} />
             <Legend />
             
-            {/* Stock Split Markers */}
-            {showSplits && visibleSplits.map((split, index) => (
+            {/* Stock Split Markers - Always visible */}
+            {visibleSplits.map((split, index) => (
               <ReferenceLine
                 key={index}
                 x={formatDate(split.date, timeRange)}
@@ -413,22 +413,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                 }}
               />
             ))}
-            
-            {/* Dividend Markers - Show as dots on the price line */}
-            {showDividends && displayData.map((point, index) => {
-              if (point.dividend && point.dividend > 0) {
-                return (
-                  <ReferenceLine
-                    key={`div-${index}`}
-                    x={point.date}
-                    stroke="#3B82F6"
-                    strokeDasharray="2 2"
-                    strokeWidth={1}
-                  />
-                );
-              }
-              return null;
-            })}
             
             {/* Volume Bars */}
             {showVolume && (
