@@ -46,7 +46,7 @@ function HomePage() {
             <span className="text-green-500"> Made Simple</span>
           </h1>
           <p className="text-xl text-gray-400 mb-8">
-            Smarter Decision Smarter Returns
+            Smarter Decision. Smarter Returns.
           </p>
         </div>
 
