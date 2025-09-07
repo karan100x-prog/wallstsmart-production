@@ -123,7 +123,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     return num.toFixed(2);
   };
 
-  const formatMoney = (value: any) => {
+  //const formatMoney = (value: any) => {
     const num = parseFloat(value);
     if (isNaN(num) || num === 0) return 'N/A';
     return `$${formatLargeNumber(num)}`;
@@ -135,7 +135,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     return `$${num.toFixed(2)}`;
   };
 
-  const formatPercent = (value: any) => {
+  //const formatPercent = (value: any) => {
     const num = parseFloat(value);
     if (isNaN(num) || num === 0) return 'N/A';
     return `${(num * 100).toFixed(2)}%`;
