@@ -211,6 +211,10 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
           </div>
         </div>
 
+{/* Add this after your existing Valuation Metrics section */}
+<StockHealthMetrics symbol={symbol} />
+
+        
         {/* RIGHT SIDE: Analyst Targets */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Analyst Targets</h3>
