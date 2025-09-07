@@ -123,7 +123,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     return num.toFixed(2);
   };
 
-  //const formatMoney = (value: any) => {
+  const formatMoney = (value: any) => {
     const num = parseFloat(value);
     if (isNaN(num) || num === 0) return 'N/A';
     return `$${formatLargeNumber(num)}`;
@@ -135,7 +135,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     return `$${num.toFixed(2)}`;
   };
 
-  //const formatPercent = (value: any) => {
+  const formatPercent = (value: any) => {
     const num = parseFloat(value);
     if (isNaN(num) || num === 0) return 'N/A';
     return `${(num * 100).toFixed(2)}%`;
@@ -168,15 +168,56 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
       {/* Advanced Health Metrics */}
       <StockHealthMetrics symbol={symbol} />
 
-      {/* Valuation & Analyst Targets - Keep your existing code */}
+      {/* Valuation & Analyst Targets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Valuation Metrics</h3>
-          {/* Your existing valuation metrics */}
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Market Cap</span>
+              <span className="text-lg font-semibold">{formatMoney(company?.MarketCapitalization)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">P/E Ratio</span>
+              <span className="text-lg font-semibold">{company?.PERatio || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">PEG Ratio</span>
+              <span className="text-lg font-semibold">{company?.PEGRatio || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Book Value</span>
+              <span className="text-lg font-semibold">{formatCurrency(company?.BookValue)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Dividend Yield</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.DividendYield)}</span>
+            </div>
+          </div>
         </div>
+
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Analyst Targets</h3>
-          {/* Your existing analyst targets */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Target Price</span>
+              <span className="text-2xl font-bold text-green-500">
+                {formatCurrency(company?.AnalystTargetPrice)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">52 Week High</span>
+              <span className="text-lg font-semibold">{formatCurrency(company?.['52WeekHigh'])}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">52 Week Low</span>
+              <span className="text-lg font-semibold">{formatCurrency(company?.['52WeekLow'])}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Beta</span>
+              <span className="text-lg font-semibold">{company?.Beta || 'N/A'}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -218,15 +259,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
                           <span className={`text-sm font-medium ${getSentimentColor(article.sentiment_label, article.sentiment_score)}`}>
                             {article.sentiment_score > 0 ? '+' : ''}{article.sentiment_score.toFixed(2)}
                           </span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            article.sentiment_label === 'Bullish' 
-                              ? 'bg-green-900/30 text-green-400' 
-                              : article.sentiment_label === 'Bearish'
-                              ? 'bg-red-900/30 text-red-400'
-                              : 'bg-gray-700 text-gray-400'
-                          }`}>
-                            {article.sentiment_label}
-                          </span>
                         </div>
                       </div>
                       <h4 className="text-white font-semibold mb-2 leading-tight">
@@ -237,10 +269,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
                           {article.summary.substring(0, 200)}...
                         </p>
                       )}
-                      <div className="flex items-center gap-4 text-xs text-gray-400">
-                        <span>Relevance: {(article.relevance * 100).toFixed(0)}%</span>
-                        <span>Impact: {article.overall_sentiment_score > 0.5 ? 'High' : article.overall_sentiment_score > 0.2 ? 'Medium' : 'Low'}</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -253,24 +281,12 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
             )}
           </div>
         )}
-
-        {newsData.length > 0 && (
-          <div className="text-center mt-6">
-            <button 
-              onClick={loadNewsData}
-              className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition flex items-center gap-2 mx-auto"
-            >
-              <TrendingUp className="w-4 h-4" />
-              Refresh News
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Trading Metrics */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
         <h3 className="text-xl font-bold mb-4">Trading Metrics</h3>
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="flex justify-between">
             <span className="text-gray-400 text-sm">Volume</span>
             <span className="text-lg font-semibold">{formatLargeNumber(volume)}</span>
@@ -278,10 +294,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
           <div className="flex justify-between">
             <span className="text-gray-400 text-sm">50 Day MA</span>
             <span className="text-lg font-semibold">{formatCurrency(company?.['50DayMovingAverage'])}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400 text-sm">200 Day MA</span>
-            <span className="text-lg font-semibold">{formatCurrency(company?.['200DayMovingAverage'])}</span>
           </div>
         </div>
       </div>
