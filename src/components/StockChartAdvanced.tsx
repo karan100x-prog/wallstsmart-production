@@ -1,4 +1,4 @@
-// StockChartAdvanced.tsx - Fixed version
+// StockChartAdvanced.tsx - Split-Adjusted Version
 import React, { useState, useEffect } from 'react';
 import {
   XAxis,
@@ -9,7 +9,8 @@ import {
   ComposedChart,
   Bar,
   Line,
-  Legend
+  Legend,
+  ReferenceLine
 } from 'recharts';
 
 interface StockChartAdvancedProps {
@@ -20,36 +21,50 @@ interface ChartDataPoint {
   date: string;
   fullDate: string;
   price: number;
+  adjustedClose: number;
   volume: number;
   sma50?: number;
+  splitCoefficient?: number;
+  dividend?: number;
+}
+
+interface SplitEvent {
+  date: string;
+  ratio: string;
 }
 
 type TimeRange = '7D' | '1M' | '6M' | '1Y' | '3Y' | '5Y' | '10Y' | 'MAX';
 
 const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [splitEvents, setSplitEvents] = useState<SplitEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('6M');
+  const [useAdjusted, setUseAdjusted] = useState(true); // Toggle for adjusted vs raw prices
   
   // Toggle states
   const [showVolume, setShowVolume] = useState(true);
   const [showSMA50, setShowSMA50] = useState(false);
+  const [showSplits, setShowSplits] = useState(true);
+  const [showDividends, setShowDividends] = useState(false);
 
   useEffect(() => {
     loadChartData();
+    loadSplitData();
   }, [symbol, timeRange]);
 
   useEffect(() => {
     if (showSMA50 && chartData.length > 0) {
       loadSMA50();
     }
-  }, [showSMA50]);
+  }, [showSMA50, useAdjusted]);
 
   const loadChartData = async () => {
     setLoading(true);
     try {
+      // Use TIME_SERIES_DAILY_ADJUSTED for split-adjusted data
       const response = await fetch(
-        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=NMSRS0ZDIOWF3CLL`
+        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${symbol}&outputsize=full&apikey=NMSRS0ZDIOWF3CLL`
       );
       const data = await response.json();
       
@@ -75,8 +90,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         const formattedData = filteredDates.map(date => ({
           date: formatDate(date, timeRange),
           fullDate: date,
-          price: parseFloat(timeSeries[date]['4. close']),
-          volume: parseInt(timeSeries[date]['5. volume'])
+          price: parseFloat(timeSeries[date]['4. close']), // Raw close price
+          adjustedClose: parseFloat(timeSeries[date]['5. adjusted close']), // Split-adjusted close
+          volume: parseInt(timeSeries[date]['6. volume']),
+          splitCoefficient: parseFloat(timeSeries[date]['8. split coefficient']),
+          dividend: parseFloat(timeSeries[date]['7. dividend amount'])
         }));
         
         setChartData(formattedData);
@@ -85,6 +103,24 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       console.error('Error loading chart data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSplitData = async () => {
+    try {
+      const response = await fetch(
+        `https://www.alphavantage.co/query?function=SPLITS&symbol=${symbol}&apikey=NMSRS0ZDIOWF3CLL`
+      );
+      const data = await response.json();
+      
+      if (data?.data && Array.isArray(data.data)) {
+        setSplitEvents(data.data.map((split: any) => ({
+          date: split.effective_date,
+          ratio: split.split_ratio
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading split data:', error);
     }
   };
 
@@ -100,13 +136,16 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         
         // Merge SMA data with existing chart data
         const updatedChartData = chartData.map(point => {
-          // Match by full date for accuracy
           const smaValue = smaData[point.fullDate];
           
           if (smaValue) {
+            // If using adjusted prices, we need to adjust the SMA as well
+            const sma = parseFloat(smaValue.SMA);
+            const adjustmentRatio = useAdjusted ? (point.adjustedClose / point.price) : 1;
+            
             return {
               ...point,
-              sma50: parseFloat(smaValue.SMA)
+              sma50: sma * adjustmentRatio
             };
           }
           return point;
@@ -122,13 +161,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const formatDate = (dateStr: string, range: TimeRange) => {
     const date = new Date(dateStr);
     
-    // Different date formats based on time range
     if (range === '7D' || range === '1M') {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } else if (range === '6M' || range === '1Y') {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } else {
-      // For longer ranges, show month and year
       return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
     }
   };
@@ -142,20 +179,51 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const dataPoint = chartData.find(d => d.date === label);
+      const splitEvent = splitEvents.find(s => formatDate(s.date, timeRange) === label);
+      
       return (
         <div className="bg-gray-900 border border-gray-700 rounded p-3">
           <p className="text-white font-semibold mb-1">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {
-                entry.name === 'Volume' 
-                  ? formatVolume(entry.value)
-                  : entry.value 
-                  ? `$${entry.value.toFixed(2)}`
-                  : 'N/A'
-              }
-            </p>
-          ))}
+          
+          {payload.map((entry: any, index: number) => {
+            if (entry.dataKey === 'displayPrice' || entry.dataKey === 'sma50') {
+              return (
+                <p key={index} className="text-sm" style={{ color: entry.color }}>
+                  {entry.name}: ${entry.value?.toFixed(2) || 'N/A'}
+                </p>
+              );
+            } else if (entry.dataKey === 'volume') {
+              return (
+                <p key={index} className="text-sm" style={{ color: entry.color }}>
+                  {entry.name}: {formatVolume(entry.value)}
+                </p>
+              );
+            }
+            return null;
+          })}
+          
+          {/* Show both raw and adjusted prices if different */}
+          {dataPoint && Math.abs(dataPoint.price - dataPoint.adjustedClose) > 0.01 && (
+            <div className="mt-2 pt-2 border-t border-gray-700">
+              <p className="text-xs text-gray-400">Raw Close: ${dataPoint.price.toFixed(2)}</p>
+              <p className="text-xs text-gray-400">Adjusted: ${dataPoint.adjustedClose.toFixed(2)}</p>
+            </div>
+          )}
+          
+          {/* Show split info if on split date */}
+          {splitEvent && (
+            <div className="mt-2 pt-2 border-t border-gray-700">
+              <p className="text-xs text-yellow-400">🔄 Stock Split: {splitEvent.ratio}</p>
+            </div>
+          )}
+          
+          {/* Show dividend if present */}
+          {dataPoint && dataPoint.dividend > 0 && (
+            <div className="mt-1">
+              <p className="text-xs text-blue-400">💰 Dividend: ${dataPoint.dividend.toFixed(2)}</p>
+            </div>
+          )}
         </div>
       );
     }
@@ -178,12 +246,25 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     );
   }
 
-  const maxVolume = Math.max(...chartData.map(d => d.volume));
-  const minPrice = Math.min(...chartData.map(d => d.price));
-  const maxPrice = Math.max(...chartData.map(d => d.price));
-  const priceRange = maxPrice - minPrice;
+  // Use adjusted or raw prices based on toggle
+  const displayData = chartData.map(point => ({
+    ...point,
+    displayPrice: useAdjusted ? point.adjustedClose : point.price
+  }));
 
-  // Calculate interval for x-axis labels based on time range
+  const prices = displayData.map(d => d.displayPrice);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const priceRange = maxPrice - minPrice;
+  const maxVolume = Math.max(...chartData.map(d => d.volume));
+
+  // Filter splits to show only those in current time range
+  const visibleSplits = splitEvents.filter(split => {
+    const splitDate = new Date(split.date);
+    const firstDataDate = new Date(chartData[0]?.fullDate);
+    return splitDate >= firstDataDate;
+  });
+
   const getXAxisInterval = () => {
     const dataPoints = chartData.length;
     if (timeRange === '7D') return 0;
@@ -193,10 +274,36 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     return Math.floor(dataPoints / 10);
   };
 
-  const lastDataPoint = chartData[chartData.length - 1];
+  const lastDataPoint = displayData[displayData.length - 1];
+  const priceChange = lastDataPoint && displayData[0] 
+    ? ((lastDataPoint.displayPrice - displayData[0].displayPrice) / displayData[0].displayPrice * 100)
+    : 0;
 
   return (
     <div className="space-y-4">
+      {/* Header with Price Change */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <span className="text-2xl font-bold text-white">
+            ${lastDataPoint?.displayPrice.toFixed(2)}
+          </span>
+          <span className={`text-sm font-medium ${priceChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}% ({timeRange})
+          </span>
+        </div>
+        
+        {/* Adjusted/Raw Toggle */}
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={useAdjusted}
+            onChange={(e) => setUseAdjusted(e.target.checked)}
+            className="w-4 h-4 text-green-600 bg-gray-800 border-gray-600 rounded focus:ring-green-500"
+          />
+          <span className="text-sm text-gray-400">Split-Adjusted</span>
+        </label>
+      </div>
+
       {/* Control Panel */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Time Range Buttons */}
@@ -237,13 +344,33 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             />
             <span className="text-sm text-gray-400">SMA 50</span>
           </label>
+          
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showSplits}
+              onChange={(e) => setShowSplits(e.target.checked)}
+              className="w-4 h-4 text-green-600 bg-gray-800 border-gray-600 rounded focus:ring-green-500"
+            />
+            <span className="text-sm text-gray-400">Splits</span>
+          </label>
+          
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showDividends}
+              onChange={(e) => setShowDividends(e.target.checked)}
+              className="w-4 h-4 text-green-600 bg-gray-800 border-gray-600 rounded focus:ring-green-500"
+            />
+            <span className="text-sm text-gray-400">Dividends</span>
+          </label>
         </div>
       </div>
 
       {/* Main Chart */}
       <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <ComposedChart data={displayData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
             <XAxis
               dataKey="date"
@@ -271,6 +398,38 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             <Tooltip content={<CustomTooltip />} />
             <Legend />
             
+            {/* Stock Split Markers */}
+            {showSplits && visibleSplits.map((split, index) => (
+              <ReferenceLine
+                key={index}
+                x={formatDate(split.date, timeRange)}
+                stroke="#FBBF24"
+                strokeDasharray="5 5"
+                label={{
+                  value: `Split ${split.ratio}`,
+                  position: 'top',
+                  fill: '#FBBF24',
+                  fontSize: 10
+                }}
+              />
+            ))}
+            
+            {/* Dividend Markers - Show as dots on the price line */}
+            {showDividends && displayData.map((point, index) => {
+              if (point.dividend && point.dividend > 0) {
+                return (
+                  <ReferenceLine
+                    key={`div-${index}`}
+                    x={point.date}
+                    stroke="#3B82F6"
+                    strokeDasharray="2 2"
+                    strokeWidth={1}
+                  />
+                );
+              }
+              return null;
+            })}
+            
             {/* Volume Bars */}
             {showVolume && (
               <Bar
@@ -286,11 +445,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             <Line
               yAxisId="price"
               type="monotone"
-              dataKey="price"
+              dataKey="displayPrice"
               stroke="#10B981"
               strokeWidth={2}
               dot={false}
-              name="Price"
+              name={useAdjusted ? "Adjusted Price" : "Price"}
               animationDuration={500}
             />
             
@@ -312,23 +471,36 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       </div>
 
       {/* Chart Info Footer */}
-      {lastDataPoint && (
-        <div className="flex justify-between text-xs text-gray-400 px-2">
-          <div>
-            Latest: ${lastDataPoint.price.toFixed(2)}
-          </div>
-          {showSMA50 && lastDataPoint.sma50 && (
-            <div>
-              SMA 50: ${lastDataPoint.sma50.toFixed(2)}
-            </div>
-          )}
-          {showVolume && (
-            <div>
-              Volume: {formatVolume(lastDataPoint.volume)}
-            </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-gray-400 px-2">
+        <div>
+          <span className="block text-gray-500">Current Price</span>
+          <span className="text-white">${lastDataPoint?.displayPrice.toFixed(2)}</span>
+          {useAdjusted && lastDataPoint && Math.abs(lastDataPoint.price - lastDataPoint.adjustedClose) > 0.01 && (
+            <span className="block text-gray-500">(Raw: ${lastDataPoint.price.toFixed(2)})</span>
           )}
         </div>
-      )}
+        
+        {showSMA50 && lastDataPoint?.sma50 && (
+          <div>
+            <span className="block text-gray-500">SMA 50</span>
+            <span className="text-yellow-500">${lastDataPoint.sma50.toFixed(2)}</span>
+          </div>
+        )}
+        
+        {showVolume && (
+          <div>
+            <span className="block text-gray-500">Volume</span>
+            <span className="text-white">{formatVolume(lastDataPoint?.volume || 0)}</span>
+          </div>
+        )}
+        
+        {visibleSplits.length > 0 && (
+          <div>
+            <span className="block text-gray-500">Recent Splits</span>
+            <span className="text-yellow-400">{visibleSplits.length} in period</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
