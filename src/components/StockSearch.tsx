@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { searchSymbol, getQuote } from '../services/alphaVantage';
+import { searchStocks, getQuote } from '../services/alphaVantage';
 
 interface SearchResult {
-  '1. symbol': string;
-  '2. name': string;
-  '3. type': string;
-  '4. region': string;
-  '5. marketOpen': string;
-  '6. marketClose': string;
-  '7. timezone': string;
-  '8. currency': string;
-  '9. matchScore': string;
+  symbol: string;
+  name: string;
+  type: string;
+  region: string;
+  currency: string;
 }
 
 interface QuickQuote {
@@ -56,8 +52,8 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
 
     setLoading(true);
     try {
-      const results = await searchSymbol(searchTerm);
-      setSearchResults(results.bestMatches || []);
+      const results = await searchStocks(searchTerm);
+      setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
     } finally {
@@ -99,15 +95,15 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
             {searchResults.map((result, index) => (
               <div
                 key={index}
-                onClick={() => handleSelectStock(result['1. symbol'])}
+                onClick={() => handleSelectStock(result.symbol)}
                 className="px-4 py-3 hover:bg-gray-700 cursor-pointer border-b border-gray-700 last:border-0"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <span className="font-semibold text-white">{result['1. symbol']}</span>
-                    <span className="ml-2 text-gray-400 text-sm">{result['2. name']}</span>
+                    <span className="font-semibold text-white">{result.symbol}</span>
+                    <span className="ml-2 text-gray-400 text-sm">{result.name}</span>
                   </div>
-                  <span className="text-gray-500 text-sm">{result['3. type']}</span>
+                  <span className="text-gray-500 text-sm">{result.type}</span>
                 </div>
               </div>
             ))}
