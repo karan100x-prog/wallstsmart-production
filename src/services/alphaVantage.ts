@@ -308,3 +308,41 @@ export const getStockSplits = async (symbol: string) => {
     return [];
   }
 };
+
+// Add these functions to your existing alphaVantage.ts file
+
+export const fetchIncomeStatement = async (symbol: string) => {
+  const url = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY}`;
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching income statement:', error);
+    return null;
+  }
+};
+
+export const fetchBalanceSheet = async (symbol: string) => {
+  const url = `https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=${symbol}&apikey=${API_KEY}`;
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching balance sheet:', error);
+    return null;
+  }
+};
+
+export const fetchCashFlow = async (symbol: string) => {
+  const url = `https://www.alphavantage.co/query?function=CASH_FLOW&symbol=${symbol}&apikey=${API_KEY}`;
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching cash flow:', error);
+    return null;
+  }
+};
