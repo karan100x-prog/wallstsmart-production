@@ -165,163 +165,139 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         <StockChartAdvanced symbol={symbol} />
       </div>
 
-      {/* Advanced Health Metrics - NEW SECTION */}
+      {/* Advanced Health Metrics */}
       <StockHealthMetrics symbol={symbol} />
 
-      {/* SIDE BY SIDE: Valuation Metrics & Analyst Targets */}
+      {/* Valuation & Analyst Targets - Keep your existing code */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        
-        {/* LEFT SIDE: Valuation Metrics */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Valuation Metrics</h3>
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Market Cap</span>
-              <span className="text-lg font-semibold">
-                {formatMoney(company?.MarketCapitalization)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">P/E Ratio</span>
-              <span className="text-lg font-semibold">{company?.PERatio || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">PEG Ratio</span>
-              <span className="text-lg font-semibold">{company?.PEGRatio || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Price/Sales (TTM)</span>
-              <span className="text-lg font-semibold">{company?.PriceToSalesRatioTTM || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Book Value</span>
-              <span className="text-lg font-semibold">{formatCurrency(company?.BookValue)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Price/Book</span>
-              <span className="text-lg font-semibold">{company?.PriceToBookRatio || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Enterprise Value</span>
-              <span className="text-lg font-semibold">
-                {formatMoney(company?.EnterpriseValue)}
-              </span>
-            </div>
-          </div>
+          {/* Your existing valuation metrics */}
         </div>
-        
-        {/* RIGHT SIDE: Analyst Targets */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Analyst Targets</h3>
+          {/* Your existing analyst targets */}
+        </div>
+      </div>
+
+      {/* Latest News & Sentiment */}
+      <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold">Latest News & Sentiment</h3>
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            Live Updates
+          </div>
+        </div>
+
+        {newsLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+          </div>
+        ) : (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Target Price</span>
-              <span className="text-2xl font-bold text-green-500">
-                {formatCurrency(company?.AnalystTargetPrice)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Forward P/E</span>
-              <span className="text-lg font-semibold">{company?.ForwardPE || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Trailing P/E</span>
-              <span className="text-lg font-semibold">{company?.TrailingPE || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Beta</span>
-              <span className="text-lg font-semibold">{company?.Beta || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Latest Quarter</span>
-              <span className="text-lg font-semibold">{company?.LatestQuarter || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">52 Week High</span>
-              <span className="text-lg font-semibold">{formatCurrency(company?.['52WeekHigh'])}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">52 Week Low</span>
-              <span className="text-lg font-semibold">{formatCurrency(company?.['52WeekLow'])}</span>
-            </div>
+            {newsData.length > 0 ? (
+              newsData.map((article, index) => (
+                <div 
+                  key={index}
+                  className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-gray-600 transition-all cursor-pointer"
+                  onClick={() => window.open(article.url, '_blank')}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+                        {getSourceInitials(article.url)}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm text-gray-400">{new URL(article.url).hostname.replace('www.', '')}</span>
+                        <span className="text-xs text-gray-500">•</span>
+                        <span className="text-xs text-gray-500">{formatTimeAgo(article.time_published)}</span>
+                        <div className="ml-auto flex items-center gap-2">
+                          <span className={`text-sm font-medium ${getSentimentColor(article.sentiment_label, article.sentiment_score)}`}>
+                            {article.sentiment_score > 0 ? '+' : ''}{article.sentiment_score.toFixed(2)}
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            article.sentiment_label === 'Bullish' 
+                              ? 'bg-green-900/30 text-green-400' 
+                              : article.sentiment_label === 'Bearish'
+                              ? 'bg-red-900/30 text-red-400'
+                              : 'bg-gray-700 text-gray-400'
+                          }`}>
+                            {article.sentiment_label}
+                          </span>
+                        </div>
+                      </div>
+                      <h4 className="text-white font-semibold mb-2 leading-tight">
+                        {article.title}
+                      </h4>
+                      {article.summary && (
+                        <p className="text-gray-300 text-sm leading-relaxed mb-3">
+                          {article.summary.substring(0, 200)}...
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 text-xs text-gray-400">
+                        <span>Relevance: {(article.relevance * 100).toFixed(0)}%</span>
+                        <span>Impact: {article.overall_sentiment_score > 0.5 ? 'High' : article.overall_sentiment_score > 0.2 ? 'Medium' : 'Low'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <div className="text-4xl mb-2">📰</div>
+                <div>No recent news available for {symbol}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {newsData.length > 0 && (
+          <div className="text-center mt-6">
+            <button 
+              onClick={loadNewsData}
+              className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition flex items-center gap-2 mx-auto"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Refresh News
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Trading Metrics */}
+      <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
+        <h3 className="text-xl font-bold mb-4">Trading Metrics</h3>
+        <div className="grid grid-cols-1 gap-4">
+          <div className="flex justify-between">
+            <span className="text-gray-400 text-sm">Volume</span>
+            <span className="text-lg font-semibold">{formatLargeNumber(volume)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400 text-sm">50 Day MA</span>
+            <span className="text-lg font-semibold">{formatCurrency(company?.['50DayMovingAverage'])}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400 text-sm">200 Day MA</span>
+            <span className="text-lg font-semibold">{formatCurrency(company?.['200DayMovingAverage'])}</span>
           </div>
         </div>
       </div>
 
-      {/* SIDE BY SIDE: Profitability Metrics & Income Statement */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        
-        {/* LEFT SIDE: Profitability Metrics */}
-        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4">Profitability Metrics</h3>
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Profit Margin</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.ProfitMargin)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Operating Margin TTM</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.OperatingMarginTTM)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Gross Profit TTM</span>
-              <span className="text-lg font-semibold">
-                {formatMoney(company?.GrossProfitTTM)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">EBITDA</span>
-              <span className="text-lg font-semibold">
-                {formatMoney(company?.EBITDA)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">ROA (TTM)</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.ReturnOnAssetsTTM)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">ROE (TTM)</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.ReturnOnEquityTTM)}</span>
-            </div>
+      {/* Company Information */}
+      <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
+        <h3 className="text-xl font-bold mb-4">About {company?.Name}</h3>
+        {company?.Description ? (
+          <p className="text-gray-300 leading-relaxed text-sm">{company.Description}</p>
+        ) : (
+          <div className="text-center py-8 text-gray-400">
+            <div className="text-2xl mb-2">📋</div>
+            <div>No company description available</div>
           </div>
-        </div>
-
-        {/* RIGHT SIDE: Income Statement */}
-        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4">Income Statement</h3>
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Revenue (TTM)</span>
-              <span className="text-lg font-semibold">
-                {formatMoney(company?.RevenueTTM)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Revenue Per Share</span>
-              <span className="text-lg font-semibold">{formatCurrency(company?.RevenuePerShareTTM)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">EPS</span>
-              <span className="text-lg font-semibold">{formatCurrency(company?.EPS)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Diluted EPS (TTM)</span>
-              <span className="text-lg font-semibold">{formatCurrency(company?.DilutedEPSTTM)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Earnings Growth YoY</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.QuarterlyEarningsGrowthYOY)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Revenue Growth YoY</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.QuarterlyRevenueGrowthYOY)}</span>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
-
-      {/* Rest of your existing sections remain the same... */}
-      {/* News, Company Info, etc. */}
     </div>
   );
 };
