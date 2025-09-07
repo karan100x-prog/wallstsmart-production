@@ -51,11 +51,11 @@ function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-       //   <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          //  <Activity className="h-8 w-8 text-green-500 mb-2" />
-         //   <div className="text-2xl font-bold">Real-Time</div>
-         //   <div className="text-gray-400">Market Data</div>
-         // </div>
+          <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+            <Activity className="h-8 w-8 text-green-500 mb-2" />
+            <div className="text-2xl font-bold">Real-Time</div>
+            <div className="text-gray-400">Market Data</div>
+          </div>
           <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
             <BarChart3 className="h-8 w-8 text-blue-500 mb-2" />
             <div className="text-2xl font-bold">10,000+</div>
