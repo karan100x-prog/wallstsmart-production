@@ -349,8 +349,10 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         </div>
       )}
 
-      {/* Trading Metrics & Ownership */}
+      {/* SIDE BY SIDE: Trading Metrics & Ownership & Short Interest */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        
+        {/* LEFT SIDE: Trading Metrics */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Trading Metrics</h3>
           <div className="grid grid-cols-1 gap-4">
@@ -369,9 +371,18 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
           </div>
         </div>
 
+        {/* RIGHT SIDE: Ownership & Short Interest */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4">Ownership</h3>
+          <h3 className="text-xl font-bold mb-4">Ownership & Short Interest</h3>
           <div className="grid grid-cols-1 gap-4">
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Institutional Ownership</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.PercentInstitutions)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Insider Ownership</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.PercentInsiders)}</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Shares Outstanding</span>
               <span className="text-lg font-semibold">
@@ -383,6 +394,20 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
               <span className="text-lg font-semibold">
                 {formatLargeNumber(parseFloat(company?.SharesFloat || '0'))}
               </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Short Interest</span>
+              <span className="text-lg font-semibold">
+                {formatLargeNumber(parseFloat(company?.SharesShort || '0'))}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Short % of Float</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.ShortPercentFloat)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Short Ratio</span>
+              <span className="text-lg font-semibold">{company?.ShortRatio || 'N/A'}</span>
             </div>
           </div>
         </div>
@@ -456,6 +481,10 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         <div className="mb-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div>
+              <span className="text-gray-400 text-sm">Exchange</span>
+              <div className="text-white">{company?.Exchange || 'N/A'}</div>
+            </div>
+            <div>
               <span className="text-gray-400 text-sm">Sector</span>
               <div className="text-white">{company?.Sector || 'N/A'}</div>
             </div>
@@ -466,10 +495,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
             <div>
               <span className="text-gray-400 text-sm">Country</span>
               <div className="text-white">{company?.Country || 'N/A'}</div>
-            </div>
-            <div>
-              <span className="text-gray-400 text-sm">Employees</span>
-              <div className="text-white">{formatLargeNumber(parseFloat(company?.FullTimeEmployees || '0'))}</div>
             </div>
           </div>
         </div>
