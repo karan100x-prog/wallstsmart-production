@@ -137,6 +137,14 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="mt-16 pt-8 border-t border-gray-700">
+        <div className="text-center text-gray-400 text-sm">
+          <p className="mb-2">© 2025 WallStSmart. Professional financial analysis powered by Premium Alpha Vantage data.</p>
+          <p>Real-time market data • 75 API calls/minute • Institutional-grade analytics</p>
+        </div>
+      </footer>
     </div>
   );
 };
