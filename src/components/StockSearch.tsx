@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { searchSymbol, getQuote } from '../services/alphaVantage';
+
+interface SearchResult {
+  '1. symbol': string;
+  '2. name': string;
+  '3. type': string;
+  '4. region': string;
+  '5. marketOpen': string;
+  '6. marketClose': string;
+  '7. timezone': string;
+  '8. currency': string;
+  '9. matchScore': string;
+}
 
 interface QuickQuote {
   symbol: string;
