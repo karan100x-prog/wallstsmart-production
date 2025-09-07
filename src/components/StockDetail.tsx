@@ -168,14 +168,18 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
       {/* Advanced Health Metrics */}
       <StockHealthMetrics symbol={symbol} />
 
-      {/* Valuation & Analyst Targets */}
+      {/* SIDE BY SIDE: Valuation Metrics & Analyst Targets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        
+        {/* LEFT SIDE: Valuation Metrics */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Valuation Metrics</h3>
           <div className="grid grid-cols-1 gap-4">
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Market Cap</span>
-              <span className="text-lg font-semibold">{formatMoney(company?.MarketCapitalization)}</span>
+              <span className="text-lg font-semibold">
+                {formatMoney(company?.MarketCapitalization)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">P/E Ratio</span>
@@ -186,16 +190,27 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
               <span className="text-lg font-semibold">{company?.PEGRatio || 'N/A'}</span>
             </div>
             <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Price/Sales (TTM)</span>
+              <span className="text-lg font-semibold">{company?.PriceToSalesRatioTTM || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Book Value</span>
               <span className="text-lg font-semibold">{formatCurrency(company?.BookValue)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Dividend Yield</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.DividendYield)}</span>
+              <span className="text-gray-400 text-sm">Price/Book</span>
+              <span className="text-lg font-semibold">{company?.PriceToBookRatio || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Enterprise Value</span>
+              <span className="text-lg font-semibold">
+                {formatMoney(company?.EnterpriseValue)}
+              </span>
             </div>
           </div>
         </div>
-
+        
+        {/* RIGHT SIDE: Analyst Targets */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Analyst Targets</h3>
           <div className="space-y-4">
@@ -206,6 +221,22 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
               </span>
             </div>
             <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Forward P/E</span>
+              <span className="text-lg font-semibold">{company?.ForwardPE || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Trailing P/E</span>
+              <span className="text-lg font-semibold">{company?.TrailingPE || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Beta</span>
+              <span className="text-lg font-semibold">{company?.Beta || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Latest Quarter</span>
+              <span className="text-lg font-semibold">{company?.LatestQuarter || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-gray-400 text-sm">52 Week High</span>
               <span className="text-lg font-semibold">{formatCurrency(company?.['52WeekHigh'])}</span>
             </div>
@@ -213,15 +244,151 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
               <span className="text-gray-400 text-sm">52 Week Low</span>
               <span className="text-lg font-semibold">{formatCurrency(company?.['52WeekLow'])}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SIDE BY SIDE: Profitability Metrics & Income Statement */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        
+        {/* LEFT SIDE: Profitability Metrics */}
+        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+          <h3 className="text-xl font-bold mb-4">Profitability Metrics</h3>
+          <div className="grid grid-cols-1 gap-4">
             <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Beta</span>
-              <span className="text-lg font-semibold">{company?.Beta || 'N/A'}</span>
+              <span className="text-gray-400 text-sm">Profit Margin</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.ProfitMargin)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Operating Margin TTM</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.OperatingMarginTTM)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Gross Profit TTM</span>
+              <span className="text-lg font-semibold">
+                {formatMoney(company?.GrossProfitTTM)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">EBITDA</span>
+              <span className="text-lg font-semibold">
+                {formatMoney(company?.EBITDA)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">ROA (TTM)</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.ReturnOnAssetsTTM)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">ROE (TTM)</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.ReturnOnEquityTTM)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT SIDE: Income Statement */}
+        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+          <h3 className="text-xl font-bold mb-4">Income Statement</h3>
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Revenue (TTM)</span>
+              <span className="text-lg font-semibold">
+                {formatMoney(company?.RevenueTTM)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Revenue Per Share</span>
+              <span className="text-lg font-semibold">{formatCurrency(company?.RevenuePerShareTTM)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">EPS</span>
+              <span className="text-lg font-semibold">{formatCurrency(company?.EPS)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Diluted EPS (TTM)</span>
+              <span className="text-lg font-semibold">{formatCurrency(company?.DilutedEPSTTM)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Earnings Growth YoY</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.QuarterlyEarningsGrowthYOY)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Revenue Growth YoY</span>
+              <span className="text-lg font-semibold">{formatPercent(company?.QuarterlyRevenueGrowthYOY)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Latest News & Sentiment */}
+      {/* Dividend Information */}
+      {company?.DividendYield && parseFloat(company?.DividendYield) > 0 && (
+        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
+          <h3 className="text-xl font-bold mb-4">Dividend Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <span className="text-gray-400 text-sm">Dividend Yield</span>
+              <div className="text-lg font-semibold text-green-500">{formatPercent(company?.DividendYield)}</div>
+            </div>
+            <div>
+              <span className="text-gray-400 text-sm">Annual Dividend</span>
+              <div className="text-lg font-semibold">{formatCurrency(company?.DividendPerShare)}</div>
+            </div>
+            <div>
+              <span className="text-gray-400 text-sm">Payout Ratio</span>
+              <div className="text-lg font-semibold">{formatPercent(company?.PayoutRatio)}</div>
+            </div>
+            <div>
+              <span className="text-gray-400 text-sm">Ex-Dividend Date</span>
+              <div className="text-lg font-semibold">{company?.ExDividendDate || 'N/A'}</div>
+            </div>
+            <div>
+              <span className="text-gray-400 text-sm">Dividend Date</span>
+              <div className="text-lg font-semibold">{company?.DividendDate || 'N/A'}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trading Metrics & Ownership */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+          <h3 className="text-xl font-bold mb-4">Trading Metrics</h3>
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">50 Day MA</span>
+              <span className="text-lg font-semibold">{formatCurrency(company?.['50DayMovingAverage'])}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">200 Day MA</span>
+              <span className="text-lg font-semibold">{formatCurrency(company?.['200DayMovingAverage'])}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Volume</span>
+              <span className="text-lg font-semibold">{formatLargeNumber(volume)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+          <h3 className="text-xl font-bold mb-4">Ownership</h3>
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Shares Outstanding</span>
+              <span className="text-lg font-semibold">
+                {formatLargeNumber(parseFloat(company?.SharesOutstanding || '0'))}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Float</span>
+              <span className="text-lg font-semibold">
+                {formatLargeNumber(parseFloat(company?.SharesFloat || '0'))}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Latest News Section */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold">Latest News & Sentiment</h3>
@@ -283,24 +450,29 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         )}
       </div>
 
-      {/* Trading Metrics */}
-      <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
-        <h3 className="text-xl font-bold mb-4">Trading Metrics</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex justify-between">
-            <span className="text-gray-400 text-sm">Volume</span>
-            <span className="text-lg font-semibold">{formatLargeNumber(volume)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400 text-sm">50 Day MA</span>
-            <span className="text-lg font-semibold">{formatCurrency(company?.['50DayMovingAverage'])}</span>
-          </div>
-        </div>
-      </div>
-
       {/* Company Information */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
         <h3 className="text-xl font-bold mb-4">About {company?.Name}</h3>
+        <div className="mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <span className="text-gray-400 text-sm">Sector</span>
+              <div className="text-white">{company?.Sector || 'N/A'}</div>
+            </div>
+            <div>
+              <span className="text-gray-400 text-sm">Industry</span>
+              <div className="text-white">{company?.Industry || 'N/A'}</div>
+            </div>
+            <div>
+              <span className="text-gray-400 text-sm">Country</span>
+              <div className="text-white">{company?.Country || 'N/A'}</div>
+            </div>
+            <div>
+              <span className="text-gray-400 text-sm">Employees</span>
+              <div className="text-white">{formatLargeNumber(parseFloat(company?.FullTimeEmployees || '0'))}</div>
+            </div>
+          </div>
+        </div>
         {company?.Description ? (
           <p className="text-gray-300 leading-relaxed text-sm">{company.Description}</p>
         ) : (
