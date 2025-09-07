@@ -1,17 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown } from 'lucide-react';
-import { searchStocks, getQuote } from '../services/alphaVantage';
-
-interface StockSearchProps {
-  onSelectStock: (symbol: string) => void;
-}
-
-interface SearchResult {
-  symbol: string;
-  name: string;
-  type: string;
-  region: string;
-}
+import { useNavigate } from 'react-router-dom';
 
 interface QuickQuote {
   symbol: string;
@@ -20,11 +8,12 @@ interface QuickQuote {
   changePercent: string;
 }
 
-const StockSearch: React.FC<StockSearchProps> = ({ onSelectStock }) => {
+const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ onSelectStock }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [popularStocks, setPopularStocks] = useState<QuickQuote[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Load popular stocks on mount
@@ -32,7 +21,8 @@ const StockSearch: React.FC<StockSearchProps> = ({ onSelectStock }) => {
   }, []);
 
   const loadPopularStocks = async () => {
-    const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'];
+    // Updated to 6 stocks for single row display
+    const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA'];
     const quotes = await Promise.all(
       symbols.map(async (symbol) => {
         const data = await getQuote(symbol);
@@ -53,8 +43,8 @@ const StockSearch: React.FC<StockSearchProps> = ({ onSelectStock }) => {
 
     setLoading(true);
     try {
-      const results = await searchStocks(searchTerm);
-      setSearchResults(results);
+      const results = await searchSymbol(searchTerm);
+      setSearchResults(results.bestMatches || []);
     } catch (error) {
       console.error('Search error:', error);
     } finally {
@@ -62,89 +52,80 @@ const StockSearch: React.FC<StockSearchProps> = ({ onSelectStock }) => {
     }
   };
 
+  const handleSelectStock = (symbol: string) => {
+    if (onSelectStock) {
+      onSelectStock(symbol);
+    } else {
+      navigate(`/stock/${symbol}`);
+    }
+  };
+
   return (
-    <div>
+    <div className="w-full max-w-7xl mx-auto px-4">
       {/* Search Bar */}
-      <form onSubmit={handleSearch} className="mb-8">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+      <div className="mb-8">
+        <form onSubmit={handleSearch} className="relative">
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search stocks by symbol or name..."
-            className="w-full pl-12 pr-4 py-4 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-green-500 transition"
+            className="w-full px-4 py-3 pr-32 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500 transition-colors"
           />
           <button
             type="submit"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg transition"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 px-6 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg hover:from-green-600 hover:to-blue-600 transition-all"
           >
             Search
           </button>
-        </div>
-      </form>
+        </form>
 
-      {/* Popular Stocks */}
-      {!searchResults.length && (
-        <div>
-          <h2 className="text-2xl font-bold mb-6">Popular Stocks</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {popularStocks.map((stock) => (
+        {/* Search Results Dropdown */}
+        {searchResults.length > 0 && (
+          <div className="absolute z-10 w-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-96 overflow-y-auto">
+            {searchResults.map((result, index) => (
               <div
-                key={stock.symbol}
-                onClick={() => onSelectStock(stock.symbol)}
-                className="bg-gray-900 p-6 rounded-xl border border-gray-800 cursor-pointer hover:border-green-500 transition"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-bold">{stock.symbol}</h3>
-                  {stock.change >= 0 ? (
-                    <TrendingUp className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <TrendingDown className="h-5 w-5 text-red-500" />
-                  )}
-                </div>
-                <div className="text-2xl font-bold mb-1">
-                  ${stock.price.toFixed(2)}
-                </div>
-                <div className={`text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent})
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Search Results */}
-      {loading && (
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-        </div>
-      )}
-
-      {searchResults.length > 0 && (
-        <div>
-          <h2 className="text-2xl font-bold mb-6">Search Results</h2>
-          <div className="grid grid-cols-1 gap-4">
-            {searchResults.map((result) => (
-              <div
-                key={result.symbol}
-                onClick={() => onSelectStock(result.symbol)}
-                className="bg-gray-900 p-6 rounded-xl border border-gray-800 cursor-pointer hover:border-green-500 transition"
+                key={index}
+                onClick={() => handleSelectStock(result['1. symbol'])}
+                className="px-4 py-3 hover:bg-gray-700 cursor-pointer border-b border-gray-700 last:border-0"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 className="text-xl font-bold">{result.symbol}</h3>
-                    <p className="text-gray-400">{result.name}</p>
+                    <span className="font-semibold text-white">{result['1. symbol']}</span>
+                    <span className="ml-2 text-gray-400 text-sm">{result['2. name']}</span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-400">{result.type}</p>
-                    <p className="text-sm text-gray-400">{result.region}</p>
-                  </div>
+                  <span className="text-gray-500 text-sm">{result['3. type']}</span>
                 </div>
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Popular Stocks - Single Row */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-white mb-4">Popular Stocks</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {popularStocks.map((stock) => (
+            <div
+              key={stock.symbol}
+              onClick={() => handleSelectStock(stock.symbol)}
+              className="bg-gray-800 border border-gray-700 rounded-lg p-3 cursor-pointer hover:bg-gray-700 hover:border-gray-600 transition-all hover:transform hover:-translate-y-1"
+            >
+              <div className="font-bold text-white text-lg">{stock.symbol}</div>
+              <div className="text-white text-xl font-semibold">${stock.price.toFixed(2)}</div>
+              <div className={`text-sm font-medium ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent})
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
         </div>
       )}
     </div>
