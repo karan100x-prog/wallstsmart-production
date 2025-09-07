@@ -219,7 +219,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           )}
           
           {/* Show dividend if present */}
-          {dataPoint && dataPoint.dividend > 0 && (
+          {dataPoint && dataPoint.dividend && dataPoint.dividend > 0 && (
             <div className="mt-1">
               <p className="text-xs text-blue-400">💰 Dividend: ${dataPoint.dividend.toFixed(2)}</p>
             </div>
