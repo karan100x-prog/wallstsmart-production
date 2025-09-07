@@ -261,8 +261,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   // Filter splits to show only those in current time range
   const visibleSplits = splitEvents.filter(split => {
     const splitDate = new Date(split.date);
-    const firstDataDate = new Date(chartData[0]?.fullDate);
-    return splitDate >= firstDataDate;
+    const firstDataDate = chartData[0] ? new Date(chartData[0].fullDate) : null;
+    return firstDataDate && splitDate >= firstDataDate;
   });
 
   const getXAxisInterval = () => {
