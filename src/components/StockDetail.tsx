@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import AlphaVantageService from '../services/alphaVantageService';
-import { getCompanyOverview } from '../services/alphaVantage';
+import { getCompanyOverview, getQuote } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 import { StockHealthMetrics } from './StockHealthMetrics';
 
@@ -65,12 +64,31 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
   const loadStockData = async () => {
     setLoading(true);
     try {
-      const [price, companyData] = await Promise.all([
-        AlphaVantageService.getCurrentPrice(symbol.toUpperCase()),
+      // Use getQuote for now since AlphaVantageService doesn't exist yet
+      const [quoteData, companyData] = await Promise.all([
+        getQuote(symbol.toUpperCase()),
         getCompanyOverview(symbol)
       ]);
       
-      setPriceData(price);
+      // Transform the quote data to our new format
+      const price = parseFloat(quoteData?.['05. price'] || '0');
+      const previousClose = parseFloat(quoteData?.['08. previous close'] || '0');
+      const change = parseFloat(quoteData?.['09. change'] || '0');
+      const changePercent = parseFloat(quoteData?.['10. change percent']?.replace('%', '') || '0');
+      
+      setPriceData({
+        price,
+        previousClose,
+        change,
+        changePercent,
+        volume: parseInt(quoteData?.['06. volume'] || '0'),
+        open: parseFloat(quoteData?.['02. open'] || '0'),
+        high: parseFloat(quoteData?.['03. high'] || '0'),
+        low: parseFloat(quoteData?.['04. low'] || '0'),
+        timestamp: quoteData?.['07. latest trading day'],
+        isRealtime: false // Global quote is not real-time
+      });
+      
       setCompany(companyData);
       setLastUpdate(new Date());
     } catch (error) {
@@ -254,6 +272,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
       {/* Advanced Health Metrics */}
       <StockHealthMetrics symbol={symbol} />
 
+      {/* REST OF THE COMPONENT REMAINS THE SAME - ALL YOUR EXISTING SECTIONS */}
       {/* SIDE BY SIDE: Valuation Metrics & Analyst Targets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         
