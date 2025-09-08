@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { getQuote, getCompanyOverview } from '../services/alphaVantage';
+import AlphaVantageService from '../services/alphaVantageService';
+import { getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 import { StockHealthMetrics } from './StockHealthMetrics';
 
@@ -9,27 +10,50 @@ interface StockDetailProps {
 }
 
 const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
-  const [quote, setQuote] = useState<any>(null);
+  const [priceData, setPriceData] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [newsData, setNewsData] = useState<any[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
     loadStockData();
     loadNewsData();
+
+    // Auto-refresh price based on market status
+    const now = new Date();
+    const day = now.getDay();
+    const hour = now.getHours();
+    const isMarketHours = day >= 1 && day <= 5 && hour >= 9 && hour < 16;
+    
+    // Refresh every 5 seconds during market hours, every minute otherwise
+    const refreshInterval = isMarketHours ? 5000 : 60000;
+    
+    const interval = setInterval(() => {
+      // Only refresh price data (not company overview)
+      AlphaVantageService.getCurrentPrice(symbol.toUpperCase())
+        .then(price => {
+          setPriceData(price);
+          setLastUpdate(new Date());
+        })
+        .catch(err => console.error('Price refresh error:', err));
+    }, refreshInterval);
+    
+    return () => clearInterval(interval);
   }, [symbol]);
 
   const loadStockData = async () => {
     setLoading(true);
     try {
-      const [quoteData, companyData] = await Promise.all([
-        getQuote(symbol),
+      const [price, companyData] = await Promise.all([
+        AlphaVantageService.getCurrentPrice(symbol.toUpperCase()),
         getCompanyOverview(symbol)
       ]);
       
-      setQuote(quoteData);
+      setPriceData(price);
       setCompany(companyData);
+      setLastUpdate(new Date());
     } catch (error) {
       console.error('Error loading stock data:', error);
     } finally {
@@ -109,10 +133,12 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     );
   }
 
-  const price = parseFloat(quote?.['05. price'] || '0');
-  const change = parseFloat(quote?.['09. change'] || '0');
-  const changePercent = quote?.['10. change percent'] || '0%';
-  const volume = parseInt(quote?.['06. volume'] || '0');
+  // Use the new price data structure
+  const price = priceData?.price || 0;
+  const change = priceData?.change || 0;
+  const changePercent = priceData?.changePercent || 0;
+  const volume = priceData?.volume || 0;
+  const isRealtime = priceData?.isRealtime || false;
 
   const formatLargeNumber = (num: number) => {
     if (!num || num === 0) return 'N/A';
@@ -154,8 +180,49 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
             <div className="text-3xl font-bold">${price.toFixed(2)}</div>
             <div className={`text-lg flex items-center justify-end gap-1 ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {change >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
-              {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent})
+              {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent.toFixed(2)}%)
             </div>
+            {/* Real-time Indicator */}
+            <div className="flex items-center justify-end gap-2 mt-2 text-xs text-gray-400">
+              {isRealtime ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <span className="text-green-400">Real-time</span>
+                </>
+              ) : (
+                <span>Delayed</span>
+              )}
+              <span>• {lastUpdate.toLocaleTimeString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Price Details Bar (NEW) */}
+      <div className="bg-gray-900 p-4 rounded-xl border border-gray-800 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div>
+            <span className="text-gray-400 text-sm">Open</span>
+            <div className="text-white font-semibold">${priceData?.open?.toFixed(2) || '-'}</div>
+          </div>
+          <div>
+            <span className="text-gray-400 text-sm">Previous Close</span>
+            <div className="text-white font-semibold">${priceData?.previousClose?.toFixed(2) || '-'}</div>
+          </div>
+          <div>
+            <span className="text-gray-400 text-sm">Day High</span>
+            <div className="text-white font-semibold">${priceData?.high?.toFixed(2) || '-'}</div>
+          </div>
+          <div>
+            <span className="text-gray-400 text-sm">Day Low</span>
+            <div className="text-white font-semibold">${priceData?.low?.toFixed(2) || '-'}</div>
+          </div>
+          <div>
+            <span className="text-gray-400 text-sm">Volume</span>
+            <div className="text-white font-semibold">{formatLargeNumber(volume)}</div>
           </div>
         </div>
       </div>
@@ -413,7 +480,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         </div>
       </div>
 
-      {/* Latest News Section */}
+      {/* Latest News Section - UNCHANGED */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold">Latest News & Sentiment</h3>
@@ -475,7 +542,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         )}
       </div>
 
-      {/* Company Information */}
+      {/* Company Information - UNCHANGED */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
         <h3 className="text-xl font-bold mb-4">About {company?.Name}</h3>
         <div className="mb-4">
@@ -506,6 +573,19 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
             <div>No company description available</div>
           </div>
         )}
+      </div>
+
+      {/* Debug Info (Remove in production) */}
+      <div className="mt-8 p-4 bg-black/50 rounded-lg text-xs text-gray-400 border border-gray-800">
+        <h3 className="text-white mb-2">Debug Info (Remove in production):</h3>
+        <div className="grid grid-cols-2 gap-2">
+          <div>Current Price: ${priceData?.price}</div>
+          <div>Previous Close: ${priceData?.previousClose}</div>
+          <div>Real-time Data: {isRealtime ? 'YES ✅' : 'NO ⏰'}</div>
+          <div>Last API Call: {priceData?.timestamp}</div>
+          <div>Cache Status: {isRealtime ? 'Using Intraday API' : 'Using Global Quote API'}</div>
+          <div>Auto-refresh: Every {isRealtime ? '5 seconds' : '1 minute'}</div>
+        </div>
       </div>
     </div>
   );
