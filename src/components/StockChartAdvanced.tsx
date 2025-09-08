@@ -1,290 +1,427 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getIntradayPrices, getDailyPrices, getWeeklyPrices, getMonthlyPrices } from '../services/alphaVantage';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { alphaVantageService } from '../services/alphaVantage';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 interface StockChartAdvancedProps {
   symbol: string;
 }
 
-type TimeRange = '7D' | '1M' | '6M' | '1Y' | '3Y' | '5Y' | '10Y' | 'MAX';
+interface ChartDataPoint {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
-// Stock split data for major companies
-const STOCK_SPLITS: Record<string, Array<{date: string, ratio: number}>> = {
-  'NVDA': [
-    { date: '2024-06-10', ratio: 10 },  // 10-for-1 split
-    { date: '2021-07-20', ratio: 4 },   // 4-for-1 split
-    { date: '2007-09-11', ratio: 1.5 }, // 3-for-2 split
-    { date: '2006-04-07', ratio: 2 },   // 2-for-1 split
-    { date: '2001-09-17', ratio: 2 },   // 2-for-1 split
-    { date: '2000-06-27', ratio: 2 },   // 2-for-1 split
-  ],
-  'AAPL': [
-    { date: '2020-08-31', ratio: 4 },   // 4-for-1 split
-    { date: '2014-06-09', ratio: 7 },   // 7-for-1 split
-    { date: '2005-02-28', ratio: 2 },   // 2-for-1 split
-    { date: '2000-06-21', ratio: 2 },   // 2-for-1 split
-    { date: '1987-06-16', ratio: 2 },   // 2-for-1 split
-  ],
-  'TSLA': [
-    { date: '2022-08-25', ratio: 3 },   // 3-for-1 split
-    { date: '2020-08-31', ratio: 5 },   // 5-for-1 split
-  ],
-  'AMZN': [
-    { date: '2022-06-06', ratio: 20 },  // 20-for-1 split
-    { date: '1999-09-02', ratio: 2 },   // 2-for-1 split
-    { date: '1999-01-05', ratio: 3 },   // 3-for-1 split
-    { date: '1998-06-02', ratio: 2 },   // 2-for-1 split
-  ],
-  'GOOGL': [
-    { date: '2022-07-18', ratio: 20 },  // 20-for-1 split
-    { date: '2014-04-03', ratio: 2 },   // 2-for-1 split
-  ],
-  'GOOG': [
-    { date: '2022-07-18', ratio: 20 },  // 20-for-1 split
-    { date: '2014-04-03', ratio: 2 },   // 2-for-1 split
-  ],
-  'MSFT': [
-    { date: '2003-02-18', ratio: 2 },   // 2-for-1 split
-    { date: '1999-03-29', ratio: 2 },   // 2-for-1 split
-    { date: '1998-02-23', ratio: 2 },   // 2-for-1 split
-    { date: '1996-12-09', ratio: 2 },   // 2-for-1 split
-  ],
-  'META': [
-    // No splits for META/Facebook
-  ],
-  'NFLX': [
-    { date: '2015-07-15', ratio: 7 },   // 7-for-1 split
-    { date: '2004-02-12', ratio: 2 },   // 2-for-1 split
-  ]
-};
-
-// Function to manually adjust prices for splits
-function adjustPricesForSplits(data: any[], symbol: string): any[] {
-  const splits = STOCK_SPLITS[symbol.toUpperCase()];
-  
-  // If no splits defined, return original data
-  if (!splits || splits.length === 0) {
-    return data;
-  }
-
-  console.log(`Adjusting splits for ${symbol}`, splits);
-
-  return data.map((item, index) => {
-    const itemDate = new Date(item.date);
-    let adjustmentFactor = 1;
-
-    // Calculate cumulative adjustment factor for all splits after this date
-    for (const split of splits) {
-      const splitDate = new Date(split.date);
-      if (splitDate > itemDate) {
-        adjustmentFactor *= split.ratio;
-      }
-    }
-
-    // Always use close price and manually adjust it
-    const closePrice = parseFloat(item.close) || 0;
-    const adjustedPrice = closePrice / adjustmentFactor;
-
-    // Log first few adjustments for debugging
-    if (index < 3 && adjustmentFactor > 1) {
-      console.log(`Date: ${item.date}, Close: ${closePrice}, Factor: ${adjustmentFactor}, Adjusted: ${adjustedPrice}`);
-    }
-
-    return {
-      ...item,
-      close: closePrice,
-      adjustedClose: adjustedPrice,
-      adjustmentFactor: adjustmentFactor,
-      isAdjusted: adjustmentFactor > 1
-    };
-  });
+interface TimeSeriesData {
+  [key: string]: {
+    '1. open': string;
+    '2. high': string;
+    '3. low': string;
+    '4. close': string;
+    '5. volume': string;
+  };
 }
 
 const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
-  const [selectedRange, setSelectedRange] = useState<TimeRange>('1M');
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [timeRange, setTimeRange] = useState('1M');
+  const [chartType, setChartType] = useState('line');
 
   useEffect(() => {
-    loadChartData(selectedRange);
-  }, [symbol, selectedRange]);
+    fetchChartData();
+  }, [symbol, timeRange]);
 
-  const loadChartData = async (range: TimeRange) => {
+  const fetchChartData = async () => {
     setLoading(true);
-    let data: any[] = [];
+    setError(null);
     
     try {
-      switch (range) {
-        case '7D':
-          // Use intraday data for 7 days
-          data = await getIntradayPrices(symbol, '30min');
-          data = data.slice(0, 56); // 7 days * 8 data points per day
+      let data: ChartDataPoint[] = [];
+      
+      switch (timeRange) {
+        case '1D': {
+          const response = await alphaVantageService.getIntradayData(symbol, '5min');
+          if (response && response['Time Series (5min)']) {
+            const timeSeries = response['Time Series (5min)'] as TimeSeriesData;
+            data = Object.entries(timeSeries)
+              .slice(0, 78) // ~6.5 hours of trading
+              .map(([date, values]) => ({
+                date,
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseFloat(values['5. volume'])
+              }))
+              .reverse();
+          }
           break;
+        }
         
-        case '1M':
-          // Daily data for 1 month
-          data = await getDailyPrices(symbol);
-          data = data.slice(0, 30);
+        case '5D': {
+          const response = await alphaVantageService.getIntradayData(symbol, '30min');
+          if (response && response['Time Series (30min)']) {
+            const timeSeries = response['Time Series (30min)'] as TimeSeriesData;
+            data = Object.entries(timeSeries)
+              .slice(0, 65) // ~5 days
+              .map(([date, values]) => ({
+                date,
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseFloat(values['5. volume'])
+              }))
+              .reverse();
+          }
           break;
+        }
         
-        case '6M':
-          // Daily data for 6 months
-          data = await getDailyPrices(symbol);
-          data = data.slice(0, 180);
+        case '1M': {
+          const response = await alphaVantageService.getDailyData(symbol);
+          if (response && response['Time Series (Daily)']) {
+            const timeSeries = response['Time Series (Daily)'] as TimeSeriesData;
+            data = Object.entries(timeSeries)
+              .slice(0, 30)
+              .map(([date, values]) => ({
+                date,
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseFloat(values['5. volume'])
+              }))
+              .reverse();
+          }
           break;
+        }
         
-        case '1Y':
-          // Weekly data for 1 year
-          data = await getWeeklyPrices(symbol);
-          data = data.slice(0, 52);
+        case '3M': {
+          const response = await alphaVantageService.getDailyData(symbol);
+          if (response && response['Time Series (Daily)']) {
+            const timeSeries = response['Time Series (Daily)'] as TimeSeriesData;
+            data = Object.entries(timeSeries)
+              .slice(0, 90)
+              .map(([date, values]) => ({
+                date,
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseFloat(values['5. volume'])
+              }))
+              .reverse();
+          }
           break;
+        }
         
-        case '3Y':
-          // Weekly data for 3 years
-          data = await getWeeklyPrices(symbol);
-          data = data.slice(0, 156);
+        case '6M': {
+          const response = await alphaVantageService.getWeeklyData(symbol);
+          if (response && response['Weekly Time Series']) {
+            const timeSeries = response['Weekly Time Series'] as TimeSeriesData;
+            data = Object.entries(timeSeries)
+              .slice(0, 26)
+              .map(([date, values]) => ({
+                date,
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseFloat(values['5. volume'])
+              }))
+              .reverse();
+          }
           break;
+        }
         
-        case '5Y':
-          // Monthly data for 5 years
-          data = await getMonthlyPrices(symbol);
-          data = data.slice(0, 60);
+        case '1Y': {
+          const response = await alphaVantageService.getWeeklyData(symbol);
+          if (response && response['Weekly Time Series']) {
+            const timeSeries = response['Weekly Time Series'] as TimeSeriesData;
+            data = Object.entries(timeSeries)
+              .slice(0, 52)
+              .map(([date, values]) => ({
+                date,
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseFloat(values['5. volume'])
+              }))
+              .reverse();
+          }
           break;
+        }
         
-        case '10Y':
-          // Monthly data for 10 years
-          data = await getMonthlyPrices(symbol);
-          data = data.slice(0, 120);
+        case '5Y': {
+          const response = await alphaVantageService.getMonthlyData(symbol);
+          if (response && response['Monthly Time Series']) {
+            const timeSeries = response['Monthly Time Series'] as TimeSeriesData;
+            data = Object.entries(timeSeries)
+              .slice(0, 60)
+              .map(([date, values]) => ({
+                date,
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseFloat(values['5. volume'])
+              }))
+              .reverse();
+          }
           break;
+        }
         
-        case 'MAX':
-          // All available monthly data
-          data = await getMonthlyPrices(symbol);
+        case 'MAX': {
+          const response = await alphaVantageService.getMonthlyData(symbol);
+          if (response && response['Monthly Time Series']) {
+            const timeSeries = response['Monthly Time Series'] as TimeSeriesData;
+            data = Object.entries(timeSeries)
+              .map(([date, values]) => ({
+                date,
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseFloat(values['5. volume'])
+              }))
+              .reverse();
+          }
+          break;
+        }
+        
+        default:
           break;
       }
       
-      // Apply manual split adjustments - CRITICAL FIX
-      data = adjustPricesForSplits(data, symbol);
-      
-      // Format data for chart - use the adjusted price we calculated
-      const formattedData = data.reverse().map((item) => ({
-        date: formatDate(item.date, range),
-        price: item.adjustedClose, // Use our manually calculated adjusted price
-        originalPrice: item.close,
-        isAdjusted: item.isAdjusted || false
-      }));
-      
-      setChartData(formattedData);
-    } catch (error) {
-      console.error('Chart data error:', error);
+      setChartData(data);
+    } catch (err) {
+      console.error('Error fetching chart data:', err);
+      setError('Failed to load chart data');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (dateStr: string, range: TimeRange) => {
+  const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    
-    if (range === '7D' || range === '1M') {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } else if (range === '6M' || range === '1Y') {
-      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    if (timeRange === '1D' || timeRange === '5D') {
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } else if (timeRange === '1M' || timeRange === '3M') {
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
     } else {
-      return date.toLocaleDateString('en-US', { year: 'numeric' });
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        year: 'numeric' 
+      });
     }
   };
 
-  const timeRanges: TimeRange[] = ['7D', '1M', '6M', '1Y', '3Y', '5Y', '10Y', 'MAX'];
-
-  // Enhanced tooltip to show split adjustment info
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload[0]) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
-          <p className="text-gray-400">{label}</p>
-          <p className="text-green-400 font-semibold">
-            ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
-          </p>
-          {data.isAdjusted && (
-            <p className="text-yellow-400 text-xs mt-1">
-              Split-adjusted
-            </p>
-          )}
-        </div>
-      );
-    }
-    return null;
+  const getChartConfig = () => {
+    const labels = chartData.map(d => formatDate(d.date));
+    const prices = chartData.map(d => d.close);
+    
+    const lastPrice = prices[prices.length - 1];
+    const firstPrice = prices[0];
+    const isPositive = lastPrice >= firstPrice;
+    const color = isPositive ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)';
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: `${symbol} Price`,
+          data: prices,
+          borderColor: color,
+          backgroundColor: `${color}20`,
+          borderWidth: 2,
+          tension: chartType === 'smooth' ? 0.4 : 0,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: true
+        }
+      ]
+    };
   };
 
-  // Show split info for known stocks
-  const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        mode: 'index' as const,
+        intersect: false,
+        callbacks: {
+          label: (context: any) => {
+            const dataPoint = chartData[context.dataIndex];
+            return [
+              `Close: $${dataPoint.close.toFixed(2)}`,
+              `Open: $${dataPoint.open.toFixed(2)}`,
+              `High: $${dataPoint.high.toFixed(2)}`,
+              `Low: $${dataPoint.low.toFixed(2)}`,
+              `Volume: ${dataPoint.volume.toLocaleString()}`
+            ];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false
+        },
+        ticks: {
+          maxTicksLimit: 8,
+          maxRotation: 0
+        }
+      },
+      y: {
+        position: 'right' as const,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)'
+        },
+        ticks: {
+          callback: (value: any) => `$${value.toFixed(2)}`
+        }
+      }
+    },
+    interaction: {
+      mode: 'index' as const,
+      intersect: false
+    }
+  };
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Price Chart</h2>
-        <div className="flex gap-2">
-          {timeRanges.map((range) => (
-            <button
-              key={range}
-              onClick={() => setSelectedRange(range)}
-              className={`px-3 py-1 rounded transition ${
-                selectedRange === range
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              {range}
-            </button>
-          ))}
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-96 bg-gray-100 rounded"></div>
         </div>
       </div>
+    );
+  }
 
-      {/* Info banner about adjusted prices */}
-      {hasSplits && (
-        <div className="mb-4 p-2 bg-blue-900/20 border border-blue-900/50 rounded text-xs text-blue-400">
-          ℹ️ Historical prices are adjusted for stock splits
-        </div>
-      )}
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="text-red-600 text-center py-8">{error}</div>
+      </div>
+    );
+  }
 
-      {loading ? (
-        <div className="flex items-center justify-center h-[300px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold">Price Chart</h2>
+        
+        <div className="flex gap-2">
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            {['1D', '5D', '1M', '3M', '6M', '1Y', '5Y', 'MAX'].map(range => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  timeRange === range
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+          
+          <select
+            value={chartType}
+            onChange={(e) => setChartType(e.target.value)}
+            className="px-3 py-1 border rounded-lg text-sm"
+          >
+            <option value="line">Line</option>
+            <option value="smooth">Smooth</option>
+          </select>
         </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="date" 
-              stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
-            />
-            <YAxis 
-              stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
-              domain={['dataMin * 0.95', 'dataMax * 1.05']}
-            />
-            <Tooltip 
-              content={<CustomTooltip />}
-              contentStyle={{ 
-                backgroundColor: '#1F2937', 
-                border: '1px solid #374151',
-                borderRadius: '0.5rem'
-              }}
-              labelStyle={{ color: '#9CA3AF' }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="price" 
-              stroke="#10B981" 
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      </div>
+      
+      <div className="h-96">
+        {chartData.length > 0 ? (
+          <Line data={getChartConfig()} options={options} />
+        ) : (
+          <div className="text-center text-gray-500 py-8">
+            No chart data available
+          </div>
+        )}
+      </div>
+      
+      {chartData.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div>
+            <span className="text-gray-500">Current Price</span>
+            <div className="font-semibold">
+              ${chartData[chartData.length - 1].close.toFixed(2)}
+            </div>
+          </div>
+          <div>
+            <span className="text-gray-500">Day Range</span>
+            <div className="font-semibold">
+              ${Math.min(...chartData.slice(-1).map(d => d.low)).toFixed(2)} - 
+              ${Math.max(...chartData.slice(-1).map(d => d.high)).toFixed(2)}
+            </div>
+          </div>
+          <div>
+            <span className="text-gray-500">Volume</span>
+            <div className="font-semibold">
+              {chartData[chartData.length - 1].volume.toLocaleString()}
+            </div>
+          </div>
+          <div>
+            <span className="text-gray-500">Period Change</span>
+            <div className={`font-semibold ${
+              chartData[chartData.length - 1].close >= chartData[0].close 
+                ? 'text-green-600' 
+                : 'text-red-600'
+            }`}>
+              {((chartData[chartData.length - 1].close - chartData[0].close) / chartData[0].close * 100).toFixed(2)}%
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
