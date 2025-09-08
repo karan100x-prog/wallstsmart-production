@@ -30,14 +30,33 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     // Refresh every 5 seconds during market hours, every minute otherwise
     const refreshInterval = isMarketHours ? 5000 : 60000;
     
-    const interval = setInterval(() => {
-      // Only refresh price data (not company overview)
-      AlphaVantageService.getCurrentPrice(symbol.toUpperCase())
-        .then(price => {
-          setPriceData(price);
-          setLastUpdate(new Date());
-        })
-        .catch(err => console.error('Price refresh error:', err));
+    const interval = setInterval(async () => {
+      // Refresh price data using getQuote
+      try {
+        const quoteData = await getQuote(symbol.toUpperCase());
+        
+        const price = parseFloat(quoteData?.['05. price'] || '0');
+        const previousClose = parseFloat(quoteData?.['08. previous close'] || '0');
+        const change = parseFloat(quoteData?.['09. change'] || '0');
+        const changePercent = parseFloat(quoteData?.['10. change percent']?.replace('%', '') || '0');
+        
+        setPriceData({
+          price,
+          previousClose,
+          change,
+          changePercent,
+          volume: parseInt(quoteData?.['06. volume'] || '0'),
+          open: parseFloat(quoteData?.['02. open'] || '0'),
+          high: parseFloat(quoteData?.['03. high'] || '0'),
+          low: parseFloat(quoteData?.['04. low'] || '0'),
+          timestamp: quoteData?.['07. latest trading day'],
+          isRealtime: false
+        });
+        
+        setLastUpdate(new Date());
+      } catch (err: any) {
+        console.error('Price refresh error:', err);
+      }
     }, refreshInterval);
     
     return () => clearInterval(interval);
