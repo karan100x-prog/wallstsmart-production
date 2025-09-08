@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { getCompanyOverview, getQuote } from '../services/alphaVantage';
+import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 import { StockHealthMetrics } from './StockHealthMetrics';
 
@@ -9,100 +9,27 @@ interface StockDetailProps {
 }
 
 const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
-  const [priceData, setPriceData] = useState<any>(null);
+  const [quote, setQuote] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [newsData, setNewsData] = useState<any[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
     loadStockData();
     loadNewsData();
-
-    // Auto-refresh price based on market status
-    const now = new Date();
-    const day = now.getDay();
-    const hour = now.getHours();
-    const isMarketHours = day >= 1 && day <= 5 && hour >= 9 && hour < 16;
-    
-    // Refresh every 30 seconds during market hours, every 2 minutes otherwise
-    const refreshInterval = isMarketHours ? 30000 : 120000;
-    
-    const interval = setInterval(async () => {
-      try {
-        const quoteData = await getQuote(symbol.toUpperCase());
-        
-        console.log('Refresh - Quote data:', quoteData);
-        
-        // CRITICAL: Use field '05. price' for current price
-        const currentPrice = parseFloat(quoteData?.['05. price'] || '0');
-        const previousClose = parseFloat(quoteData?.['08. previous close'] || '0');
-        const change = parseFloat(quoteData?.['09. change'] || '0');
-        const changePercent = parseFloat(quoteData?.['10. change percent']?.replace('%', '') || '0');
-        
-        setPriceData({
-          price: currentPrice,
-          previousClose: previousClose,
-          change: change,
-          changePercent: changePercent,
-          volume: parseInt(quoteData?.['06. volume'] || '0'),
-          open: parseFloat(quoteData?.['02. open'] || '0'),
-          high: parseFloat(quoteData?.['03. high'] || '0'),
-          low: parseFloat(quoteData?.['04. low'] || '0'),
-          timestamp: quoteData?.['07. latest trading day'],
-          isRealtime: isMarketHours
-        });
-        
-        setLastUpdate(new Date());
-      } catch (err: any) {
-        console.error('Price refresh error:', err);
-      }
-    }, refreshInterval);
-    
-    return () => clearInterval(interval);
   }, [symbol]);
 
   const loadStockData = async () => {
     setLoading(true);
     try {
       const [quoteData, companyData] = await Promise.all([
-        getQuote(symbol.toUpperCase()),
+        getQuote(symbol),
         getCompanyOverview(symbol)
       ]);
       
-      // DEBUG: Log what we're getting from API
-      console.log('Initial load - Full quote data:', quoteData);
-      console.log('Field 05. price (current):', quoteData?.['05. price']);
-      console.log('Field 08. previous close:', quoteData?.['08. previous close']);
-      
-      // CRITICAL FIX: Use field '05. price' for CURRENT price
-      const currentPrice = parseFloat(quoteData?.['05. price'] || '0');
-      const previousClose = parseFloat(quoteData?.['08. previous close'] || '0');
-      
-      // Alert if we're getting wrong data
-      if (currentPrice === 0 && previousClose > 0) {
-        console.error('WARNING: Current price is 0, but previous close exists. Check API response!');
-      }
-      
-      const change = parseFloat(quoteData?.['09. change'] || '0');
-      const changePercent = parseFloat(quoteData?.['10. change percent']?.replace('%', '') || '0');
-      
-      setPriceData({
-        price: currentPrice, // THIS MUST BE '05. price' NOT '08. previous close'
-        previousClose: previousClose,
-        change: change,
-        changePercent: changePercent,
-        volume: parseInt(quoteData?.['06. volume'] || '0'),
-        open: parseFloat(quoteData?.['02. open'] || '0'),
-        high: parseFloat(quoteData?.['03. high'] || '0'),
-        low: parseFloat(quoteData?.['04. low'] || '0'),
-        timestamp: quoteData?.['07. latest trading day'],
-        isRealtime: false
-      });
-      
+      setQuote(quoteData);
       setCompany(companyData);
-      setLastUpdate(new Date());
     } catch (error) {
       console.error('Error loading stock data:', error);
     } finally {
@@ -182,12 +109,10 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     );
   }
 
-  // Use the price data
-  const price = priceData?.price || 0;
-  const change = priceData?.change || 0;
-  const changePercent = priceData?.changePercent || 0;
-  const volume = priceData?.volume || 0;
-  const isRealtime = priceData?.isRealtime || false;
+  const price = parseFloat(quote?.['05. price'] || '0');
+  const change = parseFloat(quote?.['09. change'] || '0');
+  const changePercent = quote?.['10. change percent'] || '0%';
+  const volume = parseInt(quote?.['06. volume'] || '0');
 
   const formatLargeNumber = (num: number) => {
     if (!num || num === 0) return 'N/A';
@@ -229,49 +154,8 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
             <div className="text-3xl font-bold">${price.toFixed(2)}</div>
             <div className={`text-lg flex items-center justify-end gap-1 ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {change >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
-              {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent.toFixed(2)}%)
+              {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent})
             </div>
-            {/* Real-time Indicator */}
-            <div className="flex items-center justify-end gap-2 mt-2 text-xs text-gray-400">
-              {isRealtime ? (
-                <>
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                  </span>
-                  <span className="text-green-400">Real-time</span>
-                </>
-              ) : (
-                <span>Delayed</span>
-              )}
-              <span>• {lastUpdate.toLocaleTimeString()}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Price Details Bar */}
-      <div className="bg-gray-900 p-4 rounded-xl border border-gray-800 mb-8">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div>
-            <span className="text-gray-400 text-sm">Open</span>
-            <div className="text-white font-semibold">${priceData?.open?.toFixed(2) || '-'}</div>
-          </div>
-          <div>
-            <span className="text-gray-400 text-sm">Previous Close</span>
-            <div className="text-white font-semibold">${priceData?.previousClose?.toFixed(2) || '-'}</div>
-          </div>
-          <div>
-            <span className="text-gray-400 text-sm">Day High</span>
-            <div className="text-white font-semibold">${priceData?.high?.toFixed(2) || '-'}</div>
-          </div>
-          <div>
-            <span className="text-gray-400 text-sm">Day Low</span>
-            <div className="text-white font-semibold">${priceData?.low?.toFixed(2) || '-'}</div>
-          </div>
-          <div>
-            <span className="text-gray-400 text-sm">Volume</span>
-            <div className="text-white font-semibold">{formatLargeNumber(volume)}</div>
           </div>
         </div>
       </div>
@@ -622,27 +506,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
             <div>No company description available</div>
           </div>
         )}
-      </div>
-
-      {/* Debug Info - REMOVE THIS IN PRODUCTION */}
-      <div className="mt-8 p-4 bg-black/50 rounded-lg text-xs text-gray-400 border border-gray-800">
-        <h3 className="text-white mb-2">Debug Info (Remove in production):</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <div>Current Price (field 05): ${priceData?.price}</div>
-          <div>Previous Close (field 08): ${priceData?.previousClose}</div>
-          <div>Change: ${priceData?.change}</div>
-          <div>Change %: {priceData?.changePercent}%</div>
-          <div>Open: ${priceData?.open}</div>
-          <div>High: ${priceData?.high}</div>
-          <div>Low: ${priceData?.low}</div>
-          <div>Volume: {formatLargeNumber(priceData?.volume)}</div>
-          <div>Last Trading Day: {priceData?.timestamp}</div>
-          <div>Auto-refresh: Every {isRealtime ? '30 seconds' : '2 minutes'}</div>
-        </div>
-        <div className="mt-2 text-yellow-400">
-          If price shows ${priceData?.previousClose} instead of ${priceData?.price}, 
-          the API is returning wrong field!
-        </div>
       </div>
     </div>
   );
