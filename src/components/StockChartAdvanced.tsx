@@ -313,11 +313,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
               dataKey="date" 
               stroke="#9CA3AF"
               tick={{ fill: '#9CA3AF', fontSize: 11 }}
-              interval={(index: number) => {
-                // For custom interval, show labels only when they have content
-                const label = chartData[index]?.date;
-                return label && label !== '';
-              }}
+              interval={0}
               minTickGap={20}
             />
             <YAxis 
