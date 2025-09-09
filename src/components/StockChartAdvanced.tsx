@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getIntradayPrices, getDailyPrices, getWeeklyPrices, getMonthlyPrices } from '../services/alphaVantage';
+import { getDailyPrices, getWeeklyPrices, getMonthlyPrices } from '../services/alphaVantage';
 
 interface StockChartAdvancedProps {
   symbol: string;
