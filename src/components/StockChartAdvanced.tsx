@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart } from 'recharts';
 import { getDailyPrices, getWeeklyPrices, getMonthlyPrices } from '../services/alphaVantage';
 
 interface StockChartAdvancedProps {
@@ -76,11 +76,15 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
 
     const closePrice = parseFloat(item.close) || 0;
     const adjustedPrice = closePrice / adjustmentFactor;
+    const volume = parseInt(item.volume) || 0;
+    const adjustedVolume = volume * adjustmentFactor;
 
     return {
       ...item,
       close: closePrice,
       adjustedClose: adjustedPrice,
+      volume: volume,
+      adjustedVolume: adjustedVolume,
       adjustmentFactor: adjustmentFactor,
       isAdjusted: adjustmentFactor > 1
     };
@@ -91,6 +95,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1M');
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showVolume, setShowVolume] = useState(true);
 
   useEffect(() => {
     loadChartData(selectedRange);
@@ -163,10 +168,15 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       // Apply manual split adjustments
       data = adjustPricesForSplits(data, symbol);
       
+      // Calculate max volume for scaling
+      const maxVolume = Math.max(...data.map(item => item.adjustedVolume || item.volume || 0));
+      
       // Format data for chart with smart date labeling
       const formattedData = data.reverse().map((item, index, array) => ({
         date: formatDateSmart(item.date, range, index, array),
         price: item.adjustedClose || item.close,
+        volume: item.adjustedVolume || item.volume || 0,
+        volumeScaled: ((item.adjustedVolume || item.volume || 0) / maxVolume) * 100, // Scale to percentage
         originalPrice: item.close,
         isAdjusted: item.isAdjusted || false,
         fullDate: new Date(item.date).toLocaleDateString('en-US', { 
@@ -185,9 +195,12 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           data = await getDailyPrices(symbol);
           data = data.slice(0, 5);
           data = adjustPricesForSplits(data, symbol);
+          const maxVolume = Math.max(...data.map(item => item.adjustedVolume || item.volume || 0));
           const formattedData = data.reverse().map((item, index, array) => ({
             date: formatDateSmart(item.date, range, index, array),
             price: item.adjustedClose || item.close,
+            volume: item.adjustedVolume || item.volume || 0,
+            volumeScaled: ((item.adjustedVolume || item.volume || 0) / maxVolume) * 100,
             originalPrice: item.close,
             isAdjusted: item.isAdjusted || false,
             fullDate: new Date(item.date).toLocaleDateString('en-US', { 
@@ -206,43 +219,48 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     }
   };
 
-  // Smart date formatting to avoid repetition
+  // Smart date formatting to show labels at period starts
   const formatDateSmart = (dateStr: string, range: TimeRange, index: number, array: any[]) => {
     const date = new Date(dateStr);
+    const prevDate = index > 0 ? new Date(array[index - 1].date) : null;
     
     if (range === '5D') {
-      // 5 days: Show abbreviated month and day
+      // 5 days: Show abbreviated month and day for all points
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } 
     else if (range === '1M') {
-      // 1 month: Show day number only, with month at start
-      if (index === 0 || date.getDate() === 1) {
+      // 1 month: Show label only on the 1st of month or first/last data point
+      if (index === 0 || index === array.length - 1 || date.getDate() === 1) {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }
-      return date.getDate().toString();
+      return '';
     }
     else if (range === '6M') {
-      // 6 months: Show month name only
-      return date.toLocaleDateString('en-US', { month: 'short' });
+      // 6 months: Show month name only on the 1st of each month
+      if (date.getDate() === 1 || index === 0 || index === array.length - 1) {
+        return date.toLocaleDateString('en-US', { month: 'short' });
+      }
+      return '';
     } 
     else if (range === '1Y') {
-      // 1 year: Show month name, with year at start/end
-      if (index === 0 || index === array.length - 1) {
-        return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      // 1 year: Show month on 1st of each month, with year at start/end
+      if (date.getDate() <= 7) { // Within first week of month (for weekly data)
+        if (index === 0 || index === array.length - 1 || date.getMonth() === 0) {
+          return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        }
+        return date.toLocaleDateString('en-US', { month: 'short' });
       }
-      return date.toLocaleDateString('en-US', { month: 'short' });
+      return '';
     } 
-    else if (range === '5Y') {
-      // 5 years: Show year only
-      return date.getFullYear().toString();
-    }
-    else if (range === '10Y') {
-      // 10 years: Show year only
-      return date.getFullYear().toString();
+    else if (range === '5Y' || range === '10Y' || range === 'MAX') {
+      // For multi-year views: Show year only on January or when year changes
+      if (date.getMonth() === 0 || (prevDate && date.getFullYear() !== prevDate.getFullYear()) || index === 0) {
+        return date.getFullYear().toString();
+      }
+      return '';
     }
     else {
-      // MAX: Show year only
-      return date.getFullYear().toString();
+      return '';
     }
   };
 
@@ -256,8 +274,13 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
           <p className="text-gray-400">{data.fullDate}</p>
           <p className="text-green-400 font-semibold">
-            ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
+            ${typeof data.price === 'number' ? data.price.toFixed(2) : '0.00'}
           </p>
+          {showVolume && (
+            <p className="text-gray-300 text-xs mt-1">
+              Vol: {(data.volume / 1000000).toFixed(2)}M
+            </p>
+          )}
           {data.isAdjusted && (
             <p className="text-yellow-400 text-xs mt-1">Split-adjusted</p>
           )}
@@ -267,11 +290,23 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     return null;
   };
 
+  // Format volume for Y-axis
+  const formatVolume = (value: number) => {
+    if (value >= 1000000000) {
+      return `${(value / 1000000000).toFixed(1)}B`;
+    } else if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(0)}M`;
+    } else if (value >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`;
+    }
+    return value.toString();
+  };
+
   const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
 
   return (
-    <div>
-      {/* Removed "Price Chart" header - cleaner look */}
+    <div className="w-full">
+      {/* Time range selector */}
       <div className="flex justify-end items-center mb-4">
         <div className="flex gap-1 sm:gap-2 overflow-x-auto">
           {timeRanges.map((range) => (
@@ -297,51 +332,100 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         </div>
       )}
 
+      {/* Chart Container - Full width, no padding */}
       {loading ? (
-        <div className="flex items-center justify-center h-[300px]">
+        <div className="flex items-center justify-center h-[400px]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
         </div>
       ) : chartData.length === 0 ? (
-        <div className="flex items-center justify-center h-[300px] text-gray-400">
+        <div className="flex items-center justify-center h-[400px] text-gray-400">
           No data available for this time range
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="date" 
-              stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 11 }}
-              interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
-                Math.floor(chartData.length / 8) : 'preserveStartEnd'}
-              minTickGap={20}
-            />
-            <YAxis 
-              stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 11 }}
-              domain={['dataMin * 0.95', 'dataMax * 1.05']}
-              tickFormatter={(value) => `$${value.toFixed(0)}`}
-            />
-            <Tooltip 
-              content={<CustomTooltip />}
-              contentStyle={{ 
-                backgroundColor: '#1F2937', 
-                border: '1px solid #374151',
-                borderRadius: '0.5rem'
-              }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="price" 
-              stroke="#10B981" 
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="w-full -ml-8"> {/* Negative margin to align left */}
+          <ResponsiveContainer width="100%" height={showVolume ? 400 : 300}>
+            <ComposedChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis 
+                dataKey="date" 
+                stroke="#9CA3AF"
+                tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                interval={0}
+                minTickGap={20}
+              />
+              
+              {/* Price Y-Axis (left) */}
+              <YAxis 
+                yAxisId="price"
+                orientation="left"
+                stroke="#9CA3AF"
+                tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                domain={['dataMin * 0.95', 'dataMax * 1.05']}
+                tickFormatter={(value) => `$${value.toFixed(0)}`}
+              />
+              
+              {/* Volume Y-Axis (right) - only show if volume is enabled */}
+              {showVolume && (
+                <YAxis 
+                  yAxisId="volume"
+                  orientation="right"
+                  stroke="#9CA3AF"
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  domain={[0, 'dataMax']}
+                  tickFormatter={formatVolume}
+                />
+              )}
+              
+              <Tooltip 
+                content={<CustomTooltip />}
+                contentStyle={{ 
+                  backgroundColor: '#1F2937', 
+                  border: '1px solid #374151',
+                  borderRadius: '0.5rem'
+                }}
+              />
+              
+              {/* Volume Bars - show only if enabled */}
+              {showVolume && (
+                <Bar 
+                  yAxisId="volume"
+                  dataKey="volume" 
+                  fill="#4B5563"
+                  opacity={0.3}
+                />
+              )}
+              
+              {/* Price Line */}
+              <Line 
+                yAxisId="price"
+                type="monotone" 
+                dataKey="price" 
+                stroke="#10B981" 
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 6 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       )}
+
+      {/* Volume Toggle Switch */}
+      <div className="flex items-center justify-center mt-4 gap-2">
+        <span className="text-sm text-gray-400">Volume</span>
+        <button
+          onClick={() => setShowVolume(!showVolume)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            showVolume ? 'bg-green-600' : 'bg-gray-700'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              showVolume ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
     </div>
   );
 };
