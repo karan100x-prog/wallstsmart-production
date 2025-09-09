@@ -6,7 +6,7 @@ interface StockChartAdvancedProps {
   symbol: string;
 }
 
-type TimeRange = '5D' | '1M' | '6M' | '1Y' | '3Y' | '5Y' | '10Y' | 'MAX';
+type TimeRange = '5D' | '1M' | '6M' | '1Y' | '5Y' | '10Y' | 'MAX';
 
 // Stock split data for major companies
 const STOCK_SPLITS: Record<string, Array<{date: string, ratio: number}>> = {
@@ -138,14 +138,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
-        case '3Y':
-          // Exactly 3 years ago
-          cutoffDate.setFullYear(today.getFullYear() - 3);
-          data = await getWeeklyPrices(symbol);
-          // Filter data from last 3 years
-          data = data.filter(item => new Date(item.date) >= cutoffDate);
-          break;
-        
         case '5Y':
           // Exactly 5 years ago
           cutoffDate.setFullYear(today.getFullYear() - 5);
@@ -217,62 +209,44 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   // Smart date formatting to avoid repetition
   const formatDateSmart = (dateStr: string, range: TimeRange, index: number, array: any[]) => {
     const date = new Date(dateStr);
-    const prevDate = index > 0 ? new Date(array[index - 1].date) : null;
     
-    if (range === '5D' || range === '1M') {
-      // For short ranges, show month and day
-      const month = date.toLocaleDateString('en-US', { month: 'short' });
-      const day = date.getDate();
-      
-      // Only show month if it's different from previous or first item
-      if (!prevDate || date.getMonth() !== prevDate.getMonth() || index === 0) {
-        return `${month} ${day}`;
-      }
-      return `${day}`;
+    if (range === '5D') {
+      // 5 days: Show abbreviated month and day
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } 
-    else if (range === '6M' || range === '1Y') {
-      // For medium ranges, show month and year sparingly
-      const month = date.toLocaleDateString('en-US', { month: 'short' });
-      const year = date.getFullYear().toString().slice(-2);
-      
-      // Show year only at the beginning and when it changes
-      if (!prevDate || date.getFullYear() !== prevDate.getFullYear() || index === 0) {
-        return `${month} '${year}`;
+    else if (range === '1M') {
+      // 1 month: Show day number only, with month at start
+      if (index === 0 || date.getDate() === 1) {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }
-      // Show month only every 3rd label to reduce clutter
-      if (index % 3 === 0) {
-        return month;
-      }
-      return '';
+      return date.getDate().toString();
+    }
+    else if (range === '6M') {
+      // 6 months: Show month name only
+      return date.toLocaleDateString('en-US', { month: 'short' });
     } 
-    else if (range === '3Y' || range === '5Y') {
-      // For 3-5 year ranges, show Q1, Q2, Q3, Q4 with year
-      const quarter = Math.floor(date.getMonth() / 3) + 1;
-      const year = date.getFullYear();
-      
-      // Only show year when it changes or at start
-      if (!prevDate || date.getFullYear() !== prevDate.getFullYear() || index === 0) {
-        return `Q${quarter} ${year}`;
+    else if (range === '1Y') {
+      // 1 year: Show month name, with year at start/end
+      if (index === 0 || index === array.length - 1) {
+        return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
       }
-      // Show quarter every other label
-      if (index % 2 === 0) {
-        return `Q${quarter}`;
-      }
-      return '';
+      return date.toLocaleDateString('en-US', { month: 'short' });
+    } 
+    else if (range === '5Y') {
+      // 5 years: Show year only
+      return date.getFullYear().toString();
+    }
+    else if (range === '10Y') {
+      // 10 years: Show year only
+      return date.getFullYear().toString();
     }
     else {
-      // For 10Y and MAX, only show years
-      const year = date.getFullYear();
-      
-      // Show year only when it changes or at regular intervals
-      if (!prevDate || date.getFullYear() !== prevDate.getFullYear() || index % 12 === 0) {
-        return year.toString();
-      }
-      return '';
+      // MAX: Show year only
+      return date.getFullYear().toString();
     }
   };
 
-  const timeRanges: TimeRange[] = ['5D', '1M', '6M', '1Y', '3Y', '5Y', '10Y', 'MAX'];
+  const timeRanges: TimeRange[] = ['5D', '1M', '6M', '1Y', '5Y', '10Y', 'MAX'];
 
   // Enhanced tooltip
   const CustomTooltip = ({ active, payload }: any) => {
