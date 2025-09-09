@@ -339,7 +339,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
               dataKey="date" 
               stroke="#9CA3AF"
               tick={{ fill: '#9CA3AF', fontSize: 11 }}
-              interval={range === '5Y' || range === '10Y' || range === 'MAX' ? 
+              interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
                 Math.floor(chartData.length / 8) : 'preserveStartEnd'}
               minTickGap={20}
             />
