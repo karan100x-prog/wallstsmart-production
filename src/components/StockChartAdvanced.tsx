@@ -306,41 +306,43 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           No data available for this time range
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="date" 
-              stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 11 }}
-              interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
-                Math.floor(chartData.length / 8) : 'preserveStartEnd'}
-              minTickGap={20}
-            />
-            <YAxis 
-              stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 11 }}
-              domain={['dataMin * 0.95', 'dataMax * 1.05']}
-              tickFormatter={(value) => `$${value.toFixed(0)}`}
-            />
-            <Tooltip 
-              content={<CustomTooltip />}
-              contentStyle={{ 
-                backgroundColor: '#1F2937', 
-                border: '1px solid #374151',
-                borderRadius: '0.5rem'
-              }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="price" 
-              stroke="#10B981" 
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="-ml-8"> {/* Added wrapper div with negative left margin */}
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis 
+                dataKey="date" 
+                stroke="#9CA3AF"
+                tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
+                  Math.floor(chartData.length / 8) : 'preserveStartEnd'}
+                minTickGap={20}
+              />
+              <YAxis 
+                stroke="#9CA3AF"
+                tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                domain={['dataMin * 0.95', 'dataMax * 1.05']}
+                tickFormatter={(value) => `$${value.toFixed(0)}`}
+              />
+              <Tooltip 
+                content={<CustomTooltip />}
+                contentStyle={{ 
+                  backgroundColor: '#1F2937', 
+                  border: '1px solid #374151',
+                  borderRadius: '0.5rem'
+                }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="price" 
+                stroke="#10B981" 
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   );
