@@ -6,55 +6,52 @@ interface StockChartAdvancedProps {
   symbol: string;
 }
 
-type TimeRange = '7D' | '1M' | '6M' | '1Y' | '3Y' | '5Y' | '10Y' | 'MAX';
+type TimeRange = '5D' | '1M' | '6M' | '1Y' | '3Y' | '5Y' | '10Y' | 'MAX';
 
 // Stock split data for major companies
 const STOCK_SPLITS: Record<string, Array<{date: string, ratio: number}>> = {
   'NVDA': [
-    { date: '2024-06-10', ratio: 10 },  // 10-for-1 split
-    { date: '2021-07-20', ratio: 4 },   // 4-for-1 split
-    { date: '2007-09-11', ratio: 1.5 }, // 3-for-2 split
-    { date: '2006-04-07', ratio: 2 },   // 2-for-1 split
-    { date: '2001-09-17', ratio: 2 },   // 2-for-1 split
-    { date: '2000-06-27', ratio: 2 },   // 2-for-1 split
+    { date: '2024-06-10', ratio: 10 },
+    { date: '2021-07-20', ratio: 4 },
+    { date: '2007-09-11', ratio: 1.5 },
+    { date: '2006-04-07', ratio: 2 },
+    { date: '2001-09-17', ratio: 2 },
+    { date: '2000-06-27', ratio: 2 },
   ],
   'AAPL': [
-    { date: '2020-08-31', ratio: 4 },   // 4-for-1 split
-    { date: '2014-06-09', ratio: 7 },   // 7-for-1 split
-    { date: '2005-02-28', ratio: 2 },   // 2-for-1 split
-    { date: '2000-06-21', ratio: 2 },   // 2-for-1 split
-    { date: '1987-06-16', ratio: 2 },   // 2-for-1 split
+    { date: '2020-08-31', ratio: 4 },
+    { date: '2014-06-09', ratio: 7 },
+    { date: '2005-02-28', ratio: 2 },
+    { date: '2000-06-21', ratio: 2 },
+    { date: '1987-06-16', ratio: 2 },
   ],
   'TSLA': [
-    { date: '2022-08-25', ratio: 3 },   // 3-for-1 split
-    { date: '2020-08-31', ratio: 5 },   // 5-for-1 split
+    { date: '2022-08-25', ratio: 3 },
+    { date: '2020-08-31', ratio: 5 },
   ],
   'AMZN': [
-    { date: '2022-06-06', ratio: 20 },  // 20-for-1 split
-    { date: '1999-09-02', ratio: 2 },   // 2-for-1 split
-    { date: '1999-01-05', ratio: 3 },   // 3-for-1 split
-    { date: '1998-06-02', ratio: 2 },   // 2-for-1 split
+    { date: '2022-06-06', ratio: 20 },
+    { date: '1999-09-02', ratio: 2 },
+    { date: '1999-01-05', ratio: 3 },
+    { date: '1998-06-02', ratio: 2 },
   ],
   'GOOGL': [
-    { date: '2022-07-18', ratio: 20 },  // 20-for-1 split
-    { date: '2014-04-03', ratio: 2 },   // 2-for-1 split
+    { date: '2022-07-18', ratio: 20 },
+    { date: '2014-04-03', ratio: 2 },
   ],
   'GOOG': [
-    { date: '2022-07-18', ratio: 20 },  // 20-for-1 split
-    { date: '2014-04-03', ratio: 2 },   // 2-for-1 split
+    { date: '2022-07-18', ratio: 20 },
+    { date: '2014-04-03', ratio: 2 },
   ],
   'MSFT': [
-    { date: '2003-02-18', ratio: 2 },   // 2-for-1 split
-    { date: '1999-03-29', ratio: 2 },   // 2-for-1 split
-    { date: '1998-02-23', ratio: 2 },   // 2-for-1 split
-    { date: '1996-12-09', ratio: 2 },   // 2-for-1 split
-  ],
-  'META': [
-    // No splits for META/Facebook
+    { date: '2003-02-18', ratio: 2 },
+    { date: '1999-03-29', ratio: 2 },
+    { date: '1998-02-23', ratio: 2 },
+    { date: '1996-12-09', ratio: 2 },
   ],
   'NFLX': [
-    { date: '2015-07-15', ratio: 7 },   // 7-for-1 split
-    { date: '2004-02-12', ratio: 2 },   // 2-for-1 split
+    { date: '2015-07-15', ratio: 7 },
+    { date: '2004-02-12', ratio: 2 },
   ]
 };
 
@@ -62,18 +59,14 @@ const STOCK_SPLITS: Record<string, Array<{date: string, ratio: number}>> = {
 function adjustPricesForSplits(data: any[], symbol: string): any[] {
   const splits = STOCK_SPLITS[symbol.toUpperCase()];
   
-  // If no splits defined, return original data
   if (!splits || splits.length === 0) {
     return data;
   }
 
-  console.log(`Adjusting splits for ${symbol}`, splits);
-
-  return data.map((item, index) => {
+  return data.map((item) => {
     const itemDate = new Date(item.date);
     let adjustmentFactor = 1;
 
-    // Calculate cumulative adjustment factor for all splits after this date
     for (const split of splits) {
       const splitDate = new Date(split.date);
       if (splitDate > itemDate) {
@@ -81,14 +74,8 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
       }
     }
 
-    // Always use close price and manually adjust it
     const closePrice = parseFloat(item.close) || 0;
     const adjustedPrice = closePrice / adjustmentFactor;
-
-    // Log first few adjustments for debugging
-    if (index < 3 && adjustmentFactor > 1) {
-      console.log(`Date: ${item.date}, Close: ${closePrice}, Factor: ${adjustmentFactor}, Adjusted: ${adjustedPrice}`);
-    }
 
     return {
       ...item,
@@ -115,22 +102,22 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     
     try {
       switch (range) {
-        case '7D':
-          // Use intraday data for 7 days
-          data = await getIntradayPrices(symbol, '30min');
-          data = data.slice(0, 56); // 7 days * 8 data points per day
+        case '5D':
+          // Use daily data for 5 days (more reliable than intraday)
+          data = await getDailyPrices(symbol);
+          data = data.slice(0, 5);
           break;
         
         case '1M':
           // Daily data for 1 month
           data = await getDailyPrices(symbol);
-          data = data.slice(0, 30);
+          data = data.slice(0, 22); // ~22 trading days in a month
           break;
         
         case '6M':
           // Daily data for 6 months
           data = await getDailyPrices(symbol);
-          data = data.slice(0, 180);
+          data = data.slice(0, 130); // ~130 trading days in 6 months
           break;
         
         case '1Y':
@@ -163,53 +150,116 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           break;
       }
       
-      // Apply manual split adjustments - CRITICAL FIX
+      // Apply manual split adjustments
       data = adjustPricesForSplits(data, symbol);
       
-      // Format data for chart - use the adjusted price we calculated
-      const formattedData = data.reverse().map((item) => ({
-        date: formatDate(item.date, range),
-        price: item.adjustedClose, // Use our manually calculated adjusted price
+      // Format data for chart with smart date labeling
+      const formattedData = data.reverse().map((item, index, array) => ({
+        date: formatDateSmart(item.date, range, index, array),
+        price: item.adjustedClose || item.close,
         originalPrice: item.close,
-        isAdjusted: item.isAdjusted || false
+        isAdjusted: item.isAdjusted || false,
+        fullDate: item.date
       }));
       
       setChartData(formattedData);
     } catch (error) {
       console.error('Chart data error:', error);
+      // If 5D fails, try to fall back to daily data
+      if (range === '5D') {
+        try {
+          data = await getDailyPrices(symbol);
+          data = data.slice(0, 5);
+          data = adjustPricesForSplits(data, symbol);
+          const formattedData = data.reverse().map((item, index, array) => ({
+            date: formatDateSmart(item.date, range, index, array),
+            price: item.adjustedClose || item.close,
+            originalPrice: item.close,
+            isAdjusted: item.isAdjusted || false,
+            fullDate: item.date
+          }));
+          setChartData(formattedData);
+        } catch (fallbackError) {
+          console.error('Fallback failed:', fallbackError);
+        }
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (dateStr: string, range: TimeRange) => {
+  // Smart date formatting to avoid repetition
+  const formatDateSmart = (dateStr: string, range: TimeRange, index: number, array: any[]) => {
     const date = new Date(dateStr);
+    const prevDate = index > 0 ? new Date(array[index - 1].date) : null;
     
-    if (range === '7D' || range === '1M') {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } else if (range === '6M' || range === '1Y') {
-      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    } else {
-      return date.toLocaleDateString('en-US', { year: 'numeric' });
+    if (range === '5D' || range === '1M') {
+      // For short ranges, show month and day
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const day = date.getDate();
+      
+      // Only show month if it's different from previous or first item
+      if (!prevDate || date.getMonth() !== prevDate.getMonth() || index === 0) {
+        return `${month} ${day}`;
+      }
+      return `${day}`;
+    } 
+    else if (range === '6M' || range === '1Y') {
+      // For medium ranges, show month and year sparingly
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const year = date.getFullYear().toString().slice(-2);
+      
+      // Show year only at the beginning and when it changes
+      if (!prevDate || date.getFullYear() !== prevDate.getFullYear() || index === 0) {
+        return `${month} '${year}`;
+      }
+      // Show month only every 3rd label to reduce clutter
+      if (index % 3 === 0) {
+        return month;
+      }
+      return '';
+    } 
+    else if (range === '3Y' || range === '5Y') {
+      // For 3-5 year ranges, show Q1, Q2, Q3, Q4 with year
+      const quarter = Math.floor(date.getMonth() / 3) + 1;
+      const year = date.getFullYear();
+      
+      // Only show year when it changes or at start
+      if (!prevDate || date.getFullYear() !== prevDate.getFullYear() || index === 0) {
+        return `Q${quarter} ${year}`;
+      }
+      // Show quarter every other label
+      if (index % 2 === 0) {
+        return `Q${quarter}`;
+      }
+      return '';
+    }
+    else {
+      // For 10Y and MAX, only show years
+      const year = date.getFullYear();
+      
+      // Show year only when it changes or at regular intervals
+      if (!prevDate || date.getFullYear() !== prevDate.getFullYear() || index % 12 === 0) {
+        return year.toString();
+      }
+      return '';
     }
   };
 
-  const timeRanges: TimeRange[] = ['7D', '1M', '6M', '1Y', '3Y', '5Y', '10Y', 'MAX'];
+  const timeRanges: TimeRange[] = ['5D', '1M', '6M', '1Y', '3Y', '5Y', '10Y', 'MAX'];
 
-  // Enhanced tooltip to show split adjustment info
+  // Enhanced tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload[0]) {
       const data = payload[0].payload;
       return (
         <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
-          <p className="text-gray-400">{label}</p>
+          <p className="text-gray-400">{data.fullDate}</p>
           <p className="text-green-400 font-semibold">
             ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
           </p>
           {data.isAdjusted && (
-            <p className="text-yellow-400 text-xs mt-1">
-              Split-adjusted
-            </p>
+            <p className="text-yellow-400 text-xs mt-1">Split-adjusted</p>
           )}
         </div>
       );
@@ -217,19 +267,18 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     return null;
   };
 
-  // Show split info for known stocks
   const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Price Chart</h2>
-        <div className="flex gap-2">
+      {/* Removed "Price Chart" header - cleaner look */}
+      <div className="flex justify-end items-center mb-4">
+        <div className="flex gap-1 sm:gap-2 overflow-x-auto">
           {timeRanges.map((range) => (
             <button
               key={range}
               onClick={() => setSelectedRange(range)}
-              className={`px-3 py-1 rounded transition ${
+              className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm transition whitespace-nowrap ${
                 selectedRange === range
                   ? 'bg-green-600 text-white'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
@@ -252,6 +301,10 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         <div className="flex items-center justify-center h-[300px]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
         </div>
+      ) : chartData.length === 0 ? (
+        <div className="flex items-center justify-center h-[300px] text-gray-400">
+          No data available for this time range
+        </div>
       ) : (
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
@@ -259,12 +312,15 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             <XAxis 
               dataKey="date" 
               stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
+              tick={{ fill: '#9CA3AF', fontSize: 11 }}
+              interval="preserveStartEnd"
+              minTickGap={30}
             />
             <YAxis 
               stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
+              tick={{ fill: '#9CA3AF', fontSize: 11 }}
               domain={['dataMin * 0.95', 'dataMax * 1.05']}
+              tickFormatter={(value) => `$${value.toFixed(0)}`}
             />
             <Tooltip 
               content={<CustomTooltip />}
@@ -273,7 +329,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                 border: '1px solid #374151',
                 borderRadius: '0.5rem'
               }}
-              labelStyle={{ color: '#9CA3AF' }}
             />
             <Line 
               type="monotone" 
