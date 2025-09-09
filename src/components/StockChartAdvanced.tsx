@@ -101,47 +101,65 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     let data: any[] = [];
     
     try {
+      // Calculate the cutoff date based on the selected range
+      const today = new Date();
+      let cutoffDate = new Date();
+      
       switch (range) {
         case '5D':
-          // Use daily data for 5 days (more reliable than intraday)
+          // Get last 5 trading days
+          cutoffDate.setDate(today.getDate() - 7); // Account for weekends
           data = await getDailyPrices(symbol);
+          // Filter to get last 5 trading days
           data = data.slice(0, 5);
           break;
         
         case '1M':
-          // Daily data for 1 month
+          // Exactly 1 month ago
+          cutoffDate.setMonth(today.getMonth() - 1);
           data = await getDailyPrices(symbol);
-          data = data.slice(0, 22); // ~22 trading days in a month
+          // Filter data from last month
+          data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '6M':
-          // Daily data for 6 months
+          // Exactly 6 months ago
+          cutoffDate.setMonth(today.getMonth() - 6);
           data = await getDailyPrices(symbol);
-          data = data.slice(0, 130); // ~130 trading days in 6 months
+          // Filter data from last 6 months
+          data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '1Y':
-          // Weekly data for 1 year
+          // Exactly 1 year ago
+          cutoffDate.setFullYear(today.getFullYear() - 1);
           data = await getWeeklyPrices(symbol);
-          data = data.slice(0, 52);
+          // Filter data from last year
+          data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '3Y':
-          // Weekly data for 3 years
+          // Exactly 3 years ago
+          cutoffDate.setFullYear(today.getFullYear() - 3);
           data = await getWeeklyPrices(symbol);
-          data = data.slice(0, 156);
+          // Filter data from last 3 years
+          data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '5Y':
-          // Monthly data for 5 years
+          // Exactly 5 years ago
+          cutoffDate.setFullYear(today.getFullYear() - 5);
           data = await getMonthlyPrices(symbol);
-          data = data.slice(0, 60);
+          // Filter data from last 5 years
+          data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '10Y':
-          // Monthly data for 10 years
+          // Exactly 10 years ago
+          cutoffDate.setFullYear(today.getFullYear() - 10);
           data = await getMonthlyPrices(symbol);
-          data = data.slice(0, 120);
+          // Filter data from last 10 years
+          data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case 'MAX':
@@ -159,7 +177,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         price: item.adjustedClose || item.close,
         originalPrice: item.close,
         isAdjusted: item.isAdjusted || false,
-        fullDate: item.date
+        fullDate: new Date(item.date).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric', 
+          year: 'numeric' 
+        })
       }));
       
       setChartData(formattedData);
@@ -176,7 +198,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             price: item.adjustedClose || item.close,
             originalPrice: item.close,
             isAdjusted: item.isAdjusted || false,
-            fullDate: item.date
+            fullDate: new Date(item.date).toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric' 
+            })
           }));
           setChartData(formattedData);
         } catch (fallbackError) {
