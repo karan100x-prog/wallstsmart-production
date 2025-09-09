@@ -249,7 +249,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const timeRanges: TimeRange[] = ['5D', '1M', '6M', '1Y', '3Y', '5Y', '10Y', 'MAX'];
 
   // Enhanced tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload[0]) {
       const data = payload[0].payload;
       return (
