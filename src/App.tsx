@@ -1,85 +1,109 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
-import { TrendingUp, Menu, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { TrendingUp, Menu, X, LogOut } from 'lucide-react';
+import { useState } from 'react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
 import Screener from './pages/Screener';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Login from './components/Login';
 
 function Navigation() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const { currentUser, logout } = useAuth();
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Failed to log out:', error);
+    }
+  };
   
   return (
-    <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <TrendingUp className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />
-            <span className="text-lg sm:text-xl font-bold">WallStSmart</span>
-          </div>
-          
-          {/* Desktop Navigation - FIXED WITH LINK COMPONENTS */}
-          <div className="hidden md:flex items-center gap-6">
-            <Link to="/" className="hover:text-green-500 transition">
-              Markets
-            </Link>
-            <Link to="/screener" className="hover:text-green-500 transition">
-              Screener
-            </Link>
-            <Link to="/portfolio" className="hover:text-green-500 transition">
-              Portfolio
-            </Link>
-            <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition">
-              Sign In
+    <>
+      <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+              <TrendingUp className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />
+              <span className="text-lg sm:text-xl font-bold">WallStSmart</span>
+            </div>
+            
+            <div className="hidden md:flex items-center gap-6">
+              <Link to="/" className="hover:text-green-500 transition">Markets</Link>
+              <Link to="/screener" className="hover:text-green-500 transition">Screener</Link>
+              <Link to="/portfolio" className="hover:text-green-500 transition">Portfolio</Link>
+              
+              {currentUser ? (
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-400">{currentUser.email}</span>
+                  <button 
+                    onClick={handleLogout}
+                    className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setShowLogin(true)}
+                  className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
+            
+            <button 
+              className="md:hidden p-2"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
           
-          {/* Mobile Menu Button */}
-          <button 
-            className="md:hidden p-2"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
-          </button>
-        </div>
-        
-        {/* Mobile Navigation Menu - FIXED WITH LINK COMPONENTS */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-800 py-4">
-            <div className="flex flex-col gap-4">
-              <Link 
-                to="/" 
-                className="px-2 py-1 hover:text-green-500 transition"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Markets
-              </Link>
-              <Link 
-                to="/screener" 
-                className="px-2 py-1 hover:text-green-500 transition"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Screener
-              </Link>
-              <Link 
-                to="/portfolio" 
-                className="px-2 py-1 hover:text-green-500 transition"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Portfolio
-              </Link>
-              <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition w-full">
-                Sign In
-              </button>
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-gray-800 py-4">
+              <div className="flex flex-col gap-4">
+                <Link to="/" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+                  Markets
+                </Link>
+                <Link to="/screener" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+                  Screener
+                </Link>
+                <Link to="/portfolio" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+                  Portfolio
+                </Link>
+                {currentUser ? (
+                  <>
+                    <div className="px-2 py-1 text-sm text-gray-400">{currentUser.email}</div>
+                    <button 
+                      onClick={handleLogout}
+                      className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition w-full"
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <button 
+                    onClick={() => setShowLogin(true)}
+                    className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition w-full"
+                  >
+                    Sign In
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </nav>
+          )}
+        </div>
+      </nav>
+      
+      {showLogin && <Login onClose={() => setShowLogin(false)} />}
+    </>
   );
 }
 
@@ -117,13 +141,8 @@ function StockPage() {
   const { symbol } = useParams<{ symbol: string }>();
   const navigate = useNavigate();
   
-  useEffect(() => {
-    if (!symbol) {
-      navigate('/', { replace: true });
-    }
-  }, [symbol, navigate]);
-  
   if (!symbol) {
+    navigate('/', { replace: true });
     return null;
   }
   
@@ -136,18 +155,56 @@ function StockPage() {
   );
 }
 
+function PortfolioPage() {
+  const { currentUser } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+  
+  if (!currentUser) {
+    return (
+      <>
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-10 text-center">
+          <h2 className="text-2xl font-bold mb-4">Sign in to access your portfolio</h2>
+          <p className="text-gray-400 mb-6">Track your investments and create watchlists</p>
+          <button 
+            onClick={() => setShowLogin(true)}
+            className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-semibold"
+          >
+            Sign In
+          </button>
+        </div>
+        {showLogin && <Login onClose={() => setShowLogin(false)} />}
+      </>
+    );
+  }
+  
+  return (
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-10">
+      <h1 className="text-3xl font-bold mb-8">My Portfolio</h1>
+      <div className="grid gap-6">
+        <div className="bg-gray-900 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Welcome, {currentUser.email}!</h2>
+          <p className="text-gray-400">Your portfolio features are being set up...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-950 text-white">
-        <Navigation />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/stock/:symbol" element={<StockPage />} />
-          <Route path="/screener" element={<Screener />} />
-        </Routes>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-gray-950 text-white">
+          <Navigation />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/stock/:symbol" element={<StockPage />} />
+            <Route path="/screener" element={<Screener />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 
