@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
 import { TrendingUp, Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import StockSearch from './components/StockSearch';
@@ -18,11 +18,17 @@ function Navigation() {
             <span className="text-lg sm:text-xl font-bold">WallStSmart</span>
           </div>
           
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - FIXED WITH LINK COMPONENTS */}
           <div className="hidden md:flex items-center gap-6">
-            <a href="#" className="hover:text-green-500 transition">Markets</a>
-            <a href="#" className="hover:text-green-500 transition">Screener</a>
-            <a href="#" className="hover:text-green-500 transition">Portfolio</a>
+            <Link to="/" className="hover:text-green-500 transition">
+              Markets
+            </Link>
+            <Link to="/screener" className="hover:text-green-500 transition">
+              Screener
+            </Link>
+            <Link to="/portfolio" className="hover:text-green-500 transition">
+              Portfolio
+            </Link>
             <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition">
               Sign In
             </button>
@@ -41,13 +47,31 @@ function Navigation() {
           </button>
         </div>
         
-        {/* Mobile Navigation Menu */}
+        {/* Mobile Navigation Menu - FIXED WITH LINK COMPONENTS */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-800 py-4">
             <div className="flex flex-col gap-4">
-              <a href="#" className="px-2 py-1 hover:text-green-500 transition">Markets</a>
-              <a href="#" className="px-2 py-1 hover:text-green-500 transition">Screener</a>
-              <a href="#" className="px-2 py-1 hover:text-green-500 transition">Portfolio</a>
+              <Link 
+                to="/" 
+                className="px-2 py-1 hover:text-green-500 transition"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Markets
+              </Link>
+              <Link 
+                to="/screener" 
+                className="px-2 py-1 hover:text-green-500 transition"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Screener
+              </Link>
+              <Link 
+                to="/portfolio" 
+                className="px-2 py-1 hover:text-green-500 transition"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Portfolio
+              </Link>
               <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition w-full">
                 Sign In
               </button>
