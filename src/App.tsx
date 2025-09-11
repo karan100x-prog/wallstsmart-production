@@ -1,11 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
 import { TrendingUp, Menu, X, LogOut, User } from 'lucide-react';
-import { useEffect, useState } from 'react';  // <-- Only ONE import from react
+import { useEffect, useState } from 'react';  // <-- KEEP ONLY THIS ONE
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
 import Screener from './pages/Screener';
 import { supabase } from './lib/supabase';
 import AuthForm from './components/AuthForm';
+// DELETE THE DUPLICATE useState, useEffect import that was here
 
 function Navigation({ user, onSignOut }) {
   const navigate = useNavigate();
