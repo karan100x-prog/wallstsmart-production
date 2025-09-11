@@ -3,6 +3,7 @@ import { TrendingUp, Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
+import Screener from './pages/Screener';
 
 function Navigation() {
   const navigate = useNavigate();
