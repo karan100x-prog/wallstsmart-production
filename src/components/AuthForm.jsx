@@ -1,6 +1,6 @@
 
-import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState } from 'react'  // <-- lowercase 'react'
+import { supabase } from '../lib/supabase'  // <-- no .js extension
 
 export default function AuthForm() {
   const [email, setEmail] = useState('')
