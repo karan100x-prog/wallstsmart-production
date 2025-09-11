@@ -385,14 +385,18 @@ export default function StockScreener() {
   };
 
   // Run screen
-  const runScreen = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setResults(mockResults);
-      setLoading(false);
-    }, 1500);
-  };
+const runScreen = async () => {
+  setLoading(true);
+  try {
+    const filteredStocks = await screenerService.runScreen(activeFilters);
+    setResults(filteredStocks);
+  } catch (error) {
+    console.error('Screening error:', error);
+    // You can add a toast notification here
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Clear all filters
   const clearAllFilters = () => {
