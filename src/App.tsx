@@ -4,6 +4,7 @@ import { useState } from 'react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
 import Screener from './pages/Screener';
+import Portfolio from './components/Portfolio';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 
@@ -179,13 +180,7 @@ function PortfolioPage() {
   
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-10">
-      <h1 className="text-3xl font-bold mb-8">My Portfolio</h1>
-      <div className="grid gap-6">
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Welcome, {currentUser.email}!</h2>
-          <p className="text-gray-400">Your portfolio features are being set up...</p>
-        </div>
-      </div>
+      <Portfolio />
     </div>
   );
 }
