@@ -15,10 +15,7 @@
     "axios": "^1.6.0",
     "lucide-react": "^0.400.0",
     "recharts": "^2.10.0",
-    "@supabase/supabase-js": "^2.39.0"
     "firebase": "^10.7.0"
-        
-    
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
