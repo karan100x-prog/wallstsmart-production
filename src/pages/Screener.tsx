@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { screenerService } from '../services/screenerService';
 import { ChevronDown, ChevronUp, Filter, Download, Save, TrendingUp, DollarSign, Activity, Shield, Users, Zap, Search, X, Info, Star, RefreshCw } from 'lucide-react';
 
 // Screener Component
