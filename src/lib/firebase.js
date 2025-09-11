@@ -6,10 +6,10 @@ import { getFirestore } from 'firebase/firestore';
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_AIzaSyDHyVQ7f4moAJGBJex6Hv1Trkf4KKxPguw,
   authDomain: import.meta.env.VITE_wallstsmart-production.firebaseapp.com,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  projectId: import.meta.env.VITE_wallstsmart-production,
+  storageBucket: import.meta.env.VITE_wallstsmart-production.firebasestorage.app,
+  messagingSenderId: import.meta.env.VITE_694145103814,
+  appId: import.meta.env.VITE_1:694145103814:web:f2347abe73f54a4f07e4c7
 };
 
 // Initialize Firebase
