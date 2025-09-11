@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>
+  // Suppress specific console errors from Google Auth
+  const originalError = console.error;
+  console.error = function(...args) {
+    if (args[0]?.includes?.('Cross-Origin-Opener-Policy') || 
+        args[0]?.includes?.('identitytoolkit.googleapis.com')) {
+      return;
+    }
+    originalError.apply(console, args);
+  };
+</script>
+    
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
