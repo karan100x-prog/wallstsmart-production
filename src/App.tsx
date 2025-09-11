@@ -120,6 +120,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/stock/:symbol" element={<StockPage />} />
+          <Route path="/screener" element={<Screener />} />
         </Routes>
       </div>
     </Router>
