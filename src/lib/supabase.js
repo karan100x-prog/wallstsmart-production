@@ -1,21 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-// These will come from environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Hardcode values directly
+const supabaseUrl = 'https://atbydkckyhbepxhpubxd.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0Ynlka2NreWhiZXB4aHB1YnhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMzU3OTEsImV4cCI6MjA3MjYxMTc5MX0.xN8XYf5A2vHqabTUSQzGeiQ4hAS1BzPetUUGMYmLSLI'
 
-// Log to see if variables are loaded (remove in production)
-console.log('Supabase URL:', supabaseUrl ? 'Loaded' : 'Missing')
-console.log('Supabase Key:', supabaseKey ? 'Loaded' : 'Missing')
+console.log('Supabase initialized')
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase environment variables!')
-  // Use empty strings to prevent crash
-  const supabaseUrl = 'https://placeholder.supabase.co'
-  const supabaseKey = 'placeholder-key'
-}
-
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseKey || 'placeholder-key'
-)
+export const supabase = createClient(supabaseUrl, supabaseKey)
