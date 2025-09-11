@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
 import { TrendingUp, Menu, X, LogOut, User } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';  // <-- Only ONE import from react
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
 import Screener from './pages/Screener';
