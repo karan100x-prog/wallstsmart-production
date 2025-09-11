@@ -5,7 +5,9 @@ import { ChevronDown, ChevronUp, Filter, Download, Save, TrendingUp, DollarSign,
 // Screener Component
 export default function StockScreener() {
   const [activeFilters, setActiveFilters] = useState({});
-  const [expandedCategories, setExpandedCategories] = useState({});
+  const [expandedCategories, setExpandedCategories] = useState({
+    fundamentals: true // Start with fundamentals expanded
+  });
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState(null);
@@ -385,18 +387,18 @@ export default function StockScreener() {
   };
 
   // Run screen
-const runScreen = async () => {
-  setLoading(true);
-  try {
-    const filteredStocks = await screenerService.runScreen(activeFilters);
-    setResults(filteredStocks);
-  } catch (error) {
-    console.error('Screening error:', error);
-    // You can add a toast notification here
-  } finally {
-    setLoading(false);
-  }
-};
+  const runScreen = async () => {
+    setLoading(true);
+    try {
+      const filteredStocks = await screenerService.runScreen(activeFilters);
+      setResults(filteredStocks);
+    } catch (error) {
+      console.error('Screening error:', error);
+      // You can add a toast notification here
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Clear all filters
   const clearAllFilters = () => {
@@ -405,8 +407,16 @@ const runScreen = async () => {
     setResults([]);
   };
 
-  // Count active filters
-  const activeFilterCount = Object.keys(activeFilters).length;
+  // Count active filters - FIXED to only count filters with actual values
+  const activeFilterCount = useMemo(() => {
+    return Object.entries(activeFilters).filter(([key, value]) => {
+      if (!value) return false;
+      if (typeof value === 'object') {
+        return value.min !== undefined || value.max !== undefined;
+      }
+      return value !== null && value !== '';
+    }).length;
+  }, [activeFilters]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -437,7 +447,7 @@ const runScreen = async () => {
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Sidebar - Filters */}
-          <div className="lg:col-span-1 space-y-4">
+          <div className="lg:col-span-1 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
             {/* Preset Screens */}
             <div className="bg-gray-900 rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
@@ -448,10 +458,10 @@ const runScreen = async () => {
                   <button
                     key={preset.id}
                     onClick={() => applyPreset(preset)}
-                    className={`w-full text-left p-3 rounded-lg transition-all ${
+                    className={`w-full text-left p-3 rounded-lg transition-all transform hover:scale-[1.01] ${
                       selectedPreset === preset.id
-                        ? 'bg-gradient-to-r from-green-600/20 to-blue-600/20 border border-green-500/30'
-                        : 'bg-gray-800 hover:bg-gray-750 border border-gray-700'
+                        ? 'bg-gradient-to-r from-green-500/20 to-blue-500/20 border-2 border-green-400 shadow-lg shadow-green-500/20'
+                        : 'bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-gray-600'
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -507,10 +517,10 @@ const runScreen = async () => {
                     </button>
 
                     {expandedCategories[catKey] && (
-                      <div className="p-3 space-y-3 bg-gray-850">
+                      <div className="p-4 space-y-4 bg-gray-850">
                         {Object.entries(category.filters).map(([filterKey, filter]) => (
-                          <div key={filterKey}>
-                            <label className="text-xs text-gray-400 mb-1 block">
+                          <div key={filterKey} className="space-y-2">
+                            <label className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                               {filter.name}
                             </label>
                             {filter.type === 'range' && (
@@ -518,17 +528,24 @@ const runScreen = async () => {
                                 <input
                                   type="number"
                                   placeholder="Min"
-                                  className="flex-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm focus:border-green-500 focus:outline-none"
+                                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-sm 
+                                           text-white placeholder-gray-500 
+                                           focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20
+                                           hover:border-gray-600 transition-all"
                                   value={activeFilters[filterKey]?.min || ''}
                                   onChange={(e) => handleFilterChange(filterKey, {
                                     ...activeFilters[filterKey],
                                     min: e.target.value ? Number(e.target.value) : undefined
                                   })}
                                 />
+                                <span className="text-gray-500 self-center">-</span>
                                 <input
                                   type="number"
                                   placeholder="Max"
-                                  className="flex-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm focus:border-green-500 focus:outline-none"
+                                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-sm 
+                                           text-white placeholder-gray-500 
+                                           focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20
+                                           hover:border-gray-600 transition-all"
                                   value={activeFilters[filterKey]?.max || ''}
                                   onChange={(e) => handleFilterChange(filterKey, {
                                     ...activeFilters[filterKey],
@@ -539,11 +556,13 @@ const runScreen = async () => {
                             )}
                             {filter.type === 'select' && (
                               <select
-                                className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm focus:border-green-500 focus:outline-none"
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-sm 
+                                         text-white focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20
+                                         hover:border-gray-600 transition-all"
                                 value={activeFilters[filterKey] || ''}
                                 onChange={(e) => handleFilterChange(filterKey, e.target.value || null)}
                               >
-                                <option value="">All</option>
+                                <option value="" className="text-gray-400">All</option>
                                 {filter.options.map(option => (
                                   <option key={option.value} value={option.value}>
                                     {option.label}
@@ -559,21 +578,32 @@ const runScreen = async () => {
                 ))}
               </div>
 
-              {/* Run Screen Button */}
+              {/* Run Screen Button - IMPROVED VISIBILITY */}
               <button
                 onClick={runScreen}
                 disabled={loading}
-                className="w-full mt-4 px-4 py-3 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg font-semibold hover:from-green-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full mt-4 px-4 py-3.5 bg-gradient-to-r from-green-500 to-blue-500 
+                         rounded-lg font-semibold text-white text-base
+                         hover:from-green-600 hover:to-blue-600 
+                         disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed 
+                         transition-all transform hover:scale-[1.02] active:scale-[0.98]
+                         shadow-lg hover:shadow-xl hover:shadow-green-500/20
+                         flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="w-5 h-5 animate-spin" />
                     Screening...
                   </>
                 ) : (
                   <>
-                    <Search className="w-4 h-4" />
+                    <Search className="w-5 h-5" />
                     Run Screen
+                    {activeFilterCount > 0 && (
+                      <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                        {activeFilterCount}
+                      </span>
+                    )}
                   </>
                 )}
               </button>
@@ -581,7 +611,7 @@ const runScreen = async () => {
           </div>
 
           {/* Main Content - Results */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 min-h-[600px]">
             {/* Results Header */}
             <div className="bg-gray-900 rounded-xl p-4 mb-4">
               <div className="flex items-center justify-between">
@@ -617,13 +647,31 @@ const runScreen = async () => {
             </div>
 
             {/* Results Display */}
-            {results.length === 0 ? (
+            {loading ? (
               <div className="bg-gray-900 rounded-xl p-12 text-center">
-                <Filter className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-300 mb-2">Start Your Search</h3>
-                <p className="text-gray-500 max-w-md mx-auto">
-                  Select filters or choose a preset screen, then click "Run Screen" to find stocks matching your criteria.
+                <RefreshCw className="w-12 h-12 text-green-500 mx-auto mb-4 animate-spin" />
+                <h3 className="text-lg font-medium text-gray-300 mb-2">Screening Stocks...</h3>
+                <p className="text-gray-500">Analyzing {activeFilterCount > 0 ? `with ${activeFilterCount} filters` : 'all stocks'}</p>
+              </div>
+            ) : results.length === 0 ? (
+              <div className="bg-gray-900 rounded-xl p-12 text-center">
+                <Filter className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-300 mb-3">
+                  Start Your Search
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto mb-6">
+                  Select filters or choose a preset screen to find stocks matching your criteria
                 </p>
+                <button
+                  onClick={() => {
+                    applyPreset(presetScreens[0]);
+                    setTimeout(runScreen, 100);
+                  }}
+                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg font-medium hover:from-green-600 hover:to-blue-600 transition-all inline-flex items-center gap-2"
+                >
+                  <Zap className="w-4 h-4" />
+                  Quick Start with Warren Buffett Style
+                </button>
               </div>
             ) : viewMode === 'table' ? (
               <div className="bg-gray-900 rounded-xl overflow-hidden">
