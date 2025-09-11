@@ -1,6 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
 import { TrendingUp, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
 import Screener from './pages/Screener';
@@ -18,32 +18,63 @@ function Navigation() {
             <span className="text-lg sm:text-xl font-bold">WallStSmart</span>
           </div>
           
+          {/* Desktop Navigation - FIXED WITH LINK COMPONENTS */}
           <div className="hidden md:flex items-center gap-6">
-            <Link to="/" className="hover:text-green-500 transition">Markets</Link>
-            <Link to="/screener" className="hover:text-green-500 transition">Screener</Link>
-            <Link to="/portfolio" className="hover:text-green-500 transition">Portfolio</Link>
+            <Link to="/" className="hover:text-green-500 transition">
+              Markets
+            </Link>
+            <Link to="/screener" className="hover:text-green-500 transition">
+              Screener
+            </Link>
+            <Link to="/portfolio" className="hover:text-green-500 transition">
+              Portfolio
+            </Link>
+            <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition">
+              Sign In
+            </button>
           </div>
           
+          {/* Mobile Menu Button */}
           <button 
             className="md:hidden p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {mobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </button>
         </div>
         
+        {/* Mobile Navigation Menu - FIXED WITH LINK COMPONENTS */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-800 py-4">
             <div className="flex flex-col gap-4">
-              <Link to="/" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+              <Link 
+                to="/" 
+                className="px-2 py-1 hover:text-green-500 transition"
+                onClick={() => setMobileMenuOpen(false)}
+              >
                 Markets
               </Link>
-              <Link to="/screener" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+              <Link 
+                to="/screener" 
+                className="px-2 py-1 hover:text-green-500 transition"
+                onClick={() => setMobileMenuOpen(false)}
+              >
                 Screener
               </Link>
-              <Link to="/portfolio" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+              <Link 
+                to="/portfolio" 
+                className="px-2 py-1 hover:text-green-500 transition"
+                onClick={() => setMobileMenuOpen(false)}
+              >
                 Portfolio
               </Link>
+              <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition w-full">
+                Sign In
+              </button>
             </div>
           </div>
         )}
@@ -83,11 +114,16 @@ function HomePage() {
 }
 
 function StockPage() {
-  const navigate = useNavigate();
   const { symbol } = useParams<{ symbol: string }>();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (!symbol) {
+      navigate('/', { replace: true });
+    }
+  }, [symbol, navigate]);
   
   if (!symbol) {
-    navigate('/');
     return null;
   }
   
@@ -96,15 +132,6 @@ function StockPage() {
       <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         <StockDetail symbol={symbol} />
       </div>
-    </div>
-  );
-}
-
-function PortfolioPage() {
-  return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-10 text-center">
-      <h1 className="text-3xl font-bold mb-4">Portfolio</h1>
-      <p className="text-gray-400">Coming soon - Authentication will be added here</p>
     </div>
   );
 }
@@ -118,7 +145,6 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/stock/:symbol" element={<StockPage />} />
           <Route path="/screener" element={<Screener />} />
-          <Route path="/portfolio" element={<PortfolioPage />} />
         </Routes>
       </div>
     </Router>
