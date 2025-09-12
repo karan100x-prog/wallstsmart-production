@@ -8,6 +8,7 @@ import Portfolio from './components/Portfolio';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import MacroDashboard from './components/MacroDashboard';
+import SmartFlow from './components/SmartFlow';
 
 function Navigation() {
   const navigate = useNavigate();
@@ -198,6 +199,7 @@ function App() {
             <Route path="/screener" element={<Screener />} />
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/macro" element={<MacroDashboard />} />
+            <Route path="/smart-flow" element={<SmartFlow />} />
           </Routes>
         </div>
       </Router>
