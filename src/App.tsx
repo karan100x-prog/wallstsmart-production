@@ -39,6 +39,7 @@ function Navigation() {
               <Link to="/macro" className="hover:text-green-500 transition">Macro</Link>
               <Link to="/screener" className="hover:text-green-500 transition">Screener</Link>
               <Link to="/portfolio" className="hover:text-green-500 transition">Portfolio</Link>
+              <Link to="/smart-flow" className="nav-link">Smart Flow</Link>
               
               {currentUser ? (
                 <div className="flex items-center gap-4">
