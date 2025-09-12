@@ -197,6 +197,7 @@ function App() {
             <Route path="/stock/:symbol" element={<StockPage />} />
             <Route path="/screener" element={<Screener />} />
             <Route path="/portfolio" element={<PortfolioPage />} />
+            <Route path="/macro" element={<MacroDashboard />} />
           </Routes>
         </div>
       </Router>
