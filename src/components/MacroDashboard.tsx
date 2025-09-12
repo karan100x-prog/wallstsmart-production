@@ -198,7 +198,7 @@ const MacroDashboard = () => {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4 flex items-center justify-center">
         <div className="text-center">
           <Activity className="w-12 h-12 text-blue-400 animate-pulse mx-auto mb-4" />
-          <p className="text-gray-400">Loading real-time macro data from Alpha Vantage...</p>
+          <p className="text-gray-400">Loading real-time macro data...</p>
           <p className="text-xs text-gray-500 mt-2">Premium API: 75 calls/minute</p>
         </div>
       </div>
@@ -215,7 +215,7 @@ const MacroDashboard = () => {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
               Macro View
             </h1>
-            <p className="text-gray-400 mt-1">Real-time economic indicators powered by Alpha Vantage Premium</p>
+            <p className="text-gray-400 mt-1">Real-time economic indicators</p>
           </div>
           <div className="text-right">
             <div className="text-sm text-gray-400">Last Update</div>
@@ -334,12 +334,12 @@ const MacroDashboard = () => {
           <div className="bg-gray-800/50 backdrop-blur rounded-xl p-4 border border-gray-700">
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <Zap className="w-5 h-5 text-yellow-400" />
-              Alpha Vantage API Status
+              API Status
             </h3>
             <div className="space-y-2">
               <div className="flex items-center justify-between py-1">
                 <span className="text-sm">API Plan</span>
-                <span className="text-green-400 font-semibold">Premium (75 calls/min)</span>
+                <span className="text-green-400 font-semibold">Loading...</span>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-sm">Data Sources Active</span>
