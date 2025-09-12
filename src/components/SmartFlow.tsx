@@ -63,11 +63,11 @@ const SmartFlow: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-white">
-              Smart<span className="text-green-500">Flow</span>
+              <span className="text-green-500"></span>
             </h1>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Live • Tracking smart money activity</span>
+              <span>Tracking smart money activity</span>
             </div>
           </div>
         </div>
