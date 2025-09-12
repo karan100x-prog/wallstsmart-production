@@ -9,3 +9,16 @@ export default {
   },
   plugins: [],
 }
+
+
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        'dark-bg': '#0f1117',
+        'dark-card': '#1a1d29',
+        'green-primary': '#10b981'
+      }
+    }
+  }
+}
