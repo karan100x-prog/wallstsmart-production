@@ -1,6 +1,12 @@
 // src/components/SmartFlow.tsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { 
+  getSmartFlowData, 
+  getInsiderTransactions,
+  getTopGainersLosers,
+  getNewsSentiment 
+} from '../services/alphaVantage';
 
 const ALPHA_VANTAGE_KEY = 'NMSRS0ZDIOWF3CLL';
 
