@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Globe, Briefcase, Home, Factory, Zap, AlertTriangle, ChevronUp, ChevronDown, Info } from 'lucide-react';
 import axios from 'axios';
+import { fetchAndProcessMacroData } from '../services/macroDataService';
 
 // Using your existing Premium Alpha Vantage API key
 const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_KEY || 'NMSRS0ZDIOWF3CLL';
