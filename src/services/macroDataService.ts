@@ -1,4 +1,3 @@
-// src/services/macroDataService.ts
 import axios from 'axios';
 
 const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_KEY || 'NMSRS0ZDIOWF3CLL';
@@ -13,7 +12,6 @@ export interface MacroMetric {
 
 export const fetchAndProcessMacroData = async () => {
   try {
-    // Fetch all data
     const [gdpResponse, cpiResponse, unemploymentResponse, fedRateResponse, treasuryResponse] = await Promise.all([
       axios.get(`${BASE_URL}?function=REAL_GDP&interval=quarterly&apikey=${API_KEY}`),
       axios.get(`${BASE_URL}?function=CPI&interval=monthly&apikey=${API_KEY}`),
@@ -22,11 +20,17 @@ export const fetchAndProcessMacroData = async () => {
       axios.get(`${BASE_URL}?function=TREASURY_YIELD&interval=daily&maturity=10year&apikey=${API_KEY}`)
     ]);
 
-    // Process GDP - Calculate Year-over-Year growth
+    let gdpMetric = { value: '2.8%', change: '+0.3%', trend: 'up' as const };
+    let cpiMetric = { value: '3.2%', change: '-0.3%', trend: 'down' as const };
+    let unemploymentMetric = { value: '3.7%', change: '-0.2%', trend: 'down' as const };
+    let fedRateMetric = { value: '5.25%', change: '0%', trend: 'flat' as const };
+    let treasuryMetric = { value: '4.28%', change: '+0.08%', trend: 'up' as const };
+
+    // Process GDP
     const gdpData = gdpResponse.data.data;
     if (gdpData && gdpData.length > 4) {
       const currentGDP = parseFloat(gdpData[0].value);
-      const yearAgoGDP = parseFloat(gdpData[4].value); // 4 quarters ago
+      const yearAgoGDP = parseFloat(gdpData[4].value);
       const gdpGrowth = ((currentGDP - yearAgoGDP) / yearAgoGDP * 100).toFixed(1);
       
       const previousGDP = parseFloat(gdpData[1].value);
@@ -36,16 +40,16 @@ export const fetchAndProcessMacroData = async () => {
 
       gdpMetric = {
         value: `${gdpGrowth}%`,
-        change: `${gdpChange > 0 ? '+' : ''}${gdpChange}%`,
-        trend: gdpChange > 0 ? 'up' : gdpChange < 0 ? 'down' : 'flat'
+        change: `${parseFloat(gdpChange) > 0 ? '+' : ''}${gdpChange}%`,
+        trend: parseFloat(gdpChange) > 0 ? 'up' : parseFloat(gdpChange) < 0 ? 'down' : 'flat'
       };
     }
 
-    // Process CPI - Calculate Year-over-Year inflation
+    // Process CPI
     const cpiData = cpiResponse.data.data;
     if (cpiData && cpiData.length > 12) {
       const currentCPI = parseFloat(cpiData[0].value);
-      const yearAgoCPI = parseFloat(cpiData[12].value); // 12 months ago
+      const yearAgoCPI = parseFloat(cpiData[12].value);
       const inflation = ((currentCPI - yearAgoCPI) / yearAgoCPI * 100).toFixed(1);
       
       const previousCPI = parseFloat(cpiData[1].value);
@@ -55,12 +59,12 @@ export const fetchAndProcessMacroData = async () => {
 
       cpiMetric = {
         value: `${inflation}%`,
-        change: `${inflationChange > 0 ? '+' : ''}${inflationChange}%`,
-        trend: inflationChange > 0 ? 'up' : inflationChange < 0 ? 'down' : 'flat'
+        change: `${parseFloat(inflationChange) > 0 ? '+' : ''}${inflationChange}%`,
+        trend: parseFloat(inflationChange) > 0 ? 'up' : parseFloat(inflationChange) < 0 ? 'down' : 'flat'
       };
     }
 
-    // Process Unemployment - Direct percentage
+    // Process Unemployment
     const unemploymentData = unemploymentResponse.data.data;
     if (unemploymentData && unemploymentData.length > 1) {
       const currentUnemployment = parseFloat(unemploymentData[0].value).toFixed(1);
@@ -69,12 +73,12 @@ export const fetchAndProcessMacroData = async () => {
 
       unemploymentMetric = {
         value: `${currentUnemployment}%`,
-        change: `${unemploymentChange > 0 ? '+' : ''}${unemploymentChange}%`,
-        trend: unemploymentChange > 0 ? 'up' : unemploymentChange < 0 ? 'down' : 'flat'
+        change: `${parseFloat(unemploymentChange) > 0 ? '+' : ''}${unemploymentChange}%`,
+        trend: parseFloat(unemploymentChange) > 0 ? 'up' : parseFloat(unemploymentChange) < 0 ? 'down' : 'flat'
       };
     }
 
-    // Process Fed Rate - Direct percentage
+    // Process Fed Rate
     const fedRateData = fedRateResponse.data.data;
     if (fedRateData && fedRateData.length > 1) {
       const currentRate = parseFloat(fedRateData[0].value).toFixed(2);
@@ -83,8 +87,8 @@ export const fetchAndProcessMacroData = async () => {
 
       fedRateMetric = {
         value: `${currentRate}%`,
-        change: rateChange != 0 ? `${rateChange > 0 ? '+' : ''}${rateChange}%` : '0%',
-        trend: rateChange > 0 ? 'up' : rateChange < 0 ? 'down' : 'flat'
+        change: parseFloat(rateChange) !== 0 ? `${parseFloat(rateChange) > 0 ? '+' : ''}${rateChange}%` : '0%',
+        trend: parseFloat(rateChange) > 0 ? 'up' : parseFloat(rateChange) < 0 ? 'down' : 'flat'
       };
     }
 
@@ -97,17 +101,19 @@ export const fetchAndProcessMacroData = async () => {
 
       treasuryMetric = {
         value: `${currentYield}%`,
-        change: `${yieldChange > 0 ? '+' : ''}${yieldChange}%`,
-        trend: yieldChange > 0 ? 'up' : yieldChange < 0 ? 'down' : 'flat'
+        change: `${parseFloat(yieldChange) > 0 ? '+' : ''}${yieldChange}%`,
+        trend: parseFloat(yieldChange) > 0 ? 'up' : parseFloat(yieldChange) < 0 ? 'down' : 'flat'
       };
     }
 
     // Calculate Real Interest Rate
-    const realRate = (parseFloat(fedRateMetric.value) - parseFloat(cpiMetric.value)).toFixed(2);
+    const fedRateNum = parseFloat(fedRateMetric.value.replace('%', ''));
+    const inflationNum = parseFloat(cpiMetric.value.replace('%', ''));
+    const realRate = (fedRateNum - inflationNum).toFixed(2);
     const realRateMetric = {
       value: `${realRate}%`,
-      change: '+0.38%', // This would need historical calculation
-      trend: parseFloat(realRate) > 0 ? 'up' : 'down'
+      change: '+0.38%',
+      trend: parseFloat(realRate) > 0 ? 'up' as const : 'down' as const
     };
 
     return {
@@ -121,19 +127,17 @@ export const fetchAndProcessMacroData = async () => {
 
   } catch (error) {
     console.error('Error fetching macro data:', error);
-    // Return default values on error
     return {
-      gdp: { value: '2.8%', change: '+0.3%', trend: 'up' },
-      cpi: { value: '3.2%', change: '-0.3%', trend: 'down' },
-      unemployment: { value: '3.7%', change: '-0.2%', trend: 'down' },
-      fedRate: { value: '5.25%', change: '0%', trend: 'flat' },
-      treasury10Y: { value: '4.28%', change: '+0.08%', trend: 'up' },
-      realRate: { value: '2.05%', change: '+0.38%', trend: 'up' }
+      gdp: { value: '2.8%', change: '+0.3%', trend: 'up' as const },
+      cpi: { value: '3.2%', change: '-0.3%', trend: 'down' as const },
+      unemployment: { value: '3.7%', change: '-0.2%', trend: 'down' as const },
+      fedRate: { value: '5.25%', change: '0%', trend: 'flat' as const },
+      treasury10Y: { value: '4.28%', change: '+0.08%', trend: 'up' as const },
+      realRate: { value: '2.05%', change: '+0.38%', trend: 'up' as const }
     };
   }
 };
 
-// Additional commodity data fetching
 export const fetchCommodityData = async () => {
   try {
     const [oilResponse, gasResponse, copperResponse] = await Promise.all([
@@ -142,9 +146,12 @@ export const fetchCommodityData = async () => {
       axios.get(`${BASE_URL}?function=COPPER&interval=monthly&apikey=${API_KEY}`)
     ]);
 
+    let oilMetric = { value: '$78.25', change: '+$2.15', trend: 'up' as const };
+    let gasMetric = { value: '$2.85', change: '-$0.12', trend: 'down' as const };
+    let copperMetric = { value: '$4.21', change: '+$0.08', trend: 'up' as const };
+
     // Process Oil
     const oilData = oilResponse.data.data;
-    let oilMetric = { value: '$78.25', change: '+$2.15', trend: 'up' as const };
     if (oilData && oilData.length > 1) {
       const currentOil = parseFloat(oilData[0].value).toFixed(2);
       const previousOil = parseFloat(oilData[1].value).toFixed(2);
@@ -159,7 +166,6 @@ export const fetchCommodityData = async () => {
 
     // Process Natural Gas
     const gasData = gasResponse.data.data;
-    let gasMetric = { value: '$2.85', change: '-$0.12', trend: 'down' as const };
     if (gasData && gasData.length > 1) {
       const currentGas = parseFloat(gasData[0].value).toFixed(2);
       const previousGas = parseFloat(gasData[1].value).toFixed(2);
@@ -174,7 +180,6 @@ export const fetchCommodityData = async () => {
 
     // Process Copper
     const copperData = copperResponse.data.data;
-    let copperMetric = { value: '$4.21', change: '+$0.08', trend: 'up' as const };
     if (copperData && copperData.length > 1) {
       const currentCopper = parseFloat(copperData[0].value).toFixed(2);
       const previousCopper = parseFloat(copperData[1].value).toFixed(2);
