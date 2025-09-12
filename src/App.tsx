@@ -7,6 +7,7 @@ import Screener from './pages/Screener';
 import Portfolio from './components/Portfolio';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
+import MacroDashboard from './components/MacroDashboard';
 
 function Navigation() {
   const navigate = useNavigate();
