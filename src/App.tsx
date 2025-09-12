@@ -35,7 +35,7 @@ function Navigation() {
             </div>
             
             <div className="hidden md:flex items-center gap-6">
-              <Link to="/" className="hover:text-green-500 transition">Markets</Link>
+              <Link to="/" className="hover:text-green-500 transition">Macro</Link>
               <Link to="/screener" className="hover:text-green-500 transition">Screener</Link>
               <Link to="/portfolio" className="hover:text-green-500 transition">Portfolio</Link>
               
@@ -72,7 +72,7 @@ function Navigation() {
             <div className="md:hidden border-t border-gray-800 py-4">
               <div className="flex flex-col gap-4">
                 <Link to="/" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
-                  Markets
+                  Macro
                 </Link>
                 <Link to="/screener" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
                   Screener
