@@ -5,14 +5,6 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-
-
-module.exports = {
-  theme: {
     extend: {
       colors: {
         'dark-bg': '#0f1117',
@@ -20,5 +12,6 @@ module.exports = {
         'green-primary': '#10b981'
       }
     }
-  }
+  },
+  plugins: [],
 }
