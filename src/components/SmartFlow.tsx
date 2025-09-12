@@ -112,6 +112,29 @@ const SmartFlow: React.FC = () => {
           </section>
         )}
 
+
+// Add this above the momentum section
+<div className="grid grid-cols-4 gap-4 mb-8">
+  <div className="bg-[#1a1d29] rounded-lg p-4 text-center">
+    <div className="text-2xl font-bold text-white">{marketMovers?.gainers?.length || 0}</div>
+    <div className="text-sm text-green-500">Gainers</div>
+  </div>
+  <div className="bg-[#1a1d29] rounded-lg p-4 text-center">
+    <div className="text-2xl font-bold text-white">{marketMovers?.losers?.length || 0}</div>
+    <div className="text-sm text-red-500">Losers</div>
+  </div>
+  <div className="bg-[#1a1d29] rounded-lg p-4 text-center">
+    <div className="text-2xl font-bold text-white">{marketMovers?.mostActive?.length || 0}</div>
+    <div className="text-sm text-yellow-500">Active</div>
+  </div>
+  <div className="bg-[#1a1d29] rounded-lg p-4 text-center">
+    <div className="text-2xl font-bold text-white">LIVE</div>
+    <div className="text-sm text-gray-400">Status</div>
+  </div>
+</div>
+
+
+        
         {/* Market Momentum Section */}
         <section className="mb-8">
           <h2 className="text-2xl font-bold text-white mb-4">
