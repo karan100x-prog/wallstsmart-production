@@ -19,42 +19,40 @@ const SmartFlow: React.FC = () => {
 
   const loadSmartMoneyActivity = async () => {
     try {
-      // 1. Get REAL insider transactions (executives buying/selling)
-      const topStocks = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'META'];
-      const insiderPromises = topStocks.map(s => getInsiderTransactions(s));
-      const allInsiders = await Promise.all(insiderPromises);
-      
-      // Flatten and sort by date
-      const recentInsiders = allInsiders
-        .flat()
-        .filter(t => t && t.acquisitionDisposition === 'A') // Focus on acquisitions
-        .sort((a, b) => new Date(b.filingDate).getTime() - new Date(a.filingDate).getTime())
-        .slice(0, 20);
-
-      setInsiderActivity(recentInsiders);
-
-      // 2. Get REAL market movers (what's being bought/sold heavily)
+      console.log('Fetching market movers...');
       const movers = await getTopGainersLosers();
+      console.log('Movers data:', movers);
       
-      // Filter out weird tickers (warrants, preferred shares)
+      // Clean and set movers
       if (movers) {
         const cleanMovers = {
-          gainers: movers.gainers?.filter((s: any) => !s.ticker.includes('^') && !s.ticker.includes('W') && s.ticker.length <= 5),
-          losers: movers.losers?.filter((s: any) => !s.ticker.includes('^') && !s.ticker.includes('W') && s.ticker.length <= 5),
-          mostActive: movers.mostActive?.filter((s: any) => !s.ticker.includes('^') && s.ticker.length <= 5)
+          gainers: movers.gainers?.filter((s: any) => 
+            !s.ticker.includes('^') && 
+            !s.ticker.endsWith('W') && 
+            s.ticker.length <= 5
+          ),
+          losers: movers.losers?.filter((s: any) => 
+            !s.ticker.includes('^') && 
+            !s.ticker.endsWith('W') && 
+            s.ticker.length <= 5
+          ),
+          mostActive: movers.mostActive
         };
         setMarketMovers(cleanMovers);
-      } else {
-        setMarketMovers(movers);
       }
 
-      // 3. Get REAL sentiment (what institutions are talking about)
+      // Try fetching news
+      console.log('Fetching news sentiment...');
       const news = await getNewsSentiment();
-      setSentiment(news);
+      console.log('News data:', news);
+      setSentiment(news || []);
 
+      // Skip insider data if it's not working
+      setInsiderActivity([]);
+      
       setLoading(false);
     } catch (error) {
-      console.error('Error loading:', error);
+      console.error('Error details:', error);
       setLoading(false);
     }
   };
@@ -117,45 +115,59 @@ const SmartFlow: React.FC = () => {
           </div>
         </div>
 
-        {/* Insider Buying Section */}
-        {insiderActivity.length > 0 ? (
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              🎯 Recent Insider Buying
-            </h2>
-            <div className="grid gap-4">
-              {insiderActivity.slice(0, 5).map((insider, idx) => (
-                <div key={idx} className="bg-[#1a1d29] rounded-lg p-4 border border-white/5 hover:border-green-500/30 transition-all">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="text-green-500 font-semibold">BUY</span>
-                      <span className="text-white ml-3 font-semibold">{insider.symbol}</span>
-                      <span className="text-gray-400 ml-3">{insider.reportingName}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-white">{insider.securitiesTransacted?.toLocaleString() || 'N/A'} shares</div>
-                      <div className="text-gray-400 text-sm">{insider.filingDate}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+        {/* Market Summary */}
+        <section className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4">
+            📈 Market Summary
+          </h2>
+          <div className="bg-[#1a1d29] rounded-lg p-6 border border-white/5">
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <p className="text-gray-400 text-sm mb-1">Biggest Gainer</p>
+                <p className="text-2xl font-bold text-green-500">
+                  {marketMovers?.gainers?.[0]?.ticker || 'N/A'}
+                </p>
+                <p className="text-sm text-green-400">
+                  {marketMovers?.gainers?.[0]?.change_percentage || ''}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-sm mb-1">Biggest Loser</p>
+                <p className="text-2xl font-bold text-red-500">
+                  {marketMovers?.losers?.[0]?.ticker || 'N/A'}
+                </p>
+                <p className="text-sm text-red-400">
+                  {marketMovers?.losers?.[0]?.change_percentage || ''}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-sm mb-1">Most Volume</p>
+                <p className="text-2xl font-bold text-yellow-500">
+                  {marketMovers?.mostActive?.[0]?.ticker || 'N/A'}
+                </p>
+                <p className="text-sm text-gray-400">
+                  {marketMovers?.mostActive?.[0]?.volume ? 
+                    `${(parseInt(marketMovers.mostActive[0].volume) / 1000000).toFixed(0)}M` : ''}
+                </p>
+              </div>
             </div>
-          </section>
-        ) : (
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              📊 Market Overview
-            </h2>
-            <div className="bg-[#1a1d29] rounded-lg p-6 text-center border border-white/5">
-              <p className="text-gray-400">
-                Tracking {marketMovers?.mostActive?.length || 0} active stocks today
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                Insider transaction data updates throughout the trading day
-              </p>
-            </div>
-          </section>
-        )}
+          </div>
+        </section>
+
+        {/* Insider Buying Section - Now always shows market overview */}
+        <section className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4">
+            📊 Market Activity Overview
+          </h2>
+          <div className="bg-[#1a1d29] rounded-lg p-6 text-center border border-white/5">
+            <p className="text-gray-400">
+              Tracking {marketMovers?.mostActive?.length || 0} active stocks today
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Market data updates in real-time during trading hours
+            </p>
+          </div>
+        </section>
         
         {/* Market Momentum Section */}
         <section className="mb-8">
@@ -206,18 +218,28 @@ const SmartFlow: React.FC = () => {
               📰 Smart Money Sentiment
             </h2>
             <div className="grid gap-4">
-              {sentiment.slice(0, 5).map((article: any, idx: number) => (
+              {sentiment.slice(0, 10).map((article: any, idx: number) => (
                 <div key={idx} className="bg-[#1a1d29] rounded-lg p-4 border border-white/5 hover:border-green-500/30 transition-all">
-                  <h4 className="text-white font-semibold mb-2">{article.title}</h4>
-                  <div className="flex gap-4 text-sm">
-                    <span className={`font-medium ${
-                      article.overallLabel === 'Bullish' ? 'text-green-500' : 
-                      article.overallLabel === 'Bearish' ? 'text-red-500' : 
-                      'text-gray-400'
-                    }`}>
-                      {article.overallLabel || 'Neutral'}
-                    </span>
-                    <span className="text-gray-400">{article.source}</span>
+                  <h4 className="text-white font-semibold mb-2 line-clamp-2">{article.title}</h4>
+                  {article.summary && (
+                    <p className="text-gray-400 text-sm mb-3 line-clamp-2">{article.summary}</p>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <div className="flex gap-4 text-sm">
+                      <span className={`font-medium ${
+                        article.overall_sentiment_label === 'Bullish' ? 'text-green-500' : 
+                        article.overall_sentiment_label === 'Bearish' ? 'text-red-500' : 
+                        'text-gray-400'
+                      }`}>
+                        {article.overall_sentiment_label || article.overallLabel || 'Neutral'}
+                      </span>
+                      <span className="text-gray-500">{article.source}</span>
+                    </div>
+                    {article.time_published && (
+                      <span className="text-xs text-gray-500">
+                        {new Date(article.time_published).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
