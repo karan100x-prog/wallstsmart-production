@@ -6,6 +6,8 @@ const SmartFlow: React.FC = () => {
   const [sentiment, setSentiment] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  export default SmartFlow;  // ← This line is required!
+  
   useEffect(() => {
     loadSmartMoneyActivity();
   }, []);
