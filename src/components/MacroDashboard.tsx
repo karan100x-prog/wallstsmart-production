@@ -199,7 +199,7 @@ const MacroDashboard = () => {
         <div className="text-center">
           <Activity className="w-12 h-12 text-blue-400 animate-pulse mx-auto mb-4" />
           <p className="text-gray-400">Loading real-time macro data...</p>
-          <p className="text-xs text-gray-500 mt-2">Premium API: 75 calls/minute</p>
+          <p className="text-xs text-gray-500 mt-2">Fetching data.. </p>
         </div>
       </div>
     );
