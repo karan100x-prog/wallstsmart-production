@@ -24,7 +24,7 @@ const MacroDashboard = () => {
     const interval = setInterval(() => {
       fetchAllMacroData();
       setLastUpdate(new Date());
-    }, 60000);
+    }, 43200000);  // 12 hours
     
     return () => clearInterval(interval);
   }, []);
