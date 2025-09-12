@@ -1,36 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Globe, Briefcase, Home, Factory, Zap, AlertTriangle, ChevronUp, ChevronDown, Info } from 'lucide-react';
-import axios from 'axios';
-import { fetchAndProcessMacroData } from '../services/macroDataService';
-
-// Using your existing Premium Alpha Vantage API key
-const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_KEY || 'NMSRS0ZDIOWF3CLL';
-const BASE_URL = 'https://www.alphavantage.co/query';
+import { fetchAndProcessMacroData, fetchCommodityData } from '../services/macroDataService';
 
 const MacroDashboard = () => {
   const [selectedRegime, setSelectedRegime] = useState('current');
   const [hoveredMetric, setHoveredMetric] = useState(null);
   const [macroData, setMacroData] = useState({
-    gdp: null,
-    cpi: null,
-    unemployment: null,
-    treasury: null,
-    fedRate: null,
-    vix: null,
-    oil: null,
-    copper: null,
-    gold: null
+    gdp: { value: '2.8%', change: '+0.3%', trend: 'up' },
+    cpi: { value: '3.2%', change: '-0.3%', trend: 'down' },
+    unemployment: { value: '3.7%', change: '-0.2%', trend: 'down' },
+    fedRate: { value: '5.25%', change: '0%', trend: 'flat' },
+    treasury10Y: { value: '4.28%', change: '+0.08%', trend: 'up' },
+    realRate: { value: '2.05%', change: '+0.38%', trend: 'up' },
+    oil: { value: '$78.25', change: '+$2.15', trend: 'up' },
+    naturalGas: { value: '$2.85', change: '-$0.12', trend: 'down' },
+    copper: { value: '$4.21', change: '+$0.08', trend: 'up' }
   });
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  // Fetch real macro data from Alpha Vantage
   useEffect(() => {
     fetchAllMacroData();
     const interval = setInterval(() => {
       fetchAllMacroData();
       setLastUpdate(new Date());
-    }, 60000); // Refresh every minute (within your 75 calls/min limit)
+    }, 60000);
     
     return () => clearInterval(interval);
   }, []);
@@ -39,39 +33,20 @@ const MacroDashboard = () => {
     try {
       setLoading(true);
       
-      // Batch 1: Economic Indicators (5 calls)
-      const economicPromises = [
-        axios.get(`${BASE_URL}?function=REAL_GDP&interval=quarterly&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=CPI&interval=monthly&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=UNEMPLOYMENT&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=FEDERAL_FUNDS_RATE&interval=daily&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=INFLATION&apikey=${API_KEY}`)
-      ];
-
-      // Batch 2: Treasury Yields (3 calls)
-      const yieldPromises = [
-        axios.get(`${BASE_URL}?function=TREASURY_YIELD&interval=daily&maturity=3month&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=TREASURY_YIELD&interval=daily&maturity=2year&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=TREASURY_YIELD&interval=daily&maturity=10year&apikey=${API_KEY}`)
-      ];
-
-      // Batch 3: Commodities (4 calls)
-      const commodityPromises = [
-        axios.get(`${BASE_URL}?function=WTI&interval=daily&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=COPPER&interval=monthly&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=ALUMINUM&interval=monthly&apikey=${API_KEY}`),
-        axios.get(`${BASE_URL}?function=NATURAL_GAS&interval=daily&apikey=${API_KEY}`)
-      ];
-
-      // Execute all API calls (12 total calls, well within 75/min limit)
-      const [economic, yields, commodities] = await Promise.all([
-        Promise.all(economicPromises),
-        Promise.all(yieldPromises),
-        Promise.all(commodityPromises)
+      // Fetch processed economic data
+      const [economicData, commodityData] = await Promise.all([
+        fetchAndProcessMacroData(),
+        fetchCommodityData()
       ]);
 
-      // Process the data
-      processMarketData(economic, yields, commodities);
+      // Update state with properly processed data
+      setMacroData({
+        ...economicData,
+        ...commodityData
+      });
+
+      // Determine economic regime based on processed data
+      determineEconomicRegime(economicData);
       
       setLoading(false);
     } catch (error) {
@@ -80,55 +55,9 @@ const MacroDashboard = () => {
     }
   };
 
-  const processMarketData = (economic, yields, commodities) => {
-    // Process GDP Data
-    const gdpData = economic[0].data;
-    const latestGDP = gdpData.data?.[0];
-    
-    // Process CPI Data
-    const cpiData = economic[1].data;
-    const latestCPI = cpiData.data?.[0];
-    
-    // Process Unemployment
-    const unemploymentData = economic[2].data;
-    const latestUnemployment = unemploymentData.data?.[0];
-    
-    // Process Fed Rate
-    const fedRateData = economic[3].data;
-    const latestFedRate = fedRateData.data?.[0];
-    
-    // Process Treasury Yields
-    const yield3M = yields[0].data.data?.[0];
-    const yield2Y = yields[1].data.data?.[0];
-    const yield10Y = yields[2].data.data?.[0];
-    
-    // Process Oil Price
-    const oilData = commodities[0].data;
-    const latestOil = oilData.data?.[0];
-    
-    // Process Copper
-    const copperData = commodities[1].data;
-    const latestCopper = copperData.data?.[0];
-
-    // Update state with processed data
-    setMacroData({
-      gdp: latestGDP,
-      cpi: latestCPI,
-      unemployment: latestUnemployment,
-      fedRate: latestFedRate,
-      yields: { threeMonth: yield3M, twoYear: yield2Y, tenYear: yield10Y },
-      oil: latestOil,
-      copper: latestCopper
-    });
-
-    // Determine economic regime based on real data
-    determineEconomicRegime(latestGDP, latestCPI, latestUnemployment);
-  };
-
-  const determineEconomicRegime = (gdp, cpi, unemployment) => {
-    // Simple regime detection logic based on real data
-    const gdpGrowth = parseFloat(gdp?.value || 2.5);
-    const inflation = parseFloat(cpi?.value || 3.0);
+  const determineEconomicRegime = (data) => {
+    const gdpGrowth = parseFloat(data.gdp?.value) || 2.5;
+    const inflation = parseFloat(data.cpi?.value) || 3.0;
     
     if (gdpGrowth > 2.5 && inflation < 3) {
       setSelectedRegime('current'); // Goldilocks
@@ -141,34 +70,62 @@ const MacroDashboard = () => {
     }
   };
 
-  // Calculate dynamic metrics from real data
   const getDynamicMetrics = () => {
-    const gdpValue = macroData.gdp?.value || '2.8';
-    const cpiValue = macroData.cpi?.value || '3.2';
-    const unemploymentValue = macroData.unemployment?.value || '3.7';
-    const fedRateValue = macroData.fedRate?.value || '5.25';
-    const tenYearYield = macroData.yields?.tenYear?.value || '4.28';
-    const oilPrice = macroData.oil?.value || '78.25';
-    
     return [
       {
         category: 'GROWTH INDICATORS',
         color: 'from-blue-600 to-blue-700',
         metrics: [
-          { name: 'GDP Growth', value: `${gdpValue}%`, change: '+0.3%', trend: 'up', api: 'REAL_GDP' },
-          { name: 'Unemployment', value: `${unemploymentValue}%`, change: '-0.2%', trend: 'down', api: 'UNEMPLOYMENT' },
-          { name: 'Retail Sales', value: 'Loading...', change: '--', trend: 'flat', api: 'RETAIL_SALES' },
-          { name: 'Nonfarm Payroll', value: 'Loading...', change: '--', trend: 'flat', api: 'NONFARM_PAYROLL' }
+          { 
+            name: 'GDP Growth', 
+            value: macroData.gdp?.value || '2.8%', 
+            change: macroData.gdp?.change || '+0.3%', 
+            trend: macroData.gdp?.trend || 'up',
+            api: 'REAL_GDP'
+          },
+          { 
+            name: 'Unemployment', 
+            value: macroData.unemployment?.value || '3.7%', 
+            change: macroData.unemployment?.change || '-0.2%', 
+            trend: macroData.unemployment?.trend || 'down',
+            api: 'UNEMPLOYMENT'
+          },
+          { name: 'Retail Sales', value: 'Coming Soon', change: '--', trend: 'flat', api: 'RETAIL_SALES' },
+          { name: 'Nonfarm Payroll', value: 'Coming Soon', change: '--', trend: 'flat', api: 'NONFARM_PAYROLL' }
         ]
       },
       {
         category: 'INFLATION & RATES',
         color: 'from-orange-600 to-orange-700',
         metrics: [
-          { name: 'CPI Inflation', value: `${cpiValue}%`, change: '-0.3%', trend: 'down', api: 'CPI' },
-          { name: 'Fed Funds Rate', value: `${fedRateValue}%`, change: '0%', trend: 'flat', api: 'FEDERAL_FUNDS_RATE' },
-          { name: '10Y Treasury', value: `${tenYearYield}%`, change: '+0.08%', trend: 'up', api: 'TREASURY_YIELD' },
-          { name: 'Real Interest Rate', value: `${(parseFloat(fedRateValue) - parseFloat(cpiValue)).toFixed(2)}%`, change: '+0.38%', trend: 'up', calculated: true }
+          { 
+            name: 'CPI Inflation', 
+            value: macroData.cpi?.value || '3.2%', 
+            change: macroData.cpi?.change || '-0.3%', 
+            trend: macroData.cpi?.trend || 'down',
+            api: 'CPI'
+          },
+          { 
+            name: 'Fed Funds Rate', 
+            value: macroData.fedRate?.value || '5.25%', 
+            change: macroData.fedRate?.change || '0%', 
+            trend: macroData.fedRate?.trend || 'flat',
+            api: 'FEDERAL_FUNDS_RATE'
+          },
+          { 
+            name: '10Y Treasury', 
+            value: macroData.treasury10Y?.value || '4.28%', 
+            change: macroData.treasury10Y?.change || '+0.08%', 
+            trend: macroData.treasury10Y?.trend || 'up',
+            api: 'TREASURY_YIELD'
+          },
+          { 
+            name: 'Real Interest Rate', 
+            value: macroData.realRate?.value || '2.05%', 
+            change: macroData.realRate?.change || '+0.38%', 
+            trend: macroData.realRate?.trend || 'up',
+            calculated: true
+          }
         ]
       },
       {
@@ -185,16 +142,33 @@ const MacroDashboard = () => {
         category: 'COMMODITY & ENERGY',
         color: 'from-emerald-600 to-emerald-700',
         metrics: [
-          { name: 'Oil (WTI)', value: `$${oilPrice}`, change: '+$2.15', trend: 'up', api: 'WTI' },
-          { name: 'Natural Gas', value: '$2.85', change: '-$0.12', trend: 'down', api: 'NATURAL_GAS' },
-          { name: 'Copper', value: '$4.21', change: '+$0.08', trend: 'up', api: 'COPPER' },
+          { 
+            name: 'Oil (WTI)', 
+            value: macroData.oil?.value || '$78.25', 
+            change: macroData.oil?.change || '+$2.15', 
+            trend: macroData.oil?.trend || 'up',
+            api: 'WTI'
+          },
+          { 
+            name: 'Natural Gas', 
+            value: macroData.naturalGas?.value || '$2.85', 
+            change: macroData.naturalGas?.change || '-$0.12', 
+            trend: macroData.naturalGas?.trend || 'down',
+            api: 'NATURAL_GAS'
+          },
+          { 
+            name: 'Copper', 
+            value: macroData.copper?.value || '$4.21', 
+            change: macroData.copper?.change || '+$0.08', 
+            trend: macroData.copper?.trend || 'up',
+            api: 'COPPER'
+          },
           { name: 'Aluminum', value: '$2,385', change: '+$45', trend: 'up', api: 'ALUMINUM' }
         ]
       }
     ];
   };
 
-  // Economic Regime Indicator
   const economicRegimes = {
     current: { name: 'Goldilocks', color: 'bg-green-500', description: 'Moderate growth, low inflation' },
     deflation: { name: 'Deflation', color: 'bg-blue-500', description: 'Falling prices, slow growth' },
@@ -202,7 +176,6 @@ const MacroDashboard = () => {
     expansion: { name: 'Expansion', color: 'bg-emerald-500', description: 'High growth, rising inflation' }
   };
 
-  // Asset Performance Matrix
   const assetPerformance = {
     'Goldilocks': { stocks: '+18%', bonds: '+5%', gold: '+2%', commodities: '+8%', realestate: '+12%' },
     'Deflation': { stocks: '-5%', bonds: '+12%', gold: '+15%', commodities: '-20%', realestate: '-8%' },
@@ -210,50 +183,15 @@ const MacroDashboard = () => {
     'Expansion': { stocks: '+25%', bonds: '-3%', gold: '-5%', commodities: '+15%', realestate: '+20%' }
   };
 
-  // Dynamic Yield Curve Data from real Treasury yields
-  const getYieldCurveData = () => {
-    const threeMonth = macroData.yields?.threeMonth?.value || 5.45;
-    const twoYear = macroData.yields?.twoYear?.value || 4.65;
-    const tenYear = macroData.yields?.tenYear?.value || 4.28;
-    
-    return [
-      { maturity: '3M', yield: parseFloat(threeMonth) },
-      { maturity: '6M', yield: 5.38 }, // Interpolated
-      { maturity: '1Y', yield: 5.02 }, // Interpolated
-      { maturity: '2Y', yield: parseFloat(twoYear) },
-      { maturity: '5Y', yield: 4.35 }, // Interpolated
-      { maturity: '10Y', yield: parseFloat(tenYear) },
-      { maturity: '30Y', yield: 4.48 } // Will add 30Y API call
-    ];
-  };
-
-  const SparklineChart = ({ data, color = 'text-blue-500' }) => {
-    if (!data || data.length === 0) return null;
-    
-    const max = Math.max(...data);
-    const min = Math.min(...data);
-    const range = max - min || 1;
-    const width = 60;
-    const height = 20;
-    
-    const points = data.map((value, index) => {
-      const x = (index / (data.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${x},${y}`;
-    }).join(' ');
-
-    return (
-      <svg width={width} height={height} className="inline-block ml-2">
-        <polyline
-          points={points}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          className={color}
-        />
-      </svg>
-    );
-  };
+  const yieldCurveData = [
+    { maturity: '3M', yield: 5.45 },
+    { maturity: '6M', yield: 5.38 },
+    { maturity: '1Y', yield: 5.02 },
+    { maturity: '2Y', yield: 4.65 },
+    { maturity: '5Y', yield: 4.35 },
+    { maturity: '10Y', yield: parseFloat(macroData.treasury10Y?.value) || 4.28 },
+    { maturity: '30Y', yield: 4.48 }
+  ];
 
   if (loading) {
     return (
@@ -268,11 +206,9 @@ const MacroDashboard = () => {
   }
 
   const macroMetrics = getDynamicMetrics();
-  const yieldCurveData = getYieldCurveData();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4">
-      {/* Header */}
       <div className="max-w-7xl mx-auto mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -288,7 +224,6 @@ const MacroDashboard = () => {
           </div>
         </div>
 
-        {/* Economic Regime Indicator */}
         <div className="bg-gray-800/50 backdrop-blur rounded-xl p-4 mb-6 border border-gray-700">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -325,7 +260,6 @@ const MacroDashboard = () => {
           </div>
         </div>
 
-        {/* Main Metrics Grid with Real Data */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           {macroMetrics.map((category, idx) => (
             <div key={idx} className="bg-gray-800/50 backdrop-blur rounded-xl border border-gray-700 overflow-hidden">
@@ -369,9 +303,7 @@ const MacroDashboard = () => {
           ))}
         </div>
 
-        {/* Bottom Section: Yield Curve */}
         <div className="grid grid-cols-2 gap-4">
-          {/* Live Yield Curve */}
           <div className="bg-gray-800/50 backdrop-blur rounded-xl p-4 border border-gray-700">
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-blue-400" />
@@ -399,7 +331,6 @@ const MacroDashboard = () => {
             </div>
           </div>
 
-          {/* API Status Monitor */}
           <div className="bg-gray-800/50 backdrop-blur rounded-xl p-4 border border-gray-700">
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <Zap className="w-5 h-5 text-yellow-400" />
@@ -412,7 +343,7 @@ const MacroDashboard = () => {
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-sm">Data Sources Active</span>
-                <span className="text-blue-400 font-semibold">12 Endpoints</span>
+                <span className="text-blue-400 font-semibold">8 Endpoints</span>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-sm">Update Frequency</span>
@@ -435,7 +366,6 @@ const MacroDashboard = () => {
           </div>
         </div>
 
-        {/* Risk Indicators Bar */}
         <div className="mt-6 bg-gradient-to-r from-red-900/30 to-orange-900/30 rounded-xl p-4 border border-red-800/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
