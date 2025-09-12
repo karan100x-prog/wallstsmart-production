@@ -213,7 +213,7 @@ const MacroDashboard = () => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              WallStSmart Macro View
+              Macro View
             </h1>
             <p className="text-gray-400 mt-1">Real-time economic indicators powered by Alpha Vantage Premium</p>
           </div>
