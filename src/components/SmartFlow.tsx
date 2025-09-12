@@ -35,7 +35,18 @@ const SmartFlow: React.FC = () => {
 
       // 2. Get REAL market movers (what's being bought/sold heavily)
       const movers = await getTopGainersLosers();
-      setMarketMovers(movers);
+      
+      // Filter out weird tickers (warrants, preferred shares)
+      if (movers) {
+        const cleanMovers = {
+          gainers: movers.gainers?.filter((s: any) => !s.ticker.includes('^') && !s.ticker.includes('W') && s.ticker.length <= 5),
+          losers: movers.losers?.filter((s: any) => !s.ticker.includes('^') && !s.ticker.includes('W') && s.ticker.length <= 5),
+          mostActive: movers.mostActive?.filter((s: any) => !s.ticker.includes('^') && s.ticker.length <= 5)
+        };
+        setMarketMovers(cleanMovers);
+      } else {
+        setMarketMovers(movers);
+      }
 
       // 3. Get REAL sentiment (what institutions are talking about)
       const news = await getNewsSentiment();
@@ -63,11 +74,11 @@ const SmartFlow: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-white">
-              <span className="text-green-500"></span>
+              Smart<span className="text-green-500">Flow</span>
             </h1>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Tracking smart money activity</span>
+              <span>Live • Tracking smart money activity</span>
             </div>
           </div>
         </div>
@@ -86,14 +97,34 @@ const SmartFlow: React.FC = () => {
       {/* Real Smart Money Activities */}
       <div className="max-w-7xl mx-auto px-4 pb-16">
         
+        {/* Stats Overview */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-[#1a1d29] rounded-lg p-4 text-center border border-white/5">
+            <div className="text-2xl font-bold text-white">{marketMovers?.gainers?.length || 0}</div>
+            <div className="text-sm text-green-500">Top Gainers</div>
+          </div>
+          <div className="bg-[#1a1d29] rounded-lg p-4 text-center border border-white/5">
+            <div className="text-2xl font-bold text-white">{marketMovers?.losers?.length || 0}</div>
+            <div className="text-sm text-red-500">Top Losers</div>
+          </div>
+          <div className="bg-[#1a1d29] rounded-lg p-4 text-center border border-white/5">
+            <div className="text-2xl font-bold text-white">{marketMovers?.mostActive?.length || 0}</div>
+            <div className="text-sm text-yellow-500">Most Active</div>
+          </div>
+          <div className="bg-[#1a1d29] rounded-lg p-4 text-center border border-white/5">
+            <div className="text-2xl font-bold text-green-500">LIVE</div>
+            <div className="text-sm text-gray-400">Market Status</div>
+          </div>
+        </div>
+
         {/* Insider Buying Section */}
-        {insiderActivity.length > 0 && (
+        {insiderActivity.length > 0 ? (
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-4">
               🎯 Recent Insider Buying
             </h2>
             <div className="grid gap-4">
-              {insiderActivity.map((insider, idx) => (
+              {insiderActivity.slice(0, 5).map((insider, idx) => (
                 <div key={idx} className="bg-[#1a1d29] rounded-lg p-4 border border-white/5 hover:border-green-500/30 transition-all">
                   <div className="flex justify-between items-center">
                     <div>
@@ -110,30 +141,21 @@ const SmartFlow: React.FC = () => {
               ))}
             </div>
           </section>
+        ) : (
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold text-white mb-4">
+              📊 Market Overview
+            </h2>
+            <div className="bg-[#1a1d29] rounded-lg p-6 text-center border border-white/5">
+              <p className="text-gray-400">
+                Tracking {marketMovers?.mostActive?.length || 0} active stocks today
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                Insider transaction data updates throughout the trading day
+              </p>
+            </div>
+          </section>
         )}
-
-
-// Add this above the momentum section
-<div className="grid grid-cols-4 gap-4 mb-8">
-  <div className="bg-[#1a1d29] rounded-lg p-4 text-center">
-    <div className="text-2xl font-bold text-white">{marketMovers?.gainers?.length || 0}</div>
-    <div className="text-sm text-green-500">Gainers</div>
-  </div>
-  <div className="bg-[#1a1d29] rounded-lg p-4 text-center">
-    <div className="text-2xl font-bold text-white">{marketMovers?.losers?.length || 0}</div>
-    <div className="text-sm text-red-500">Losers</div>
-  </div>
-  <div className="bg-[#1a1d29] rounded-lg p-4 text-center">
-    <div className="text-2xl font-bold text-white">{marketMovers?.mostActive?.length || 0}</div>
-    <div className="text-sm text-yellow-500">Active</div>
-  </div>
-  <div className="bg-[#1a1d29] rounded-lg p-4 text-center">
-    <div className="text-2xl font-bold text-white">LIVE</div>
-    <div className="text-sm text-gray-400">Status</div>
-  </div>
-</div>
-
-
         
         {/* Market Momentum Section */}
         <section className="mb-8">
@@ -147,8 +169,8 @@ const SmartFlow: React.FC = () => {
               <h3 className="text-green-500 font-semibold mb-3">Most Bought</h3>
               {marketMovers?.gainers?.slice(0, 5).map((stock: any, idx: number) => (
                 <div key={idx} className="flex justify-between py-2 border-b border-white/5 last:border-0">
-                  <span className="text-white">{stock.ticker}</span>
-                  <span className="text-green-500">+{stock.change_percentage}</span>
+                  <span className="text-white font-medium">{stock.ticker}</span>
+                  <span className="text-green-500 font-semibold">+{stock.change_percentage}</span>
                 </div>
               )) || <div className="text-gray-500">Loading...</div>}
             </div>
@@ -158,8 +180,8 @@ const SmartFlow: React.FC = () => {
               <h3 className="text-red-500 font-semibold mb-3">Most Sold</h3>
               {marketMovers?.losers?.slice(0, 5).map((stock: any, idx: number) => (
                 <div key={idx} className="flex justify-between py-2 border-b border-white/5 last:border-0">
-                  <span className="text-white">{stock.ticker}</span>
-                  <span className="text-red-500">{stock.change_percentage}</span>
+                  <span className="text-white font-medium">{stock.ticker}</span>
+                  <span className="text-red-500 font-semibold">{stock.change_percentage}</span>
                 </div>
               )) || <div className="text-gray-500">Loading...</div>}
             </div>
@@ -169,7 +191,7 @@ const SmartFlow: React.FC = () => {
               <h3 className="text-yellow-500 font-semibold mb-3">Most Active</h3>
               {marketMovers?.mostActive?.slice(0, 5).map((stock: any, idx: number) => (
                 <div key={idx} className="flex justify-between py-2 border-b border-white/5 last:border-0">
-                  <span className="text-white">{stock.ticker}</span>
+                  <span className="text-white font-medium">{stock.ticker}</span>
                   <span className="text-gray-400">{(parseInt(stock.volume) / 1000000).toFixed(1)}M</span>
                 </div>
               )) || <div className="text-gray-500">Loading...</div>}
@@ -178,7 +200,7 @@ const SmartFlow: React.FC = () => {
         </section>
 
         {/* Sentiment Analysis */}
-        {sentiment.length > 0 && (
+        {sentiment && sentiment.length > 0 ? (
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-4">
               📰 Smart Money Sentiment
@@ -188,7 +210,7 @@ const SmartFlow: React.FC = () => {
                 <div key={idx} className="bg-[#1a1d29] rounded-lg p-4 border border-white/5 hover:border-green-500/30 transition-all">
                   <h4 className="text-white font-semibold mb-2">{article.title}</h4>
                   <div className="flex gap-4 text-sm">
-                    <span className={`${
+                    <span className={`font-medium ${
                       article.overallLabel === 'Bullish' ? 'text-green-500' : 
                       article.overallLabel === 'Bearish' ? 'text-red-500' : 
                       'text-gray-400'
@@ -199,6 +221,17 @@ const SmartFlow: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+        ) : (
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold text-white mb-4">
+              💡 Smart Money Insights
+            </h2>
+            <div className="bg-[#1a1d29] rounded-lg p-6 border border-white/5">
+              <p className="text-gray-400">
+                Market sentiment analysis powered by real-time news and institutional activity
+              </p>
             </div>
           </section>
         )}
