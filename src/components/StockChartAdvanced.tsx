@@ -297,16 +297,23 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   const timeRanges: TimeRange[] = ['5D', '1M', '6M', '1Y', '5Y', '10Y', 'MAX'];
 
-  // Enhanced tooltip - removed volume display
+  // Enhanced tooltip with volume in millions
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload[0]) {
       const data = payload[0].payload;
+      const volumeInMillions = (data.volume / 1000000).toFixed(1);
+      
       return (
         <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
           <p className="text-gray-400">{data.fullDate}</p>
           <p className="text-green-400 font-semibold">
             ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
           </p>
+          {showVolume && (
+            <p className="text-gray-300 text-xs mt-1">
+              Volume: {volumeInMillions}M
+            </p>
+          )}
           {data.isAdjusted && (
             <p className="text-yellow-400 text-xs mt-1">Split-adjusted</p>
           )}
@@ -417,26 +424,26 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   minTickGap={20}
                 />
                 
-                {/* Price Y-axis (left) */}
-                <YAxis 
-                  yAxisId="price"
-                  orientation="left"
-                  stroke="#9CA3AF"
-                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                  domain={getYDomain()}
-                  tickFormatter={(value) => `$${value.toFixed(0)}`}
-                />
-                
-                {/* Volume Y-axis (right) - only show if volume is enabled */}
+                {/* Volume Y-axis (LEFT) - only show if volume is enabled */}
                 {showVolume && (
                   <YAxis 
                     yAxisId="volume"
-                    orientation="right"
+                    orientation="left"
                     stroke="#9CA3AF"
                     tick={{ fill: '#9CA3AF', fontSize: 11 }}
                     tickFormatter={formatVolume}
                   />
                 )}
+                
+                {/* Price Y-axis (RIGHT) */}
+                <YAxis 
+                  yAxisId="price"
+                  orientation="right"
+                  stroke="#9CA3AF"
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  domain={getYDomain()}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
+                />
                 
                 <Tooltip 
                   content={<CustomTooltip />}
@@ -471,22 +478,12 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             </ResponsiveContainer>
           </div>
 
-          {/* Beautiful Volume Toggle Button - Centered below chart */}
+          {/* Inline Volume Toggle Button - iOS Style */}
           <div className="flex justify-center mt-6">
-            <button
-              onClick={() => setShowVolume(!showVolume)}
-              className={`
-                relative flex items-center gap-2 px-5 py-2.5 rounded-full
-                font-medium text-sm transition-all duration-300 transform hover:scale-105
-                ${showVolume 
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25' 
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700'
-                }
-              `}
-            >
-              {/* Icon */}
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-800/50 rounded-full backdrop-blur-sm border border-gray-700/50">
+              {/* Volume Icon */}
               <svg 
-                className={`w-4 h-4 transition-transform duration-300 ${showVolume ? 'scale-110' : ''}`}
+                className="w-5 h-5 text-gray-400"
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -497,24 +494,32 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
               </svg>
               
               {/* Label */}
-              <span>Volume</span>
+              <span className="text-sm font-medium text-gray-300">Volume</span>
               
-              {/* Status indicator */}
-              <span className={`
-                ml-1 px-2 py-0.5 rounded-full text-xs font-semibold
-                ${showVolume 
-                  ? 'bg-white/20 text-white' 
-                  : 'bg-gray-700 text-gray-500'
-                }
-              `}>
+              {/* iOS Style Toggle Switch */}
+              <button
+                onClick={() => setShowVolume(!showVolume)}
+                className={`
+                  relative inline-flex h-7 w-12 items-center rounded-full
+                  transition-colors duration-200 ease-in-out focus:outline-none
+                  ${showVolume ? 'bg-green-500' : 'bg-gray-600'}
+                `}
+              >
+                <span className="sr-only">Toggle volume</span>
+                <span
+                  className={`
+                    inline-block h-5 w-5 transform rounded-full bg-white shadow-md
+                    transition-transform duration-200 ease-in-out
+                    ${showVolume ? 'translate-x-6' : 'translate-x-1'}
+                  `}
+                />
+              </button>
+              
+              {/* ON/OFF Text */}
+              <span className={`text-xs font-semibold ${showVolume ? 'text-green-400' : 'text-gray-500'}`}>
                 {showVolume ? 'ON' : 'OFF'}
               </span>
-              
-              {/* Animated glow effect when on */}
-              {showVolume && (
-                <span className="absolute inset-0 rounded-full bg-green-400/20 blur-xl animate-pulse"></span>
-              )}
-            </button>
+            </div>
           </div>
         </>
       )}
