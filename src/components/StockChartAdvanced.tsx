@@ -100,7 +100,7 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
 }
 
 const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
-  const [selectedRange, setSelectedRange] = useState<TimeRange>('1M');
+  const [selectedRange, setSelectedRange] = useState<TimeRange>('5Y'); // Changed default to 5Y
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showVolume, setShowVolume] = useState(true);
@@ -297,7 +297,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   const timeRanges: TimeRange[] = ['5D', '1M', '6M', '1Y', '5Y', '10Y', 'MAX'];
 
-  // Enhanced tooltip
+  // Enhanced tooltip - removed volume display
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload[0]) {
       const data = payload[0].payload;
@@ -307,11 +307,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           <p className="text-green-400 font-semibold">
             ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
           </p>
-          {showVolume && data.volume && (
-            <p className="text-gray-300 text-xs mt-1">
-              Volume: {(data.volume / 1000000).toFixed(2)}M
-            </p>
-          )}
           {data.isAdjusted && (
             <p className="text-yellow-400 text-xs mt-1">Split-adjusted</p>
           )}
@@ -360,7 +355,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   return (
     <div>
-      {/* Header with period change and controls */}
+      {/* Header with period change and time range controls */}
       <div className="flex justify-between items-center mb-4">
         {/* Period change display */}
         <div className="flex items-center gap-2">
@@ -370,36 +365,21 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           </span>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-4">
-          {/* Volume toggle */}
-          <button
-            onClick={() => setShowVolume(!showVolume)}
-            className={`px-3 py-1 rounded text-sm transition ${
-              showVolume
-                ? 'bg-gray-700 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            Volume
-          </button>
-
-          {/* Time range buttons */}
-          <div className="flex gap-1 sm:gap-2 overflow-x-auto">
-            {timeRanges.map((range) => (
-              <button
-                key={range}
-                onClick={() => setSelectedRange(range)}
-                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm transition whitespace-nowrap ${
-                  selectedRange === range
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
-              >
-                {range}
-              </button>
-            ))}
-          </div>
+        {/* Time range buttons */}
+        <div className="flex gap-1 sm:gap-2 overflow-x-auto">
+          {timeRanges.map((range) => (
+            <button
+              key={range}
+              onClick={() => setSelectedRange(range)}
+              className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm transition whitespace-nowrap ${
+                selectedRange === range
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              {range}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -419,75 +399,124 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           No data available for this time range
         </div>
       ) : (
-        <div className="-ml-4 mr-2"> {/* Adjusted margins for better spacing */}
-          <ResponsiveContainer width="100%" height={showVolume ? 400 : 300}>
-            <ComposedChart 
-              data={chartData}
-              margin={{ top: 20, right: 30, left: 0, bottom: 5 }} // Added margins for spacing
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="date" 
-                stroke="#9CA3AF"
-                tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
-                  Math.floor(chartData.length / 8) : 'preserveStartEnd'}
-                minTickGap={20}
-              />
-              
-              {/* Price Y-axis (left) */}
-              <YAxis 
-                yAxisId="price"
-                orientation="left"
-                stroke="#9CA3AF"
-                tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                domain={getYDomain()}
-                tickFormatter={(value) => `$${value.toFixed(0)}`}
-              />
-              
-              {/* Volume Y-axis (right) - only show if volume is enabled */}
-              {showVolume && (
-                <YAxis 
-                  yAxisId="volume"
-                  orientation="right"
+        <>
+          {/* Chart with fixed height */}
+          <div className="-ml-4 mr-2">
+            <ResponsiveContainer width="100%" height={400}> {/* Fixed height of 400px */}
+              <ComposedChart 
+                data={chartData}
+                margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="date" 
                   stroke="#9CA3AF"
                   tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                  tickFormatter={formatVolume}
+                  interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
+                    Math.floor(chartData.length / 8) : 'preserveStartEnd'}
+                  minTickGap={20}
                 />
-              )}
+                
+                {/* Price Y-axis (left) */}
+                <YAxis 
+                  yAxisId="price"
+                  orientation="left"
+                  stroke="#9CA3AF"
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  domain={getYDomain()}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
+                />
+                
+                {/* Volume Y-axis (right) - only show if volume is enabled */}
+                {showVolume && (
+                  <YAxis 
+                    yAxisId="volume"
+                    orientation="right"
+                    stroke="#9CA3AF"
+                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                    tickFormatter={formatVolume}
+                  />
+                )}
+                
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  contentStyle={{ 
+                    backgroundColor: '#1F2937', 
+                    border: '1px solid #374151',
+                    borderRadius: '0.5rem'
+                  }}
+                />
+                
+                {/* Volume bars */}
+                {showVolume && (
+                  <Bar 
+                    yAxisId="volume"
+                    dataKey="volume" 
+                    shape={VolumeBar}
+                    opacity={0.3}
+                  />
+                )}
+                
+                {/* Price line */}
+                <Line 
+                  yAxisId="price"
+                  type="monotone" 
+                  dataKey="price" 
+                  stroke="#3B82F6" 
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 6 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Beautiful Volume Toggle Button - Centered below chart */}
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={() => setShowVolume(!showVolume)}
+              className={`
+                relative flex items-center gap-2 px-5 py-2.5 rounded-full
+                font-medium text-sm transition-all duration-300 transform hover:scale-105
+                ${showVolume 
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25' 
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700'
+                }
+              `}
+            >
+              {/* Icon */}
+              <svg 
+                className={`w-4 h-4 transition-transform duration-300 ${showVolume ? 'scale-110' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <rect x="3" y="13" width="4" height="8" strokeWidth="2" rx="1" />
+                <rect x="10" y="9" width="4" height="12" strokeWidth="2" rx="1" />
+                <rect x="17" y="5" width="4" height="16" strokeWidth="2" rx="1" />
+              </svg>
               
-              <Tooltip 
-                content={<CustomTooltip />}
-                contentStyle={{ 
-                  backgroundColor: '#1F2937', 
-                  border: '1px solid #374151',
-                  borderRadius: '0.5rem'
-                }}
-              />
+              {/* Label */}
+              <span>Volume</span>
               
-              {/* Volume bars */}
+              {/* Status indicator */}
+              <span className={`
+                ml-1 px-2 py-0.5 rounded-full text-xs font-semibold
+                ${showVolume 
+                  ? 'bg-white/20 text-white' 
+                  : 'bg-gray-700 text-gray-500'
+                }
+              `}>
+                {showVolume ? 'ON' : 'OFF'}
+              </span>
+              
+              {/* Animated glow effect when on */}
               {showVolume && (
-                <Bar 
-                  yAxisId="volume"
-                  dataKey="volume" 
-                  shape={VolumeBar}
-                  opacity={0.3}
-                />
+                <span className="absolute inset-0 rounded-full bg-green-400/20 blur-xl animate-pulse"></span>
               )}
-              
-              {/* Price line */}
-              <Line 
-                yAxisId="price"
-                type="monotone" 
-                dataKey="price" 
-                stroke="#3B82F6" 
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 6 }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
