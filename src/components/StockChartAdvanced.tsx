@@ -219,10 +219,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           
           // Calculate period change for fallback
           if (data.length > 0) {
-            const firstPrice = data[data.length - 1].adjustedClose || data[data.length - 1].close;
-            const lastPrice = data[0].adjustedClose || data[0].close;
-            const change = lastPrice - firstPrice;
-            const percentChange = (change / firstPrice) * 100;
+            // For accurate calculation, use the first and last prices in chronological order
+            const oldestPrice = data[data.length - 1].adjustedClose || data[data.length - 1].close;
+            const newestPrice = data[0].adjustedClose || data[0].close;
+            const change = newestPrice - oldestPrice;
+            const percentChange = (change / oldestPrice) * 100;
             setPeriodChange({ value: change, percentage: percentChange });
           }
           
@@ -412,7 +413,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             <ResponsiveContainer width="100%" height={400}> {/* Fixed height of 400px */}
               <ComposedChart 
                 data={chartData}
-                margin={{ top: 10, right: 50, left: 10, bottom: 10 }}
+                margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis 
