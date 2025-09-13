@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { 
+  ComposedChart, 
+  Line, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  ReferenceLine 
+} from 'recharts';
 import { getDailyPrices, getWeeklyPrices, getMonthlyPrices } from '../services/alphaVantage';
 
 interface StockChartAdvancedProps {
@@ -76,11 +86,13 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
 
     const closePrice = parseFloat(item.close) || 0;
     const adjustedPrice = closePrice / adjustmentFactor;
+    const volume = parseInt(item.volume) || 0;
 
     return {
       ...item,
       close: closePrice,
       adjustedClose: adjustedPrice,
+      volume: volume,
       adjustmentFactor: adjustmentFactor,
       isAdjusted: adjustmentFactor > 1
     };
@@ -91,6 +103,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1M');
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showVolume, setShowVolume] = useState(true);
+  const [periodChange, setPeriodChange] = useState({ value: 0, percentage: 0 });
 
   useEffect(() => {
     loadChartData(selectedRange);
@@ -163,18 +177,35 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       // Apply manual split adjustments
       data = adjustPricesForSplits(data, symbol);
       
+      // Calculate period change
+      if (data.length > 0) {
+        const firstPrice = data[data.length - 1].adjustedClose || data[data.length - 1].close;
+        const lastPrice = data[0].adjustedClose || data[0].close;
+        const change = lastPrice - firstPrice;
+        const percentChange = (change / firstPrice) * 100;
+        setPeriodChange({ value: change, percentage: percentChange });
+      }
+      
       // Format data for chart with smart date labeling
-      const formattedData = data.reverse().map((item, index, array) => ({
-        date: formatDateSmart(item.date, range, index, array),
-        price: item.adjustedClose || item.close,
-        originalPrice: item.close,
-        isAdjusted: item.isAdjusted || false,
-        fullDate: new Date(item.date).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric', 
-          year: 'numeric' 
-        })
-      }));
+      const formattedData = data.reverse().map((item, index, array) => {
+        const price = item.adjustedClose || item.close;
+        const prevPrice = index > 0 ? (array[index - 1].adjustedClose || array[index - 1].close) : price;
+        const isUp = price >= prevPrice;
+        
+        return {
+          date: formatDateSmart(item.date, range, index, array),
+          price: price,
+          volume: item.volume || 0,
+          volumeColor: isUp ? '#10B981' : '#EF4444', // Green for up, red for down
+          originalPrice: item.close,
+          isAdjusted: item.isAdjusted || false,
+          fullDate: new Date(item.date).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+          })
+        };
+      });
       
       setChartData(formattedData);
     } catch (error) {
@@ -185,17 +216,35 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           data = await getDailyPrices(symbol);
           data = data.slice(0, 5);
           data = adjustPricesForSplits(data, symbol);
-          const formattedData = data.reverse().map((item, index, array) => ({
-            date: formatDateSmart(item.date, range, index, array),
-            price: item.adjustedClose || item.close,
-            originalPrice: item.close,
-            isAdjusted: item.isAdjusted || false,
-            fullDate: new Date(item.date).toLocaleDateString('en-US', { 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
-            })
-          }));
+          
+          // Calculate period change for fallback
+          if (data.length > 0) {
+            const firstPrice = data[data.length - 1].adjustedClose || data[data.length - 1].close;
+            const lastPrice = data[0].adjustedClose || data[0].close;
+            const change = lastPrice - firstPrice;
+            const percentChange = (change / firstPrice) * 100;
+            setPeriodChange({ value: change, percentage: percentChange });
+          }
+          
+          const formattedData = data.reverse().map((item, index, array) => {
+            const price = item.adjustedClose || item.close;
+            const prevPrice = index > 0 ? (array[index - 1].adjustedClose || array[index - 1].close) : price;
+            const isUp = price >= prevPrice;
+            
+            return {
+              date: formatDateSmart(item.date, range, index, array),
+              price: price,
+              volume: item.volume || 0,
+              volumeColor: isUp ? '#10B981' : '#EF4444',
+              originalPrice: item.close,
+              isAdjusted: item.isAdjusted || false,
+              fullDate: new Date(item.date).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric' 
+              })
+            };
+          });
           setChartData(formattedData);
         } catch (fallbackError) {
           console.error('Fallback failed:', fallbackError);
@@ -258,6 +307,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           <p className="text-green-400 font-semibold">
             ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
           </p>
+          {showVolume && data.volume && (
+            <p className="text-gray-300 text-xs mt-1">
+              Volume: {(data.volume / 1000000).toFixed(2)}M
+            </p>
+          )}
           {data.isAdjusted && (
             <p className="text-yellow-400 text-xs mt-1">Split-adjusted</p>
           )}
@@ -269,24 +323,83 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
 
+  // Custom bar shape for volume
+  const VolumeBar = (props: any) => {
+    const { fill, x, y, width, height } = props;
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={props.payload.volumeColor}
+        opacity={0.5}
+      />
+    );
+  };
+
+  // Calculate Y-axis domain with padding
+  const getYDomain = () => {
+    if (chartData.length === 0) return ['auto', 'auto'];
+    const prices = chartData.map(d => d.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const padding = (maxPrice - minPrice) * 0.1; // 10% padding
+    return [minPrice - padding, maxPrice + padding];
+  };
+
+  // Format volume for Y-axis
+  const formatVolume = (value: number) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(0)}M`;
+    } else if (value >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`;
+    }
+    return value.toString();
+  };
+
   return (
     <div>
-      {/* Removed "Price Chart" header - cleaner look */}
-      <div className="flex justify-end items-center mb-4">
-        <div className="flex gap-1 sm:gap-2 overflow-x-auto">
-          {timeRanges.map((range) => (
-            <button
-              key={range}
-              onClick={() => setSelectedRange(range)}
-              className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm transition whitespace-nowrap ${
-                selectedRange === range
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              {range}
-            </button>
-          ))}
+      {/* Header with period change and controls */}
+      <div className="flex justify-between items-center mb-4">
+        {/* Period change display */}
+        <div className="flex items-center gap-2">
+          <span className="text-gray-400 text-sm">{selectedRange} Change:</span>
+          <span className={`font-semibold ${periodChange.value >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {periodChange.value >= 0 ? '+' : ''}{periodChange.value.toFixed(2)} ({periodChange.percentage >= 0 ? '+' : ''}{periodChange.percentage.toFixed(2)}%)
+          </span>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-4">
+          {/* Volume toggle */}
+          <button
+            onClick={() => setShowVolume(!showVolume)}
+            className={`px-3 py-1 rounded text-sm transition ${
+              showVolume
+                ? 'bg-gray-700 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            Volume
+          </button>
+
+          {/* Time range buttons */}
+          <div className="flex gap-1 sm:gap-2 overflow-x-auto">
+            {timeRanges.map((range) => (
+              <button
+                key={range}
+                onClick={() => setSelectedRange(range)}
+                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm transition whitespace-nowrap ${
+                  selectedRange === range
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -298,17 +411,20 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center h-[300px]">
+        <div className="flex items-center justify-center h-[400px]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
         </div>
       ) : chartData.length === 0 ? (
-        <div className="flex items-center justify-center h-[300px] text-gray-400">
+        <div className="flex items-center justify-center h-[400px] text-gray-400">
           No data available for this time range
         </div>
       ) : (
-        <div className="-ml-8"> {/* Added wrapper div with negative left margin */}
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
+        <div className="-ml-4 mr-2"> {/* Adjusted margins for better spacing */}
+          <ResponsiveContainer width="100%" height={showVolume ? 400 : 300}>
+            <ComposedChart 
+              data={chartData}
+              margin={{ top: 20, right: 30, left: 0, bottom: 20 }} // Added margins for spacing
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis 
                 dataKey="date" 
@@ -318,12 +434,28 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   Math.floor(chartData.length / 8) : 'preserveStartEnd'}
                 minTickGap={20}
               />
+              
+              {/* Price Y-axis (left) */}
               <YAxis 
+                yAxisId="price"
+                orientation="left"
                 stroke="#9CA3AF"
                 tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                domain={['dataMin * 0.95', 'dataMax * 1.05']}
+                domain={getYDomain()}
                 tickFormatter={(value) => `$${value.toFixed(0)}`}
               />
+              
+              {/* Volume Y-axis (right) - only show if volume is enabled */}
+              {showVolume && (
+                <YAxis 
+                  yAxisId="volume"
+                  orientation="right"
+                  stroke="#9CA3AF"
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  tickFormatter={formatVolume}
+                />
+              )}
+              
               <Tooltip 
                 content={<CustomTooltip />}
                 contentStyle={{ 
@@ -332,15 +464,28 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   borderRadius: '0.5rem'
                 }}
               />
+              
+              {/* Volume bars */}
+              {showVolume && (
+                <Bar 
+                  yAxisId="volume"
+                  dataKey="volume" 
+                  shape={VolumeBar}
+                  opacity={0.3}
+                />
+              )}
+              
+              {/* Price line */}
               <Line 
+                yAxisId="price"
                 type="monotone" 
                 dataKey="price" 
-                stroke="#10B981" 
+                stroke="#3B82F6" 
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 6 }}
               />
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
