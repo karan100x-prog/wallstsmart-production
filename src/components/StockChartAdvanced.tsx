@@ -481,18 +481,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           {/* Inline Volume Toggle Button - iOS Style */}
           <div className="flex justify-center mt-6">
             <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-800/50 rounded-full backdrop-blur-sm border border-gray-700/50">
-              {/* Volume Icon */}
-              <svg 
-                className="w-5 h-5 text-gray-400"
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <rect x="3" y="13" width="4" height="8" strokeWidth="2" rx="1" />
-                <rect x="10" y="9" width="4" height="12" strokeWidth="2" rx="1" />
-                <rect x="17" y="5" width="4" height="16" strokeWidth="2" rx="1" />
-              </svg>
-              
               {/* Label */}
               <span className="text-sm font-medium text-gray-300">Volume</span>
               
@@ -514,11 +502,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   `}
                 />
               </button>
-              
-              {/* ON/OFF Text */}
-              <span className={`text-xs font-semibold ${showVolume ? 'text-green-400' : 'text-gray-500'}`}>
-                {showVolume ? 'ON' : 'OFF'}
-              </span>
             </div>
           </div>
         </>
