@@ -423,7 +423,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           <ResponsiveContainer width="100%" height={showVolume ? 400 : 300}>
             <ComposedChart 
               data={chartData}
-              margin={{ top: 20, right: 30, left: 0, bottom: 20 }} // Added margins for spacing
+              margin={{ top: 20, right: 30, left: 0, bottom: 5 }} // Added margins for spacing
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis 
