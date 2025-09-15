@@ -114,10 +114,10 @@ const formatVolume = (value: number): string => {
 };
 
 const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
-  const [selectedRange, setSelectedRange] = useState<TimeRange>('1Y'); // Changed default to 1Y
+  const [selectedRange, setSelectedRange] = useState<TimeRange>('1Y');
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showVolume, setShowVolume] = useState(true); // Volume toggle state (default ON)
+  const [showVolume, setShowVolume] = useState(true);
 
   useEffect(() => {
     loadChartData(selectedRange);
@@ -128,69 +128,53 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     let data: any[] = [];
     
     try {
-      // Calculate the cutoff date based on the selected range
       const today = new Date();
       let cutoffDate = new Date();
       
       switch (range) {
         case '5D':
-          // Get last 5 trading days
-          cutoffDate.setDate(today.getDate() - 7); // Account for weekends
+          cutoffDate.setDate(today.getDate() - 7);
           data = await getDailyPrices(symbol);
-          // Filter to get last 5 trading days
           data = data.slice(0, 5);
           break;
         
         case '1M':
-          // Exactly 1 month ago
           cutoffDate.setMonth(today.getMonth() - 1);
           data = await getDailyPrices(symbol);
-          // Filter data from last month
           data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '6M':
-          // Exactly 6 months ago
           cutoffDate.setMonth(today.getMonth() - 6);
           data = await getDailyPrices(symbol);
-          // Filter data from last 6 months
           data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '1Y':
-          // Exactly 1 year ago
           cutoffDate.setFullYear(today.getFullYear() - 1);
           data = await getWeeklyPrices(symbol);
-          // Filter data from last year
           data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '5Y':
-          // Exactly 5 years ago
           cutoffDate.setFullYear(today.getFullYear() - 5);
           data = await getMonthlyPrices(symbol);
-          // Filter data from last 5 years
           data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case '10Y':
-          // Exactly 10 years ago
           cutoffDate.setFullYear(today.getFullYear() - 10);
           data = await getMonthlyPrices(symbol);
-          // Filter data from last 10 years
           data = data.filter(item => new Date(item.date) >= cutoffDate);
           break;
         
         case 'MAX':
-          // All available monthly data
           data = await getMonthlyPrices(symbol);
           break;
       }
       
-      // Apply manual split adjustments
       data = adjustPricesForSplits(data, symbol);
       
-      // Format data for chart with smart date labeling
       const formattedData = data.reverse().map((item, index, array) => ({
         date: formatDateSmart(item.date, range, index, array),
         price: item.adjustedClose || item.close,
@@ -207,7 +191,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       setChartData(formattedData);
     } catch (error) {
       console.error('Chart data error:', error);
-      // If 5D fails, try to fall back to daily data
       if (range === '5D') {
         try {
           data = await getDailyPrices(symbol);
@@ -235,49 +218,40 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     }
   };
 
-  // Smart date formatting to avoid repetition
   const formatDateSmart = (dateStr: string, range: TimeRange, index: number, array: any[]) => {
     const date = new Date(dateStr);
     
     if (range === '5D') {
-      // 5 days: Show abbreviated month and day
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } 
     else if (range === '1M') {
-      // 1 month: Show day number only, with month at start
       if (index === 0 || date.getDate() === 1) {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }
       return date.getDate().toString();
     }
     else if (range === '6M') {
-      // 6 months: Show month name only
       return date.toLocaleDateString('en-US', { month: 'short' });
     } 
     else if (range === '1Y') {
-      // 1 year: Show month name, with year at start/end
       if (index === 0 || index === array.length - 1) {
         return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
       }
       return date.toLocaleDateString('en-US', { month: 'short' });
     } 
     else if (range === '5Y') {
-      // 5 years: Show year only
       return date.getFullYear().toString();
     }
     else if (range === '10Y') {
-      // 10 years: Show year only
       return date.getFullYear().toString();
     }
     else {
-      // MAX: Show year only
       return date.getFullYear().toString();
     }
   };
 
   const timeRanges: TimeRange[] = ['5D', '1M', '6M', '1Y', '5Y', '10Y', 'MAX'];
 
-  // Enhanced tooltip
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload[0]) {
       const data = payload[0].payload;
@@ -305,28 +279,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        {/* Volume Toggle on the left */}
-        <div className="flex items-center gap-2">
-          <label className="flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showVolume}
-              onChange={(e) => setShowVolume(e.target.checked)}
-              className="sr-only"
-            />
-            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              showVolume ? 'bg-green-600' : 'bg-gray-600'
-            }`}>
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                showVolume ? 'translate-x-6' : 'translate-x-1'
-              }`} />
-            </div>
-            <span className="ml-2 text-sm text-gray-400">Volume</span>
-          </label>
-        </div>
-
-        {/* Time Range Buttons on the right */}
+      {/* Time Range Buttons at the top */}
+      <div className="flex justify-end items-center mb-4">
         <div className="flex gap-1 sm:gap-2 overflow-x-auto">
           {timeRanges.map((range) => (
             <button
@@ -360,73 +314,95 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           No data available for this time range
         </div>
       ) : (
-        <div className="-ml-8">
-          <ResponsiveContainer width="100%" height={400}>
-            <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="date" 
-                stroke="#9CA3AF"
-                tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
-                  Math.floor(chartData.length / 8) : 'preserveStartEnd'}
-                minTickGap={20}
-              />
-              
-              {/* Volume Y-Axis on the LEFT */}
-              {showVolume && (
+        <>
+          <div className="-ml-8">
+            <ResponsiveContainer width="100%" height={400}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#9CA3AF"
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
+                    Math.floor(chartData.length / 8) : 'preserveStartEnd'}
+                  minTickGap={20}
+                />
+                
+                {/* Volume Y-Axis on the LEFT - Always rendered but conditionally styled */}
                 <YAxis 
                   yAxisId="volume"
                   orientation="left"
-                  stroke="#60A5FA"
-                  tick={{ fill: '#60A5FA', fontSize: 11 }}
+                  stroke={showVolume ? "#60A5FA" : "transparent"}
+                  tick={{ fill: showVolume ? '#60A5FA' : 'transparent', fontSize: 11 }}
                   tickFormatter={formatVolume}
                   domain={[0, 'dataMax * 1.2']}
+                  axisLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
+                  tickLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
                 />
-              )}
-              
-              {/* Price Y-Axis on the RIGHT */}
-              <YAxis 
-                yAxisId="price"
-                orientation="right"
-                stroke="#9CA3AF"
-                tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                domain={['dataMin * 0.95', 'dataMax * 1.05']}
-                tickFormatter={(value) => `$${value.toFixed(0)}`}
-              />
-              
-              <Tooltip 
-                content={<CustomTooltip />}
-                contentStyle={{ 
-                  backgroundColor: '#1F2937', 
-                  border: '1px solid #374151',
-                  borderRadius: '0.5rem'
-                }}
-              />
-              
-              {/* Volume Bars */}
-              {showVolume && (
-                <Bar 
-                  yAxisId="volume"
-                  dataKey="volume" 
-                  fill="#60A5FA"
-                  opacity={0.3}
+                
+                {/* Price Y-Axis on the RIGHT */}
+                <YAxis 
+                  yAxisId="price"
+                  orientation="right"
+                  stroke="#9CA3AF"
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  domain={['dataMin * 0.95', 'dataMax * 1.05']}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
                 />
-              )}
-              
-              {/* Price Line */}
-              <Line 
-                yAxisId="price"
-                type="monotone" 
-                dataKey="price" 
-                stroke="#10B981" 
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 6 }}
+                
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  contentStyle={{ 
+                    backgroundColor: '#1F2937', 
+                    border: '1px solid #374151',
+                    borderRadius: '0.5rem'
+                  }}
+                />
+                
+                {/* Volume Bars - Only rendered when showVolume is true */}
+                {showVolume && (
+                  <Bar 
+                    yAxisId="volume"
+                    dataKey="volume" 
+                    fill="#60A5FA"
+                    opacity={0.3}
+                  />
+                )}
+                
+                {/* Price Line */}
+                <Line 
+                  yAxisId="price"
+                  type="monotone" 
+                  dataKey="price" 
+                  stroke="#10B981" 
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 6 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Volume Toggle at the bottom */}
+          <div className="flex justify-center mt-4">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showVolume}
+                onChange={(e) => setShowVolume(e.target.checked)}
+                className="sr-only"
               />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+              <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                showVolume ? 'bg-green-600' : 'bg-gray-600'
+              }`}>
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  showVolume ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </div>
+              <span className="ml-2 text-sm text-gray-400">Show Volume</span>
+            </label>
+          </div>
+        </>
       )}
     </div>
   );
