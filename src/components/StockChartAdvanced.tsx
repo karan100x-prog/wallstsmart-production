@@ -143,32 +143,11 @@ const formatVolume = (value: number): string => {
   return value.toString();
 };
 
-// Calculate Simple Moving Average
-function calculateSMA(data: any[], period: number): number[] {
-  const sma: (number | null)[] = [];
-  
-  for (let i = 0; i < data.length; i++) {
-    if (i < period - 1) {
-      sma.push(null);
-    } else {
-      let sum = 0;
-      for (let j = 0; j < period; j++) {
-        sum += data[i - j].price;
-      }
-      sma.push(sum / period);
-    }
-  }
-  
-  return sma;
-}
-
 const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1Y'); // Changed default to 1Y
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showVolume, setShowVolume] = useState(true); // Volume toggle state (default ON)
-  const [showSMA50, setShowSMA50] = useState(false); // SMA 50 toggle
-  const [showSMA200, setShowSMA200] = useState(false); // SMA 200 toggle
   const [showSMA50, setShowSMA50] = useState(false); // SMA 50 toggle (default OFF)
   const [showSMA200, setShowSMA200] = useState(false); // SMA 200 toggle (default OFF)
 
