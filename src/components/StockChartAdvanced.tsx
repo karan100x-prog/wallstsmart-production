@@ -399,7 +399,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   showVolume ? 'translate-x-6' : 'translate-x-1'
                 }`} />
               </div>
-              <span className="ml-2 text-sm text-gray-400">Show Volume</span>
+              <span className="ml-2 text-sm text-gray-400">Volume</span>
             </label>
           </div>
         </>
