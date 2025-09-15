@@ -73,7 +73,7 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
     return data;
   }
 
-  return data.map((item, index, array) => {
+  return data.map((item) => {
     const itemDate = new Date(item.date);
     let adjustmentFactor = 1;
 
@@ -85,27 +85,18 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
     }
 
     const closePrice = parseFloat(item.close) || 0;
-    const openPrice = parseFloat(item.open) || 0;
     const volume = parseFloat(item.volume) || 0;
     const adjustedPrice = closePrice / adjustmentFactor;
-    const adjustedOpen = openPrice / adjustmentFactor;
     const adjustedVolume = volume * adjustmentFactor;
-    
-    // Determine if this is an up or down day
-    const previousClose = index < array.length - 1 ? parseFloat(array[index + 1].close) || 0 : openPrice;
-    const isUpDay = closePrice >= previousClose;
 
     return {
       ...item,
-      open: openPrice,
       close: closePrice,
-      adjustedOpen: adjustedOpen,
       adjustedClose: adjustedPrice,
       volume: volume,
       adjustedVolume: adjustedVolume,
       adjustmentFactor: adjustmentFactor,
-      isAdjusted: adjustmentFactor > 1,
-      isUpDay: isUpDay
+      isAdjusted: adjustmentFactor > 1
     };
   });
 }
@@ -188,10 +179,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         date: formatDateSmart(item.date, range, index, array),
         price: item.adjustedClose || item.close,
         volume: item.adjustedVolume || item.volume || 0,
-        volumeColor: item.isUpDay ? '#10B981' : '#EF4444', // Green for up, Red for down
         originalPrice: item.close,
         isAdjusted: item.isAdjusted || false,
-        isUpDay: item.isUpDay || false,
         fullDate: new Date(item.date).toLocaleDateString('en-US', { 
           month: 'short', 
           day: 'numeric', 
@@ -211,10 +200,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             date: formatDateSmart(item.date, range, index, array),
             price: item.adjustedClose || item.close,
             volume: item.adjustedVolume || item.volume || 0,
-            volumeColor: item.isUpDay ? '#10B981' : '#EF4444', // Green for up, Red for down
             originalPrice: item.close,
             isAdjusted: item.isAdjusted || false,
-            isUpDay: item.isUpDay || false,
             fullDate: new Date(item.date).toLocaleDateString('en-US', { 
               month: 'short', 
               day: 'numeric', 
@@ -377,22 +364,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   <Bar 
                     yAxisId="volume"
                     dataKey="volume" 
-                    fill={(entry: any) => entry.volumeColor}
-                    opacity={0.6}
-                    shape={(props: any) => {
-                      const { fill, x, y, width, height } = props;
-                      const color = props.payload.volumeColor;
-                      return (
-                        <rect
-                          x={x}
-                          y={y}
-                          width={width}
-                          height={height}
-                          fill={color}
-                          opacity={0.6}
-                        />
-                      );
-                    }}
+                    fill="#60A5FA"
+                    opacity={0.3}
                   />
                 )}
                 
