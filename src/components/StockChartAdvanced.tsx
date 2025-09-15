@@ -148,87 +148,61 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     let data: any[] = [];
     
     try {
-      // Calculate the cutoff date based on the selected range
+      // Always fetch enough data for SMA calculations
+      // We need at least 200 extra data points for SMA 200
       const today = new Date();
       let cutoffDate = new Date();
       
-      // For SMA calculations, we need more historical data
-      let needsExtraData = showSMA50 || showSMA200;
-      let extraDataPoints = showSMA200 ? 200 : (showSMA50 ? 50 : 0);
-      
       switch (range) {
         case '5D':
-          // Get last 5 trading days
-          cutoffDate.setDate(today.getDate() - 7); // Account for weekends
+          // For 5D, always get at least 205 days of data for SMA calculations
           data = await getDailyPrices(symbol);
-          // For 5D view with SMA, get more data for calculation but display only 5 days
-          if (needsExtraData) {
-            data = data.slice(0, Math.min(data.length, 5 + extraDataPoints));
-          } else {
-            data = data.slice(0, 5);
-          }
+          // Get the most recent 205 data points (5 display + 200 for SMA)
+          data = data.slice(0, 205);
           break;
         
         case '1M':
-          // Exactly 1 month ago
-          cutoffDate.setMonth(today.getMonth() - 1);
+          // For 1M, get at least 230 days (30 days + 200 for SMA)
           data = await getDailyPrices(symbol);
-          // Get extra data for SMA calculation if needed
-          if (needsExtraData) {
-            const extendedCutoff = new Date(cutoffDate);
-            extendedCutoff.setDate(extendedCutoff.getDate() - extraDataPoints);
-            data = data.filter(item => new Date(item.date) >= extendedCutoff);
-          } else {
-            data = data.filter(item => new Date(item.date) >= cutoffDate);
-          }
+          data = data.slice(0, 250);
           break;
         
         case '6M':
-          // Exactly 6 months ago
-          cutoffDate.setMonth(today.getMonth() - 6);
+          // For 6M, get at least 380 days (180 days + 200 for SMA)
           data = await getDailyPrices(symbol);
-          // Get extra data for SMA calculation if needed
-          if (needsExtraData) {
-            const extendedCutoff = new Date(cutoffDate);
-            extendedCutoff.setDate(extendedCutoff.getDate() - extraDataPoints);
-            data = data.filter(item => new Date(item.date) >= extendedCutoff);
-          } else {
-            data = data.filter(item => new Date(item.date) >= cutoffDate);
-          }
+          data = data.slice(0, 400);
           break;
         
         case '1Y':
-          // Exactly 1 year ago
-          cutoffDate.setFullYear(today.getFullYear() - 1);
-          // For 1Y view, use daily data for accurate SMA
+          // For 1Y, get at least 565 days (365 days + 200 for SMA)
           data = await getDailyPrices(symbol);
-          // Get extra data for SMA calculation if needed
-          if (needsExtraData) {
-            const extendedCutoff = new Date(cutoffDate);
-            extendedCutoff.setDate(extendedCutoff.getDate() - extraDataPoints);
-            data = data.filter(item => new Date(item.date) >= extendedCutoff);
-          } else {
-            data = data.filter(item => new Date(item.date) >= cutoffDate);
-          }
+          // Alpha Vantage returns up to 20 years of data, so we should have enough
+          const oneYearAgo = new Date();
+          oneYearAgo.setFullYear(today.getFullYear() - 1);
+          oneYearAgo.setDate(oneYearAgo.getDate() - 200); // Extra 200 days for SMA
+          data = data.filter(item => new Date(item.date) >= oneYearAgo);
           break;
         
         case '5Y':
-          // Exactly 5 years ago
-          cutoffDate.setFullYear(today.getFullYear() - 5);
-          // For 5Y, use daily data to calculate accurate SMAs
+          // For 5Y, get all available daily data
           data = await getDailyPrices(symbol);
-          data = data.filter(item => new Date(item.date) >= cutoffDate);
+          const fiveYearsAgo = new Date();
+          fiveYearsAgo.setFullYear(today.getFullYear() - 5);
+          fiveYearsAgo.setDate(fiveYearsAgo.getDate() - 200); // Extra 200 days for SMA
+          data = data.filter(item => new Date(item.date) >= fiveYearsAgo);
           break;
         
         case '10Y':
-          // Exactly 10 years ago
-          cutoffDate.setFullYear(today.getFullYear() - 10);
+          // For 10Y, get all available daily data
           data = await getDailyPrices(symbol);
-          data = data.filter(item => new Date(item.date) >= cutoffDate);
+          const tenYearsAgo = new Date();
+          tenYearsAgo.setFullYear(today.getFullYear() - 10);
+          tenYearsAgo.setDate(tenYearsAgo.getDate() - 200); // Extra 200 days for SMA
+          data = data.filter(item => new Date(item.date) >= tenYearsAgo);
           break;
         
         case 'MAX':
-          // All available data
+          // Get all available data
           data = await getDailyPrices(symbol);
           break;
       }
@@ -236,9 +210,12 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       // Apply manual split adjustments
       data = adjustPricesForSplits(data, symbol);
       
-      // Format data for chart with smart date labeling
-      let formattedData = data.reverse().map((item, index, array) => ({
-        date: formatDateSmart(item.date, range, index, array),
+      // Reverse data so it's in chronological order (oldest to newest)
+      data = data.reverse();
+      
+      // Format all data first
+      let formattedData = data.map((item, index, array) => ({
+        date: item.date,
         price: item.adjustedClose || item.close,
         volume: item.adjustedVolume || item.volume || 0,
         originalPrice: item.close,
@@ -248,52 +225,67 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           day: 'numeric', 
           year: 'numeric' 
         }),
-        rawDate: item.date // Keep raw date for filtering
+        rawDate: item.date
       }));
       
-      // Calculate SMAs if needed
-      if (showSMA50 || showSMA200) {
-        if (showSMA50) {
-          formattedData = calculateSMA(formattedData, 50);
-        }
-        if (showSMA200) {
-          formattedData = calculateSMA(formattedData, 200);
-        }
-        
-        // Filter to show only the requested range after SMA calculation
-        if (range === '5D' && needsExtraData) {
-          formattedData = formattedData.slice(formattedData.length - 5);
-        } else if ((range === '1M' || range === '6M' || range === '1Y') && needsExtraData) {
-          formattedData = formattedData.filter(item => new Date(item.rawDate) >= cutoffDate);
-        }
+      // Calculate SMAs on the full dataset
+      if (showSMA50) {
+        formattedData = calculateSMA(formattedData, 50);
       }
+      if (showSMA200) {
+        formattedData = calculateSMA(formattedData, 200);
+      }
+      
+      // Now filter to show only the requested range for display
+      const now = new Date();
+      let displayCutoff = new Date();
+      
+      switch (range) {
+        case '5D':
+          // Show only last 5 trading days
+          formattedData = formattedData.slice(-5);
+          break;
+        
+        case '1M':
+          displayCutoff.setMonth(now.getMonth() - 1);
+          formattedData = formattedData.filter(item => new Date(item.rawDate) >= displayCutoff);
+          break;
+        
+        case '6M':
+          displayCutoff.setMonth(now.getMonth() - 6);
+          formattedData = formattedData.filter(item => new Date(item.rawDate) >= displayCutoff);
+          break;
+        
+        case '1Y':
+          displayCutoff.setFullYear(now.getFullYear() - 1);
+          formattedData = formattedData.filter(item => new Date(item.rawDate) >= displayCutoff);
+          break;
+        
+        case '5Y':
+          displayCutoff.setFullYear(now.getFullYear() - 5);
+          formattedData = formattedData.filter(item => new Date(item.rawDate) >= displayCutoff);
+          break;
+        
+        case '10Y':
+          displayCutoff.setFullYear(now.getFullYear() - 10);
+          formattedData = formattedData.filter(item => new Date(item.rawDate) >= displayCutoff);
+          break;
+        
+        case 'MAX':
+          // Show all data
+          break;
+      }
+      
+      // Apply date formatting for display
+      formattedData = formattedData.map((item, index, array) => ({
+        ...item,
+        date: formatDateSmart(item.date, range, index, array)
+      }));
       
       setChartData(formattedData);
     } catch (error) {
       console.error('Chart data error:', error);
-      // If 5D fails, try to fall back to daily data
-      if (range === '5D') {
-        try {
-          data = await getDailyPrices(symbol);
-          data = data.slice(0, 5);
-          data = adjustPricesForSplits(data, symbol);
-          const formattedData = data.reverse().map((item, index, array) => ({
-            date: formatDateSmart(item.date, range, index, array),
-            price: item.adjustedClose || item.close,
-            volume: item.adjustedVolume || item.volume || 0,
-            originalPrice: item.close,
-            isAdjusted: item.isAdjusted || false,
-            fullDate: new Date(item.date).toLocaleDateString('en-US', { 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
-            })
-          }));
-          setChartData(formattedData);
-        } catch (fallbackError) {
-          console.error('Fallback failed:', fallbackError);
-        }
-      }
+      setChartData([]);
     } finally {
       setLoading(false);
     }
