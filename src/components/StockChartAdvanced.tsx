@@ -101,6 +101,36 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
   });
 }
 
+// Calculate Simple Moving Average
+function calculateSMA(data: any[], period: number): any[] {
+  console.log(`Calculating SMA${period} for ${data.length} data points`);
+  
+  return data.map((item, index) => {
+    // Need at least 'period' number of points to calculate SMA
+    if (index < period - 1) {
+      return { ...item, [`sma${period}`]: null };
+    }
+    
+    // Calculate sum of last 'period' prices
+    let sum = 0;
+    let count = 0;
+    for (let i = index - period + 1; i <= index; i++) {
+      if (data[i] && data[i].price !== null && data[i].price !== undefined) {
+        sum += parseFloat(data[i].price);
+        count++;
+      }
+    }
+    
+    // Only return SMA if we have enough valid data points
+    const smaValue = count === period ? sum / period : null;
+    
+    return {
+      ...item,
+      [`sma${period}`]: smaValue
+    };
+  });
+}
+
 // Format volume with K/M/B suffixes
 const formatVolume = (value: number): string => {
   if (value >= 1e9) {
@@ -113,123 +143,167 @@ const formatVolume = (value: number): string => {
   return value.toString();
 };
 
+// Calculate Simple Moving Average
+function calculateSMA(data: any[], period: number): number[] {
+  const sma: (number | null)[] = [];
+  
+  for (let i = 0; i < data.length; i++) {
+    if (i < period - 1) {
+      sma.push(null);
+    } else {
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += data[i - j].price;
+      }
+      sma.push(sum / period);
+    }
+  }
+  
+  return sma;
+}
+
 const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1Y'); // Changed default to 1Y
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showVolume, setShowVolume] = useState(true); // Volume toggle state (default ON)
+  const [showSMA50, setShowSMA50] = useState(false); // SMA 50 toggle
+  const [showSMA200, setShowSMA200] = useState(false); // SMA 200 toggle
+  const [showSMA50, setShowSMA50] = useState(false); // SMA 50 toggle (default OFF)
+  const [showSMA200, setShowSMA200] = useState(false); // SMA 200 toggle (default OFF)
 
   useEffect(() => {
     loadChartData(selectedRange);
-  }, [symbol, selectedRange]);
+  }, [symbol, selectedRange, showSMA50, showSMA200]);
 
   const loadChartData = async (range: TimeRange) => {
     setLoading(true);
-    let data: any[] = [];
+    console.log(`Loading data for ${symbol}, range: ${range}, SMA50: ${showSMA50}, SMA200: ${showSMA200}`);
     
     try {
-      // Calculate the cutoff date based on the selected range
-      const today = new Date();
-      let cutoffDate = new Date();
+      // Always fetch daily prices for SMA calculations
+      let allDailyData = await getDailyPrices(symbol);
+      console.log(`Fetched ${allDailyData.length} daily data points`);
       
-      switch (range) {
-        case '5D':
-          // Get last 5 trading days
-          cutoffDate.setDate(today.getDate() - 7); // Account for weekends
-          data = await getDailyPrices(symbol);
-          // Filter to get last 5 trading days
-          data = data.slice(0, 5);
-          break;
-        
-        case '1M':
-          // Exactly 1 month ago
-          cutoffDate.setMonth(today.getMonth() - 1);
-          data = await getDailyPrices(symbol);
-          // Filter data from last month
-          data = data.filter(item => new Date(item.date) >= cutoffDate);
-          break;
-        
-        case '6M':
-          // Exactly 6 months ago
-          cutoffDate.setMonth(today.getMonth() - 6);
-          data = await getDailyPrices(symbol);
-          // Filter data from last 6 months
-          data = data.filter(item => new Date(item.date) >= cutoffDate);
-          break;
-        
-        case '1Y':
-          // Exactly 1 year ago
-          cutoffDate.setFullYear(today.getFullYear() - 1);
-          data = await getWeeklyPrices(symbol);
-          // Filter data from last year
-          data = data.filter(item => new Date(item.date) >= cutoffDate);
-          break;
-        
-        case '5Y':
-          // Exactly 5 years ago
-          cutoffDate.setFullYear(today.getFullYear() - 5);
-          data = await getMonthlyPrices(symbol);
-          // Filter data from last 5 years
-          data = data.filter(item => new Date(item.date) >= cutoffDate);
-          break;
-        
-        case '10Y':
-          // Exactly 10 years ago
-          cutoffDate.setFullYear(today.getFullYear() - 10);
-          data = await getMonthlyPrices(symbol);
-          // Filter data from last 10 years
-          data = data.filter(item => new Date(item.date) >= cutoffDate);
-          break;
-        
-        case 'MAX':
-          // All available monthly data
-          data = await getMonthlyPrices(symbol);
-          break;
-      }
+      // Apply split adjustments to all data
+      allDailyData = adjustPricesForSplits(allDailyData, symbol);
       
-      // Apply manual split adjustments
-      data = adjustPricesForSplits(data, symbol);
+      // Reverse to chronological order (oldest to newest)
+      allDailyData = allDailyData.reverse();
       
-      // Format data for chart with smart date labeling
-      const formattedData = data.reverse().map((item, index, array) => ({
-        date: formatDateSmart(item.date, range, index, array),
-        price: item.adjustedClose || item.close,
-        volume: item.adjustedVolume || item.volume || 0,
-        originalPrice: item.close,
+      // Convert all data to our format first
+      let fullFormattedData = allDailyData.map((item) => ({
+        date: item.date,
+        price: parseFloat(item.adjustedClose || item.close),
+        volume: parseFloat(item.adjustedVolume || item.volume || 0),
+        originalPrice: parseFloat(item.close),
         isAdjusted: item.isAdjusted || false,
         fullDate: new Date(item.date).toLocaleDateString('en-US', { 
           month: 'short', 
           day: 'numeric', 
           year: 'numeric' 
-        })
+        }),
+        rawDate: item.date
       }));
       
-      setChartData(formattedData);
+      // Calculate SMAs on the FULL dataset if needed
+      if (showSMA50) {
+        console.log('Calculating SMA 50...');
+        fullFormattedData = calculateSMA(fullFormattedData, 50);
+      }
+      if (showSMA200) {
+        console.log('Calculating SMA 200...');
+        fullFormattedData = calculateSMA(fullFormattedData, 200);
+      }
+      
+      // Now filter data based on the selected range
+      let displayData = [...fullFormattedData];
+      const today = new Date();
+      let cutoffDate = new Date();
+      
+      switch (range) {
+        case '5D':
+          // Get last 5 data points
+          displayData = fullFormattedData.slice(-5);
+          break;
+          
+        case '1M':
+          cutoffDate = new Date(today);
+          cutoffDate.setMonth(today.getMonth() - 1);
+          displayData = fullFormattedData.filter(item => 
+            new Date(item.rawDate) >= cutoffDate
+          );
+          break;
+          
+        case '6M':
+          cutoffDate = new Date(today);
+          cutoffDate.setMonth(today.getMonth() - 6);
+          displayData = fullFormattedData.filter(item => 
+            new Date(item.rawDate) >= cutoffDate
+          );
+          break;
+          
+        case '1Y':
+          cutoffDate = new Date(today);
+          cutoffDate.setFullYear(today.getFullYear() - 1);
+          displayData = fullFormattedData.filter(item => 
+            new Date(item.rawDate) >= cutoffDate
+          );
+          break;
+          
+        case '5Y':
+          cutoffDate = new Date(today);
+          cutoffDate.setFullYear(today.getFullYear() - 5);
+          displayData = fullFormattedData.filter(item => 
+            new Date(item.rawDate) >= cutoffDate
+          );
+          break;
+          
+        case '10Y':
+          cutoffDate = new Date(today);
+          cutoffDate.setFullYear(today.getFullYear() - 10);
+          displayData = fullFormattedData.filter(item => 
+            new Date(item.rawDate) >= cutoffDate
+          );
+          break;
+          
+        case 'MAX':
+          // Use all data
+          displayData = fullFormattedData;
+          break;
+      }
+      
+      console.log(`Displaying ${displayData.length} data points for range ${range}`);
+      
+      // Apply smart date formatting for display
+      displayData = displayData.map((item, index, array) => ({
+        ...item,
+        date: formatDateSmart(item.rawDate, range, index, array)
+      }));
+      
+      // Log sample of SMA values for debugging
+      if (showSMA50 && displayData.length > 0) {
+        const lastFewWithSMA = displayData.slice(-5).map(d => ({
+          date: d.date,
+          price: d.price?.toFixed(2),
+          sma50: d.sma50?.toFixed(2) || 'null'
+        }));
+        console.log('Last 5 SMA50 values:', lastFewWithSMA);
+      }
+      
+      if (showSMA200 && displayData.length > 0) {
+        const lastFewWithSMA = displayData.slice(-5).map(d => ({
+          date: d.date,
+          price: d.price?.toFixed(2),
+          sma200: d.sma200?.toFixed(2) || 'null'
+        }));
+        console.log('Last 5 SMA200 values:', lastFewWithSMA);
+      }
+      
+      setChartData(displayData);
     } catch (error) {
       console.error('Chart data error:', error);
-      // If 5D fails, try to fall back to daily data
-      if (range === '5D') {
-        try {
-          data = await getDailyPrices(symbol);
-          data = data.slice(0, 5);
-          data = adjustPricesForSplits(data, symbol);
-          const formattedData = data.reverse().map((item, index, array) => ({
-            date: formatDateSmart(item.date, range, index, array),
-            price: item.adjustedClose || item.close,
-            volume: item.adjustedVolume || item.volume || 0,
-            originalPrice: item.close,
-            isAdjusted: item.isAdjusted || false,
-            fullDate: new Date(item.date).toLocaleDateString('en-US', { 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
-            })
-          }));
-          setChartData(formattedData);
-        } catch (fallbackError) {
-          console.error('Fallback failed:', fallbackError);
-        }
-      }
+      setChartData([]);
     } finally {
       setLoading(false);
     }
@@ -281,12 +355,26 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload[0]) {
       const data = payload[0].payload;
+      const priceData = payload.find((p: any) => p.dataKey === 'price');
+      const sma50Data = payload.find((p: any) => p.dataKey === 'sma50');
+      const sma200Data = payload.find((p: any) => p.dataKey === 'sma200');
+      
       return (
         <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
           <p className="text-gray-400">{data.fullDate}</p>
           <p className="text-green-400 font-semibold">
-            ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
+            ${priceData?.value ? priceData.value.toFixed(2) : '0.00'}
           </p>
+          {showSMA50 && sma50Data?.value && (
+            <p className="text-yellow-300">
+              SMA50: ${sma50Data.value.toFixed(2)}
+            </p>
+          )}
+          {showSMA200 && sma200Data?.value && (
+            <p className="text-orange-400">
+              SMA200: ${sma200Data.value.toFixed(2)}
+            </p>
+          )}
           {showVolume && data.volume && (
             <p className="text-blue-400">
               Vol: {formatVolume(data.volume)}
@@ -303,30 +391,48 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
 
+  // Toggle component for reusability
+  const ToggleSwitch = ({ checked, onChange, label, color = 'green' }: {
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    label: string;
+    color?: string;
+  }) => {
+    // Map color names to Tailwind classes (avoiding dynamic class generation)
+    const getColorClass = (isChecked: boolean, colorName: string) => {
+      if (!isChecked) return 'bg-gray-600';
+      switch(colorName) {
+        case 'yellow': return 'bg-yellow-500';
+        case 'orange': return 'bg-orange-500';
+        case 'green': return 'bg-green-600';
+        default: return 'bg-green-600';
+      }
+    };
+
+    return (
+      <label className="flex items-center cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="sr-only"
+        />
+        <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          getColorClass(checked, color)
+        }`}>
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            checked ? 'translate-x-6' : 'translate-x-1'
+          }`} />
+        </div>
+        <span className="ml-2 text-sm text-gray-400">{label}</span>
+      </label>
+    );
+  };
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        {/* Volume Toggle on the left */}
-        <div className="flex items-center gap-2">
-          <label className="flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showVolume}
-              onChange={(e) => setShowVolume(e.target.checked)}
-              className="sr-only"
-            />
-            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              showVolume ? 'bg-green-600' : 'bg-gray-600'
-            }`}>
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                showVolume ? 'translate-x-6' : 'translate-x-1'
-              }`} />
-            </div>
-            <span className="ml-2 text-sm text-gray-400">Volume</span>
-          </label>
-        </div>
-
-        {/* Time Range Buttons on the right */}
+      <div className="flex justify-end items-center mb-4">
+        {/* Time Range Buttons */}
         <div className="flex gap-1 sm:gap-2 overflow-x-auto">
           {timeRanges.map((range) => (
             <button
@@ -360,73 +466,123 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           No data available for this time range
         </div>
       ) : (
-        <div className="-ml-8">
-          <ResponsiveContainer width="100%" height={400}>
-            <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="date" 
-                stroke="#9CA3AF"
-                tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
-                  Math.floor(chartData.length / 8) : 'preserveStartEnd'}
-                minTickGap={20}
-              />
-              
-              {/* Volume Y-Axis on the LEFT */}
-              {showVolume && (
+        <>
+          <div className="-ml-8">
+            <ResponsiveContainer width="100%" height={400}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#9CA3AF"
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
+                    Math.floor(chartData.length / 8) : 'preserveStartEnd'}
+                  minTickGap={20}
+                />
+                
+                {/* Volume Y-Axis on the LEFT */}
+                {showVolume && (
+                  <YAxis 
+                    yAxisId="volume"
+                    orientation="left"
+                    stroke="#60A5FA"
+                    tick={{ fill: '#60A5FA', fontSize: 11 }}
+                    tickFormatter={formatVolume}
+                    domain={[0, 'dataMax * 1.2']}
+                  />
+                )}
+                
+                {/* Price Y-Axis on the RIGHT */}
                 <YAxis 
-                  yAxisId="volume"
-                  orientation="left"
-                  stroke="#60A5FA"
-                  tick={{ fill: '#60A5FA', fontSize: 11 }}
-                  tickFormatter={formatVolume}
-                  domain={[0, 'dataMax * 1.2']}
+                  yAxisId="price"
+                  orientation="right"
+                  stroke="#9CA3AF"
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  domain={['dataMin * 0.95', 'dataMax * 1.05']}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
                 />
-              )}
-              
-              {/* Price Y-Axis on the RIGHT */}
-              <YAxis 
-                yAxisId="price"
-                orientation="right"
-                stroke="#9CA3AF"
-                tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                domain={['dataMin * 0.95', 'dataMax * 1.05']}
-                tickFormatter={(value) => `$${value.toFixed(0)}`}
-              />
-              
-              <Tooltip 
-                content={<CustomTooltip />}
-                contentStyle={{ 
-                  backgroundColor: '#1F2937', 
-                  border: '1px solid #374151',
-                  borderRadius: '0.5rem'
-                }}
-              />
-              
-              {/* Volume Bars */}
-              {showVolume && (
-                <Bar 
-                  yAxisId="volume"
-                  dataKey="volume" 
-                  fill="#60A5FA"
-                  opacity={0.3}
+                
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  contentStyle={{ 
+                    backgroundColor: '#1F2937', 
+                    border: '1px solid #374151',
+                    borderRadius: '0.5rem'
+                  }}
                 />
-              )}
-              
-              {/* Price Line */}
-              <Line 
-                yAxisId="price"
-                type="monotone" 
-                dataKey="price" 
-                stroke="#10B981" 
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 6 }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+                
+                {/* Volume Bars */}
+                {showVolume && (
+                  <Bar 
+                    yAxisId="volume"
+                    dataKey="volume" 
+                    fill="#60A5FA"
+                    opacity={0.3}
+                  />
+                )}
+                
+                {/* SMA 50 Line */}
+                {showSMA50 && (
+                  <Line 
+                    yAxisId="price"
+                    type="monotone" 
+                    dataKey="sma50" 
+                    stroke="#FDE047" // Light yellow
+                    strokeWidth={1.5}
+                    dot={false}
+                    connectNulls={false}
+                  />
+                )}
+                
+                {/* SMA 200 Line */}
+                {showSMA200 && (
+                  <Line 
+                    yAxisId="price"
+                    type="monotone" 
+                    dataKey="sma200" 
+                    stroke="#FB923C" // Orange
+                    strokeWidth={1.5}
+                    dot={false}
+                    connectNulls={false}
+                  />
+                )}
+                
+                {/* Price Line - render last to be on top */}
+                <Line 
+                  yAxisId="price"
+                  type="monotone" 
+                  dataKey="price" 
+                  stroke="#10B981" 
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 6 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* All Toggles - Center Aligned Below Chart */}
+          <div className="flex justify-center items-center gap-6 mt-4 flex-wrap">
+            <ToggleSwitch 
+              checked={showVolume}
+              onChange={setShowVolume}
+              label="Volume"
+              color="green"
+            />
+            <ToggleSwitch 
+              checked={showSMA50}
+              onChange={setShowSMA50}
+              label="SMA 50"
+              color="yellow"
+            />
+            <ToggleSwitch 
+              checked={showSMA200}
+              onChange={setShowSMA200}
+              label="SMA 200"
+              color="orange"
+            />
+          </div>
+        </>
       )}
     </div>
   );
