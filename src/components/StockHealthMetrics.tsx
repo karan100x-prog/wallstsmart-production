@@ -1,6 +1,5 @@
-// StockHealthMetrics.tsx - Enhanced Version with Detailed Breakdowns
+// StockHealthMetrics.tsx - Complete Self-Contained Version
 import React, { useEffect, useState } from 'react';
-import metricsCalculator from '../services/metricsCalculator';
 import { 
   getCompanyOverview,
   fetchIncomeStatement, 
@@ -336,30 +335,74 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
           getGlobalQuote(symbol)
         ]);
 
-        // Calculate Altman Z-Score with breakdown
-        const altmanComponents = calculateAltmanComponents(overview, income, balance, quote);
-        const altmanZ = metricsCalculator.calculateAltmanZScore(overview, income, balance);
+        // Calculate all metrics inline
+        const latestBalance = balance.annualReports?.[0] || {};
+        const latestIncome = income.annualReports?.[0] || {};
+        const latestCashFlow = cashFlow.annualReports?.[0] || {};
         
-        // Calculate other metrics
-        const fcf = metricsCalculator.calculateFreeCashFlow(cashFlow);
-        const fcfYield = metricsCalculator.calculateFCFYield(overview, cashFlow);
-        const currentRatio = metricsCalculator.calculateCurrentRatio(balance);
-        const quickRatio = metricsCalculator.calculateQuickRatio(balance);
-        const debtToEquity = metricsCalculator.calculateDebtToEquity(balance);
-        const roic = metricsCalculator.calculateROIC(income, balance);
+        // Calculate Altman Z-Score components
+        const totalAssets = parseFloat(latestBalance.totalAssets) || 1;
+        const totalLiabilities = parseFloat(latestBalance.totalLiabilities) || 1;
+        const currentAssets = parseFloat(latestBalance.totalCurrentAssets) || 0;
+        const currentLiabilities = parseFloat(latestBalance.totalCurrentLiabilities) || 0;
+        const retainedEarnings = parseFloat(latestBalance.retainedEarnings) || 0;
+        const ebit = parseFloat(latestIncome.ebit) || parseFloat(latestIncome.operatingIncome) || 0;
+        const revenue = parseFloat(latestIncome.totalRevenue) || 0;
+        const marketCap = parseFloat(overview.MarketCapitalization) || 0;
         
-        // Calculate Piotroski with detailed breakdown
+        const altmanComponents = {
+          A: (currentAssets - currentLiabilities) / totalAssets,
+          B: retainedEarnings / totalAssets,
+          C: ebit / totalAssets,
+          D: marketCap / totalLiabilities,
+          E: revenue / totalAssets
+        };
+        
+        const altmanZScore = 
+          1.2 * altmanComponents.A + 
+          1.4 * altmanComponents.B + 
+          3.3 * altmanComponents.C + 
+          0.6 * altmanComponents.D + 
+          1.0 * altmanComponents.E;
+        
+        // Calculate Free Cash Flow
+        const operatingCashFlow = parseFloat(latestCashFlow.operatingCashflow) || 0;
+        const capitalExpenditure = parseFloat(latestCashFlow.capitalExpenditures) || 0;
+        const freeCashFlow = operatingCashFlow - Math.abs(capitalExpenditure);
+        
+        // Calculate FCF Yield
+        const fcfYield = marketCap > 0 ? (freeCashFlow / marketCap) * 100 : 0;
+        
+        // Calculate Current Ratio
+        const currentRatio = currentLiabilities > 0 ? currentAssets / currentLiabilities : 0;
+        
+        // Calculate Quick Ratio
+        const inventory = parseFloat(latestBalance.inventory) || 0;
+        const quickRatio = currentLiabilities > 0 ? (currentAssets - inventory) / currentLiabilities : 0;
+        
+        // Calculate Debt to Equity
+        const totalDebt = parseFloat(latestBalance.totalDebt) || 
+                         (parseFloat(latestBalance.shortTermDebt) || 0) + (parseFloat(latestBalance.longTermDebt) || 0);
+        const totalEquity = parseFloat(latestBalance.totalShareholderEquity) || 1;
+        const debtToEquity = totalEquity > 0 ? totalDebt / totalEquity : 0;
+        
+        // Calculate ROIC
+        const netIncome = parseFloat(latestIncome.netIncome) || 0;
+        const investedCapital = totalAssets - currentLiabilities;
+        const roic = investedCapital > 0 ? (netIncome / investedCapital) * 100 : 0;
+        
+        // Calculate Piotroski Score with details
         const piotroskilResult = calculatePiotroskilWithDetails(income, balance, cashFlow);
 
         setMetrics({
-          altmanZ: { ...altmanZ, components: altmanComponents },
-          freeCashFlow: fcf,
-          fcfYield,
-          currentRatio,
-          quickRatio,
-          debtToEquity,
+          altmanZ: { score: altmanZScore, components: altmanComponents },
+          freeCashFlow,
+          fcfYield: fcfYield.toFixed(2),
+          currentRatio: currentRatio.toFixed(2),
+          quickRatio: quickRatio.toFixed(2),
+          debtToEquity: debtToEquity.toFixed(2),
           piotroskiScore: piotroskilResult.score,
-          roic,
+          roic: roic.toFixed(2),
           industry: overview.Industry,
           sector: overview.Sector,
           marketCap: overview.MarketCapitalization
@@ -390,34 +433,6 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
     }
   }, [symbol]);
 
-  // Helper function to calculate Altman Z-Score components
-  const calculateAltmanComponents = (overview: any, income: any, balance: any, quote: any) => {
-    try {
-      const latestBalance = balance.annualReports?.[0] || {};
-      const latestIncome = income.annualReports?.[0] || {};
-      
-      const totalAssets = parseFloat(latestBalance.totalAssets) || 1;
-      const totalLiabilities = parseFloat(latestBalance.totalLiabilities) || 1;
-      const currentAssets = parseFloat(latestBalance.totalCurrentAssets) || 0;
-      const currentLiabilities = parseFloat(latestBalance.totalCurrentLiabilities) || 0;
-      const retainedEarnings = parseFloat(latestBalance.retainedEarnings) || 0;
-      const ebit = parseFloat(latestIncome.ebit) || parseFloat(latestIncome.operatingIncome) || 0;
-      const revenue = parseFloat(latestIncome.totalRevenue) || 0;
-      const marketCap = parseFloat(overview.MarketCapitalization) || 0;
-      
-      return {
-        A: (currentAssets - currentLiabilities) / totalAssets,
-        B: retainedEarnings / totalAssets,
-        C: ebit / totalAssets,
-        D: marketCap / totalLiabilities,
-        E: revenue / totalAssets
-      };
-    } catch (error) {
-      console.error('Error calculating Altman components:', error);
-      return null;
-    }
-  };
-
   // Helper function for detailed Piotroski calculation
   const calculatePiotroskilWithDetails = (income: any, balance: any, cashFlow: any) => {
     const details: PiotroskilDetail[] = [];
@@ -442,7 +457,6 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
       const totalAssets = parseFloat(currentBalance.totalAssets) || 1;
       const prevTotalAssets = parseFloat(previousBalance.totalAssets) || 1;
       const roa = netIncome / totalAssets;
-      const prevRoa = (parseFloat(previousIncome.netIncome) || 0) / prevTotalAssets;
       if (roa > 0) {
         score++;
         details.push({ category: 'Profitability', criteria: 'Positive ROA', passed: true, value: `${(roa * 100).toFixed(2)}%` });
