@@ -141,7 +141,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   useEffect(() => {
     loadChartData(selectedRange);
-  }, [symbol, selectedRange]);
+  }, [symbol, selectedRange, showSMA50, showSMA200]);
 
   const loadChartData = async (range: TimeRange) => {
     setLoading(true);
@@ -387,24 +387,37 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
     onChange: (checked: boolean) => void;
     label: string;
     color?: string;
-  }) => (
-    <label className="flex items-center cursor-pointer">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="sr-only"
-      />
-      <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? `bg-${color}-600` : 'bg-gray-600'
-      }`}>
-        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          checked ? 'translate-x-6' : 'translate-x-1'
-        }`} />
-      </div>
-      <span className="ml-2 text-sm text-gray-400">{label}</span>
-    </label>
-  );
+  }) => {
+    // Map color names to Tailwind classes (avoiding dynamic class generation)
+    const getColorClass = (isChecked: boolean, colorName: string) => {
+      if (!isChecked) return 'bg-gray-600';
+      switch(colorName) {
+        case 'yellow': return 'bg-yellow-500';
+        case 'orange': return 'bg-orange-500';
+        case 'green': return 'bg-green-600';
+        default: return 'bg-green-600';
+      }
+    };
+
+    return (
+      <label className="flex items-center cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="sr-only"
+        />
+        <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          getColorClass(checked, color)
+        }`}>
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            checked ? 'translate-x-6' : 'translate-x-1'
+          }`} />
+        </div>
+        <span className="ml-2 text-sm text-gray-400">{label}</span>
+      </label>
+    );
+  };
 
   return (
     <div>
