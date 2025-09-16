@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ComposedChart, ScatterChart, Scatter } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Globe, Briefcase, Gauge, Coins, ArrowUpRight, ArrowDownRight, Clock, Database, LineChart as LineChartIcon, Calendar, Layers, Eye, EyeOff, Zap, Droplet, Package, Wheat, Bitcoin, ChevronUp, ChevronDown } from 'lucide-react';
+import EconomicIndicatorsChart from './EconomicIndicatorsChart';
 import { 
   fetchHistoricalMarketData, 
   fetchAndProcessMacroData, 
