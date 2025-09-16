@@ -371,7 +371,13 @@ const MacroDashboard = () => {
                 verticalAlign="top" 
                 height={36}
                 iconType="line"
-                wrapperStyle={{ paddingBottom: '20px' }}
+                wrapperStyle={{ 
+                  paddingBottom: '20px',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '20px'
+                }}
+                formatter={(value) => <span style={{ marginRight: '15px' }}>{value}</span>}
               />
               
               {showSP500 && (
