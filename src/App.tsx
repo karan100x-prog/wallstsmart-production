@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
-import { TrendingUp, Menu, X, LogOut } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link, useLocation } from 'react-router-dom';
+import { TrendingUp, Menu, X, LogOut, Search } from 'lucide-react';
 import { useState } from 'react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
@@ -13,9 +13,14 @@ import { Analytics } from '@vercel/analytics/react';
 
 function Navigation() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const { currentUser, logout } = useAuth();
+  
+  // Check if we're on the home page
+  const isHomePage = location.pathname === '/';
   
   const handleLogout = async () => {
     try {
@@ -24,6 +29,11 @@ function Navigation() {
     } catch (error) {
       console.error('Failed to log out:', error);
     }
+  };
+  
+  const handleSearchSelect = (symbol: string) => {
+    navigate(`/stock/${symbol}`);
+    setShowSearch(false);
   };
   
   return (
@@ -37,6 +47,17 @@ function Navigation() {
             </div>
             
             <div className="hidden md:flex items-center gap-6">
+              {/* Search Icon - Only show when not on home page */}
+              {!isHomePage && (
+                <button 
+                  onClick={() => setShowSearch(!showSearch)}
+                  className="hover:text-green-500 transition p-2 rounded-lg hover:bg-gray-800"
+                  title="Search stocks"
+                >
+                  <Search className="h-5 w-5" />
+                </button>
+              )}
+              
               <Link to="/macro" className="hover:text-green-500 transition">Macro</Link>
               <Link to="/screener" className="hover:text-green-500 transition">Screener</Link>
               <Link to="/portfolio" className="hover:text-green-500 transition">Portfolio</Link>
@@ -63,13 +84,35 @@ function Navigation() {
               )}
             </div>
             
-            <button 
-              className="md:hidden p-2"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
+            <div className="flex md:hidden items-center gap-2">
+              {/* Mobile Search Icon - Only show when not on home page */}
+              {!isHomePage && (
+                <button 
+                  onClick={() => setShowSearch(!showSearch)}
+                  className="p-2 hover:text-green-500 transition"
+                  title="Search stocks"
+                >
+                  <Search className="h-5 w-5" />
+                </button>
+              )}
+              
+              <button 
+                className="p-2"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+            </div>
           </div>
+          
+          {/* Search Bar - Shows when search icon is clicked */}
+          {showSearch && !isHomePage && (
+            <div className="pb-4 px-2">
+              <div className="max-w-xl mx-auto">
+                <StockSearch onSelectStock={handleSearchSelect} />
+              </div>
+            </div>
+          )}
           
           {mobileMenuOpen && (
             <div className="md:hidden border-t border-gray-800 py-4">
@@ -82,6 +125,9 @@ function Navigation() {
                 </Link>
                 <Link to="/portfolio" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
                   Portfolio
+                </Link>
+                <Link to="/smart-flow" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+                  Smart Flow
                 </Link>
                 {currentUser ? (
                   <>
@@ -203,7 +249,7 @@ function App() {
             <Route path="/macro" element={<MacroDashboard />} />
             <Route path="/smart-flow" element={<SmartFlow />} />
           </Routes>
-          <Analytics />  {/* Add this line */}
+          <Analytics />
         </div>
       </Router>
     </AuthProvider>
