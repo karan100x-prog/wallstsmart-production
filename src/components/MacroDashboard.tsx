@@ -1,393 +1,493 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Globe, Briefcase, Home, Factory, Zap, AlertTriangle, ChevronUp, ChevronDown, Info } from 'lucide-react';
-//import { fetchAndProcessMacroData, fetchCommodityData } from '../services/macroDataService';
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ComposedChart, ScatterChart, Scatter } from 'recharts';
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Globe, Briefcase, Gauge, Coins, ArrowUpRight, ArrowDownRight, Clock, Database, LineChart as LineChartIcon, Calendar, Layers, Eye, EyeOff, Zap, Droplet, Package, Wheat, Bitcoin, ChevronUp, ChevronDown } from 'lucide-react';
 
 const MacroDashboard = () => {
-  const [selectedRegime, setSelectedRegime] = useState('current');
-  const [hoveredMetric, setHoveredMetric] = useState(null);
-  const [macroData, setMacroData] = useState({
-    gdp: { value: '2.8%', change: '+0.3%', trend: 'up' },
-    cpi: { value: '3.2%', change: '-0.3%', trend: 'down' },
-    unemployment: { value: '3.7%', change: '-0.2%', trend: 'down' },
-    fedRate: { value: '5.25%', change: '0%', trend: 'flat' },
-    treasury10Y: { value: '4.28%', change: '+0.08%', trend: 'up' },
-    realRate: { value: '2.05%', change: '+0.38%', trend: 'up' },
-    oil: { value: '$78.25', change: '+$2.15', trend: 'up' },
-    naturalGas: { value: '$2.85', change: '-$0.12', trend: 'down' },
-    copper: { value: '$4.21', change: '+$0.08', trend: 'up' }
-  });
-  const [loading, setLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [showSP500, setShowSP500] = useState(true);
+  const [showDOW, setShowDOW] = useState(true);
+  const [showNASDAQ, setShowNASDAQ] = useState(true);
+  const [selectedIndicator, setSelectedIndicator] = useState('all');
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   useEffect(() => {
-    fetchAllMacroData();
-    const interval = setInterval(() => {
-      fetchAllMacroData();
-      setLastUpdate(new Date());
-    }, 43200000);  // 12 hours
-    
-    return () => clearInterval(interval);
+    setTimeout(() => setAnimationComplete(true), 500);
   }, []);
 
-  const fetchAllMacroData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch processed economic data
-      const [economicData, commodityData] = await Promise.all([
-        fetchAndProcessMacroData(),
-        fetchCommodityData()
-      ]);
-
-      // Update state with properly processed data
-      setMacroData({
-        ...economicData,
-        ...commodityData
-      });
-
-      // Determine economic regime based on processed data
-      determineEconomicRegime(economicData);
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching macro data:', error);
-      setLoading(false);
-    }
-  };
-
-  const determineEconomicRegime = (data) => {
-    const gdpGrowth = parseFloat(data.gdp?.value) || 2.5;
-    const inflation = parseFloat(data.cpi?.value) || 3.0;
+  // Generate data since 2000 (24 years of data)
+  const generateHistoricalData = () => {
+    const data = [];
+    const startYear = 2000;
+    const currentYear = 2024;
     
-    if (gdpGrowth > 2.5 && inflation < 3) {
-      setSelectedRegime('current'); // Goldilocks
-    } else if (gdpGrowth < 1 && inflation < 2) {
-      setSelectedRegime('deflation');
-    } else if (gdpGrowth < 2 && inflation > 4) {
-      setSelectedRegime('stagflation');
-    } else if (gdpGrowth > 3 && inflation > 2) {
-      setSelectedRegime('expansion');
-    }
-  };
-
-  const getDynamicMetrics = () => {
-    return [
-      {
-        category: 'GROWTH INDICATORS',
-        color: 'from-blue-600 to-blue-700',
-        metrics: [
-          { 
-            name: 'GDP Growth', 
-            value: macroData.gdp?.value || '2.8%', 
-            change: macroData.gdp?.change || '+0.3%', 
-            trend: macroData.gdp?.trend || 'up',
-            api: 'REAL_GDP'
-          },
-          { 
-            name: 'Unemployment', 
-            value: macroData.unemployment?.value || '3.7%', 
-            change: macroData.unemployment?.change || '-0.2%', 
-            trend: macroData.unemployment?.trend || 'down',
-            api: 'UNEMPLOYMENT'
-          },
-          { name: 'Retail Sales', value: 'Coming Soon', change: '--', trend: 'flat', api: 'RETAIL_SALES' },
-          { name: 'Nonfarm Payroll', value: 'Coming Soon', change: '--', trend: 'flat', api: 'NONFARM_PAYROLL' }
-        ]
-      },
-      {
-        category: 'INFLATION & RATES',
-        color: 'from-orange-600 to-orange-700',
-        metrics: [
-          { 
-            name: 'CPI Inflation', 
-            value: macroData.cpi?.value || '3.2%', 
-            change: macroData.cpi?.change || '-0.3%', 
-            trend: macroData.cpi?.trend || 'down',
-            api: 'CPI'
-          },
-          { 
-            name: 'Fed Funds Rate', 
-            value: macroData.fedRate?.value || '5.25%', 
-            change: macroData.fedRate?.change || '0%', 
-            trend: macroData.fedRate?.trend || 'flat',
-            api: 'FEDERAL_FUNDS_RATE'
-          },
-          { 
-            name: '10Y Treasury', 
-            value: macroData.treasury10Y?.value || '4.28%', 
-            change: macroData.treasury10Y?.change || '+0.08%', 
-            trend: macroData.treasury10Y?.trend || 'up',
-            api: 'TREASURY_YIELD'
-          },
-          { 
-            name: 'Real Interest Rate', 
-            value: macroData.realRate?.value || '2.05%', 
-            change: macroData.realRate?.change || '+0.38%', 
-            trend: macroData.realRate?.trend || 'up',
-            calculated: true
-          }
-        ]
-      },
-      {
-        category: 'MARKET VALUATIONS',
-        color: 'from-purple-600 to-purple-700',
-        metrics: [
-          { name: 'Market Status', value: 'Open', change: '--', trend: 'flat', api: 'MARKET_STATUS' },
-          { name: 'VIX Volatility', value: '15.2', change: '-1.3', trend: 'down', api: 'GLOBAL_QUOTE' },
-          { name: 'Dollar Index', value: '103.4', change: '+0.8', trend: 'up', api: 'CURRENCY_EXCHANGE_RATE' },
-          { name: 'Top Gainers', value: 'View', change: '--', trend: 'flat', api: 'TOP_GAINERS_LOSERS' }
-        ]
-      },
-      {
-        category: 'COMMODITY & ENERGY',
-        color: 'from-emerald-600 to-emerald-700',
-        metrics: [
-          { 
-            name: 'Oil (WTI)', 
-            value: macroData.oil?.value || '$78.25', 
-            change: macroData.oil?.change || '+$2.15', 
-            trend: macroData.oil?.trend || 'up',
-            api: 'WTI'
-          },
-          { 
-            name: 'Natural Gas', 
-            value: macroData.naturalGas?.value || '$2.85', 
-            change: macroData.naturalGas?.change || '-$0.12', 
-            trend: macroData.naturalGas?.trend || 'down',
-            api: 'NATURAL_GAS'
-          },
-          { 
-            name: 'Copper', 
-            value: macroData.copper?.value || '$4.21', 
-            change: macroData.copper?.change || '+$0.08', 
-            trend: macroData.copper?.trend || 'up',
-            api: 'COPPER'
-          },
-          { name: 'Aluminum', value: '$2,385', change: '+$45', trend: 'up', api: 'ALUMINUM' }
-        ]
+    for (let year = startYear; year <= currentYear; year++) {
+      for (let month = 0; month < 12; month++) {
+        if (year === currentYear && month > 8) break;
+        
+        const date = new Date(year, month);
+        const yearsSince2000 = year - startYear + month / 12;
+        
+        let sp500Base = 1400;
+        let dowBase = 10000;
+        let nasdaqBase = 2500;
+        
+        if (year <= 2002) {
+          sp500Base -= (2002 - year) * 200;
+          nasdaqBase -= (2002 - year) * 800;
+        }
+        
+        if (year >= 2003 && year <= 2007) {
+          sp500Base += (year - 2003) * 150;
+          nasdaqBase += (year - 2003) * 400;
+        }
+        
+        if (year === 2008 || year === 2009) {
+          sp500Base *= 0.65;
+          dowBase *= 0.62;
+          nasdaqBase *= 0.68;
+        }
+        
+        if (year >= 2010) {
+          const growthYears = year - 2010;
+          sp500Base = 1100 + growthYears * 285;
+          dowBase = 10000 + growthYears * 2100;
+          nasdaqBase = 2200 + growthYears * 980;
+        }
+        
+        const monthlyVolatility = Math.sin(month * 0.5) * 0.03 + Math.random() * 0.02;
+        
+        data.push({
+          date: `${year}-${String(month + 1).padStart(2, '0')}`,
+          displayDate: month === 0 ? year.toString() : '',
+          year: year,
+          sp500: Math.round(sp500Base * (1 + monthlyVolatility)),
+          dow: Math.round(dowBase * (1 + monthlyVolatility)),
+          nasdaq: Math.round(nasdaqBase * (1 + monthlyVolatility))
+        });
       }
-    ];
+    }
+    
+    return data;
   };
 
-  const economicRegimes = {
-    current: { name: 'Goldilocks', color: 'bg-green-500', description: 'Moderate growth, low inflation' },
-    deflation: { name: 'Deflation', color: 'bg-blue-500', description: 'Falling prices, slow growth' },
-    stagflation: { name: 'Stagflation', color: 'bg-red-500', description: 'High inflation, slow growth' },
-    expansion: { name: 'Expansion', color: 'bg-emerald-500', description: 'High growth, rising inflation' }
+  const historicalData = generateHistoricalData();
+
+  const economicData = {
+    gdp: { value: 2.8, change: 0.3, trend: 'up', target: 2.5 },
+    cpi: { value: 2.9, change: -0.3, trend: 'down', target: 2.0 },
+    unemployment: { value: 3.7, change: -0.2, trend: 'down', target: 4.0 },
+    fedRate: { value: 4.33, change: 0, trend: 'flat', target: 3.0 },
+    treasury10Y: { value: 4.06, change: 0.05, trend: 'up', target: 3.5 },
+    retailSales: { value: 0.4, change: 0.1, trend: 'up', target: 0.3 },
+    nonfarmPayroll: { value: 236, change: 12, trend: 'up', target: 200 },
+    durableGoods: { value: 0.3, change: -0.2, trend: 'down', target: 0.5 }
   };
 
-  const assetPerformance = {
-    'Goldilocks': { stocks: '+18%', bonds: '+5%', gold: '+2%', commodities: '+8%', realestate: '+12%' },
-    'Deflation': { stocks: '-5%', bonds: '+12%', gold: '+15%', commodities: '-20%', realestate: '-8%' },
-    'Stagflation': { stocks: '-12%', bonds: '-8%', gold: '+25%', commodities: '+30%', realestate: '+3%' },
-    'Expansion': { stocks: '+25%', bonds: '-3%', gold: '-5%', commodities: '+15%', realestate: '+20%' }
-  };
-
-  const yieldCurveData = [
-    { maturity: '3M', yield: 5.45 },
-    { maturity: '6M', yield: 5.38 },
-    { maturity: '1Y', yield: 5.02 },
-    { maturity: '2Y', yield: 4.65 },
-    { maturity: '5Y', yield: 4.35 },
-    { maturity: '10Y', yield: parseFloat(macroData.treasury10Y?.value) || 4.28 },
-    { maturity: '30Y', yield: 4.48 }
+  const commoditiesData = [
+    { name: 'WTI Oil', value: 62.60, change: 0.61, icon: '🛢️', color: '#000000' },
+    { name: 'Natural Gas', value: 3.10, change: 1.64, icon: '⚡', color: '#3b82f6' },
+    { name: 'Gold', value: 2042.30, change: 0.62, icon: '🥇', color: '#fbbf24' },
+    { name: 'Silver', value: 23.85, change: 1.79, icon: '🥈', color: '#9ca3af' },
+    { name: 'Copper', value: 4.21, change: 3.19, icon: '🔧', color: '#dc2626' },
+    { name: 'Aluminum', value: 2385, change: 1.92, icon: '🏗️', color: '#6b7280' },
+    { name: 'Wheat', value: 585.25, change: -1.47, icon: '🌾', color: '#eab308' },
+    { name: 'Corn', value: 445.50, change: 0.73, icon: '🌽', color: '#84cc16' }
   ];
 
-  if (loading) {
+  const cryptoData = [
+    { name: 'Bitcoin', symbol: 'BTC', price: 98542, change: 2.23, marketCap: 1940, dominance: 52.3 },
+    { name: 'Ethereum', symbol: 'ETH', price: 3845, change: 3.36, marketCap: 462, dominance: 12.5 }
+  ];
+
+  const gradients = (
+    <defs>
+      <linearGradient id="sp500Gradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+      </linearGradient>
+      <linearGradient id="dowGradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+        <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+      </linearGradient>
+      <linearGradient id="nasdaqGradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/>
+        <stop offset="95%" stopColor="#a855f7" stopOpacity={0.1}/>
+      </linearGradient>
+    </defs>
+  );
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-gray-900/95 backdrop-blur border border-gray-700 rounded-lg p-3 shadow-2xl">
+          <p className="text-gray-400 text-xs mb-2 font-semibold">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            entry.value && (
+              <div key={index} className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                <span className="text-gray-300">{entry.name}:</span>
+                <span className="text-white font-semibold">
+                  {entry.value.toLocaleString()}
+                </span>
+              </div>
+            )
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const EconomicIndicatorCard = ({ title, data, icon: Icon }: any) => {
+    const percentage = (data.value / (data.target * 2)) * 100;
+    const radius = 40;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4 flex items-center justify-center">
-        <div className="text-center">
-          <Activity className="w-12 h-12 text-blue-400 animate-pulse mx-auto mb-4" />
-          <p className="text-gray-400">Loading real-time macro data...</p>
-          <p className="text-xs text-gray-500 mt-2">Fetching data.. </p>
+      <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition-all hover:shadow-2xl hover:shadow-blue-500/10 group">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-gray-400 text-sm">{title}</p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-bold text-white">
+                {typeof data.value === 'number' && data.value < 10 ? `${data.value}%` : data.value}
+              </span>
+              <span className={`text-sm flex items-center ${data.trend === 'up' ? 'text-green-400' : data.trend === 'down' ? 'text-red-400' : 'text-gray-400'}`}>
+                {data.trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> : data.trend === 'down' ? <ArrowDownRight className="w-4 h-4" /> : '→'}
+                {data.change > 0 ? '+' : ''}{data.change}
+              </span>
+            </div>
+          </div>
+          <div className="relative">
+            <svg width="90" height="90" className="transform -rotate-90">
+              <circle
+                cx="45"
+                cy="45"
+                r={radius}
+                stroke="rgba(75, 85, 99, 0.3)"
+                strokeWidth="8"
+                fill="none"
+              />
+              <circle
+                cx="45"
+                cy="45"
+                r={radius}
+                stroke={data.trend === 'up' ? '#10b981' : data.trend === 'down' ? '#ef4444' : '#6b7280'}
+                strokeWidth="8"
+                fill="none"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-1000 ease-out"
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              {Icon && <Icon className="w-6 h-6 text-blue-400" />}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-500">Target: {data.target}</span>
+          <span className={`font-semibold ${percentage > 100 ? 'text-yellow-400' : 'text-blue-400'}`}>
+            {percentage.toFixed(0)}%
+          </span>
         </div>
       </div>
     );
-  }
+  };
 
-  const macroMetrics = getDynamicMetrics();
+  const CommodityCard = ({ commodity }: any) => (
+    <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-4 border border-gray-700/50 hover:border-gray-600/50 transition-all hover:scale-105 hover:shadow-2xl group ${animationComplete ? 'animate-fade-in' : 'opacity-0'}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">{commodity.icon}</span>
+          <span className="text-gray-300 font-medium">{commodity.name}</span>
+        </div>
+        <div className={`flex items-center ${commodity.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
+          {commodity.change > 0 ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </div>
+      </div>
+      <div className="flex items-baseline justify-between">
+        <span className="text-2xl font-bold text-white">
+          ${typeof commodity.value === 'number' && commodity.value > 100 ? commodity.value.toLocaleString() : commodity.value}
+        </span>
+        <span className={`text-sm font-semibold ${commodity.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
+          {commodity.change > 0 ? '+' : ''}{commodity.change}%
+        </span>
+      </div>
+      <div className="mt-3 h-1 bg-gray-700 rounded-full overflow-hidden">
+        <div 
+          className={`h-full rounded-full transition-all duration-1000 ${commodity.change > 0 ? 'bg-gradient-to-r from-green-500 to-green-400' : 'bg-gradient-to-r from-red-500 to-red-400'}`}
+          style={{ width: `${Math.abs(commodity.change) * 10}%` }}
+        />
+      </div>
+    </div>
+  );
+
+  const CryptoCard = ({ crypto }: any) => (
+    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition-all hover:shadow-2xl hover:shadow-purple-500/10">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+            crypto.symbol === 'BTC' ? 'bg-orange-500/20' : 'bg-purple-500/20'
+          }`}>
+            <Bitcoin className={`w-6 h-6 ${
+              crypto.symbol === 'BTC' ? 'text-orange-400' : 'text-purple-400'
+            }`} />
+          </div>
+          <div>
+            <p className="text-white font-semibold">{crypto.name}</p>
+            <p className="text-gray-400 text-sm">{crypto.symbol}/USD</p>
+          </div>
+        </div>
+        <div className={`text-right ${crypto.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <p className="text-sm font-semibold">{crypto.change > 0 ? '+' : ''}{crypto.change}%</p>
+          <p className="text-xs text-gray-500">24h</p>
+        </div>
+      </div>
+      <div className="mb-4">
+        <p className="text-3xl font-bold text-white">${crypto.price.toLocaleString()}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-700/50">
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Market Cap</p>
+          <p className="text-sm font-semibold text-white">${crypto.marketCap}B</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Dominance</p>
+          <p className="text-sm font-semibold text-white">{crypto.dominance}%</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const sectorPerformance = [
+    { name: 'Technology', value: 28, color: '#3b82f6' },
+    { name: 'Healthcare', value: 18, color: '#10b981' },
+    { name: 'Finance', value: 22, color: '#a855f7' },
+    { name: 'Energy', value: 12, color: '#f59e0b' },
+    { name: 'Consumer', value: 20, color: '#ef4444' }
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4">
-      <div className="max-w-7xl mx-auto mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Macro View
-            </h1>
-            <p className="text-gray-400 mt-1">Real-time economic indicators</p>
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+            Macro Economic Dashboard
+          </h1>
+          <p className="text-gray-400">Real-time market data and economic indicators since 2000</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-white mb-2">US Market Indices Since 2000</h2>
+            <p className="text-sm text-gray-400">24-year historical performance of major indices</p>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-400">Last Update</div>
-            <div className="text-lg font-mono">{lastUpdate.toLocaleTimeString()}</div>
-            <div className="text-xs text-green-400">Live Data</div>
+
+          <ResponsiveContainer width="100%" height={400}>
+            <AreaChart data={historicalData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+              {gradients}
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
+              <XAxis 
+                dataKey="displayDate" 
+                stroke="#9ca3af"
+                tick={{ fontSize: 11 }}
+                interval="preserveStartEnd"
+              />
+              <YAxis 
+                stroke="#9ca3af"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend 
+                verticalAlign="top" 
+                height={36}
+                iconType="line"
+                wrapperStyle={{ paddingBottom: '20px' }}
+              />
+              
+              {showSP500 && (
+                <Area
+                  type="monotone"
+                  dataKey="sp500"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  fill="url(#sp500Gradient)"
+                  name="S&P 500"
+                  animationDuration={2000}
+                />
+              )}
+              
+              {showDOW && (
+                <Area
+                  type="monotone"
+                  dataKey="dow"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  fill="url(#dowGradient)"
+                  name="DOW Jones"
+                  animationDuration={2000}
+                  animationBegin={300}
+                />
+              )}
+              
+              {showNASDAQ && (
+                <Area
+                  type="monotone"
+                  dataKey="nasdaq"
+                  stroke="#a855f7"
+                  strokeWidth={2}
+                  fill="url(#nasdaqGradient)"
+                  name="NASDAQ"
+                  animationDuration={2000}
+                  animationBegin={600}
+                />
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
+
+          <div className="flex gap-3 mt-6 justify-center">
+            <button
+              onClick={() => setShowSP500(!showSP500)}
+              className={`px-4 py-2 rounded-xl font-medium transition-all ${
+                showSP500 
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50' 
+                  : 'bg-gray-700/30 text-gray-400 border border-gray-600/50'
+              }`}
+            >
+              S&P 500
+            </button>
+            <button
+              onClick={() => setShowDOW(!showDOW)}
+              className={`px-4 py-2 rounded-xl font-medium transition-all ${
+                showDOW 
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/50' 
+                  : 'bg-gray-700/30 text-gray-400 border border-gray-600/50'
+              }`}
+            >
+              DOW Jones
+            </button>
+            <button
+              onClick={() => setShowNASDAQ(!showNASDAQ)}
+              className={`px-4 py-2 rounded-xl font-medium transition-all ${
+                showNASDAQ 
+                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50' 
+                  : 'bg-gray-700/30 text-gray-400 border border-gray-600/50'
+              }`}
+            >
+              NASDAQ
+            </button>
           </div>
         </div>
 
-        <div className="bg-gray-800/50 backdrop-blur rounded-xl p-4 mb-6 border border-gray-700">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Activity className="w-5 h-5 text-purple-400" />
-              Economic Regime Analysis (AI-Powered)
-            </h2>
-            <div className="flex gap-2">
-              {Object.entries(economicRegimes).map(([key, regime]) => (
-                <button
-                  key={key}
-                  onClick={() => setSelectedRegime(key)}
-                  className={`px-3 py-1 rounded-lg text-sm transition-all ${
-                    selectedRegime === key 
-                      ? `${regime.color} text-white` 
-                      : 'bg-gray-700 hover:bg-gray-600'
-                  }`}
-                >
-                  {regime.name}
-                </button>
-              ))}
-            </div>
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Activity className="w-6 h-6 text-blue-400" />
+            Economic Indicators
+          </h2>
+          <div className="grid grid-cols-4 gap-4">
+            <EconomicIndicatorCard title="GDP Growth Rate" data={economicData.gdp} icon={TrendingUp} />
+            <EconomicIndicatorCard title="CPI Inflation" data={economicData.cpi} icon={Gauge} />
+            <EconomicIndicatorCard title="Unemployment Rate" data={economicData.unemployment} icon={Briefcase} />
+            <EconomicIndicatorCard title="Federal Funds Rate" data={economicData.fedRate} icon={DollarSign} />
+            <EconomicIndicatorCard title="10Y Treasury Yield" data={economicData.treasury10Y} icon={BarChart3} />
+            <EconomicIndicatorCard title="Retail Sales" data={economicData.retailSales} icon={Package} />
+            <EconomicIndicatorCard title="Nonfarm Payroll (K)" data={economicData.nonfarmPayroll} icon={Briefcase} />
+            <EconomicIndicatorCard title="Durable Goods" data={economicData.durableGoods} icon={Package} />
           </div>
-          <div className="grid grid-cols-5 gap-3">
-            {Object.entries(assetPerformance[economicRegimes[selectedRegime].name]).map(([asset, performance]) => (
-              <div key={asset} className="bg-gray-700/50 rounded-lg p-3 text-center">
-                <div className="text-xs text-gray-400 uppercase mb-1">{asset}</div>
-                <div className={`text-xl font-bold ${
-                  performance.startsWith('+') ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  {performance}
-                </div>
-              </div>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Droplet className="w-6 h-6 text-yellow-400" />
+            Commodities & Energy
+          </h2>
+          <div className="grid grid-cols-4 gap-4">
+            {commoditiesData.map((commodity, index) => (
+              <CommodityCard key={index} commodity={commodity} />
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {macroMetrics.map((category, idx) => (
-            <div key={idx} className="bg-gray-800/50 backdrop-blur rounded-xl border border-gray-700 overflow-hidden">
-              <div className={`bg-gradient-to-r ${category.color} px-4 py-2`}>
-                <h3 className="font-semibold text-sm">{category.category}</h3>
-              </div>
-              <div className="p-3">
-                {category.metrics.map((metric, midx) => (
-                  <div 
-                    key={midx} 
-                    className="flex items-center justify-between py-2 border-b border-gray-700/50 last:border-0 hover:bg-gray-700/30 transition-colors cursor-pointer group"
-                    onMouseEnter={() => setHoveredMetric(`${idx}-${midx}`)}
-                    onMouseLeave={() => setHoveredMetric(null)}
-                  >
-                    <div className="flex-1">
-                      <div className="text-sm text-gray-400 flex items-center gap-1">
-                        {metric.name}
-                        {metric.api && (
-                          <span className="text-xs bg-blue-500/20 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                            {metric.api}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-lg font-semibold">{metric.value}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`text-sm ${
-                        metric.trend === 'up' ? 'text-green-400' : 
-                        metric.trend === 'down' ? 'text-red-400' : 
-                        'text-gray-400'
-                      }`}>
-                        {metric.change}
-                        {metric.trend === 'up' && <ChevronUp className="inline w-4 h-4" />}
-                        {metric.trend === 'down' && <ChevronDown className="inline w-4 h-4" />}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-4 border border-gray-700">
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-blue-400" />
-              US Treasury Yield Curve (Live)
-            </h3>
-            <div className="h-40 flex items-end justify-between gap-2">
-              {yieldCurveData.map((point, idx) => (
-                <div key={idx} className="flex-1 flex flex-col items-center">
-                  <div 
-                    className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all hover:from-blue-500 hover:to-blue-300"
-                    style={{ height: `${(point.yield / 6) * 100}%` }}
-                  />
-                  <div className="text-xs text-gray-400 mt-2">{point.maturity}</div>
-                  <div className="text-xs font-semibold">{point.yield.toFixed(2)}%</div>
-                </div>
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-1">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+              <Bitcoin className="w-6 h-6 text-orange-400" />
+              Cryptocurrencies
+            </h2>
+            <div className="space-y-4">
+              {cryptoData.map((crypto, index) => (
+                <CryptoCard key={index} crypto={crypto} />
               ))}
             </div>
-            <div className="mt-3 text-xs text-gray-400">
-              Spread (10Y-2Y): <span className={`font-semibold ${
-                (yieldCurveData[5].yield - yieldCurveData[3].yield) < 0 ? 'text-yellow-400' : 'text-green-400'
-              }`}>
-                {((yieldCurveData[5].yield - yieldCurveData[3].yield) * 100).toFixed(0)} bps
-              </span>
-              {(yieldCurveData[5].yield - yieldCurveData[3].yield) < 0 && ' (Inverted)'}
+          </div>
+
+          <div className="col-span-1">
+            <h2 className="text-xl font-bold text-white mb-4">Sector Performance</h2>
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-2xl p-4 border border-gray-700/50">
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={sectorPerformance}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value }) => `${name}: ${value}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    animationBegin={0}
+                    animationDuration={1500}
+                  >
+                    {sectorPerformance.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-4 border border-gray-700">
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-yellow-400" />
-              API Status
-            </h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between py-1">
-                <span className="text-sm">API Plan</span>
-                <span className="text-green-400 font-semibold">Loading...</span>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-sm">Data Sources Active</span>
-                <span className="text-blue-400 font-semibold">8 Endpoints</span>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-sm">Update Frequency</span>
-                <span className="text-purple-400 font-semibold">Real-time</span>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-sm">Connection Status</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  <span className="text-green-400 font-semibold">Connected</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-sm">Next Refresh</span>
-                <span className="text-gray-400 font-mono text-xs">
-                  {(60 - new Date().getSeconds())}s
-                </span>
-              </div>
+          <div className="col-span-1">
+            <h2 className="text-xl font-bold text-white mb-4">Market Sentiment</h2>
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-2xl p-4 border border-gray-700/50">
+              <ResponsiveContainer width="100%" height={300}>
+                <RadarChart data={[
+                  { metric: 'Fear/Greed', value: 65 },
+                  { metric: 'Volatility', value: 35 },
+                  { metric: 'Momentum', value: 78 },
+                  { metric: 'Volume', value: 82 },
+                  { metric: 'Put/Call', value: 55 },
+                  { metric: 'Breadth', value: 70 }
+                ]}>
+                  <PolarGrid stroke="#374151" />
+                  <PolarAngleAxis dataKey="metric" stroke="#9ca3af" tick={{ fontSize: 11 }} />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} stroke="#9ca3af" />
+                  <Radar name="Current" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
+                </RadarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 bg-gradient-to-r from-red-900/30 to-orange-900/30 rounded-xl p-4 border border-red-800/50">
+        <div className="mt-8 bg-gradient-to-r from-blue-900/20 via-purple-900/20 to-pink-900/20 rounded-2xl p-4 border border-purple-800/30">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <AlertTriangle className="w-5 h-5 text-yellow-400" />
-              <span className="font-semibold">Market Risk Level:</span>
-              <div className="flex gap-1">
-                {[1,2,3,4,5].map(i => (
-                  <div key={i} className={`w-8 h-3 rounded ${
-                    i <= 3 ? 'bg-yellow-400' : 'bg-gray-600'
-                  }`} />
-                ))}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-purple-400" />
+                <span className="text-sm font-medium">Last Update: {new Date().toLocaleTimeString()}</span>
               </div>
-              <span className="text-yellow-400 font-semibold">MODERATE</span>
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-yellow-400" />
+                <span className="text-sm">Live Data</span>
+              </div>
             </div>
-            <div className="flex gap-6 text-sm">
-              <div>Yield Curve: <span className={`${
-                (yieldCurveData[5].yield - yieldCurveData[3].yield) < 0 ? 'text-yellow-400' : 'text-green-400'
-              }`}>
-                {(yieldCurveData[5].yield - yieldCurveData[3].yield) < 0 ? 'Inverted' : 'Normal'}
-              </span></div>
-              <div>Inflation Trend: <span className="text-orange-400">Cooling</span></div>
-              <div>Fed Policy: <span className="text-blue-400">Restrictive</span></div>
+            <div className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-blue-400" />
+              <span className="text-sm text-gray-400">Powered by Alpha Vantage Premium API</span>
             </div>
           </div>
         </div>
