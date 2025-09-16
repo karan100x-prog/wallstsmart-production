@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link, useLocation } from 'react-router-dom';
 import { TrendingUp, Menu, X, LogOut, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import StockSearch from './components/StockSearch';
 import StockDetail from './components/StockDetail';
 import Screener from './pages/Screener';
@@ -10,6 +10,7 @@ import Login from './components/Login';
 import MacroDashboard from './components/MacroDashboard';
 import SmartFlow from './components/SmartFlow';
 import { Analytics } from '@vercel/analytics/react';
+import { searchStocks } from './services/alphaVantageService';
 
 function Navigation() {
   const navigate = useNavigate();
@@ -17,10 +18,62 @@ function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchRef = useRef<HTMLDivElement>(null);
   const { currentUser, logout } = useAuth();
   
   // Check if we're on the home page
   const isHomePage = location.pathname === '/';
+  
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setSearchResults([]);
+        setSearchQuery('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  // Handle search input with debounce
+  useEffect(() => {
+    if (searchQuery.length >= 2) {
+      setIsSearching(true);
+      
+      // Clear previous timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      
+      // Set new timeout for debounced search
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const results = await searchStocks(searchQuery);
+          setSearchResults(results.slice(0, 5)); // Limit to 5 suggestions
+        } catch (error) {
+          console.error('Search error:', error);
+          setSearchResults([]);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 300); // 300ms debounce
+    } else {
+      setSearchResults([]);
+      setIsSearching(false);
+    }
+    
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
   
   const handleLogout = async () => {
     try {
@@ -34,11 +87,13 @@ function Navigation() {
   const handleSearchSelect = (symbol: string) => {
     navigate(`/stock/${symbol}`);
     setShowSearch(false);
+    setSearchQuery('');
+    setSearchResults([]);
   };
   
   return (
     <>
-      <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl">
+      <nav className={`border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl ${!isHomePage ? 'md:relative md:static fixed top-0 left-0 right-0 z-50' : ''}`}>
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
@@ -107,31 +162,49 @@ function Navigation() {
           
           {/* Search Bar - Shows when search icon is clicked */}
           {showSearch && !isHomePage && (
-            <div className="pb-4 px-2">
-              <div className="max-w-md mx-auto">
+            <div className="pb-4 px-2" ref={searchRef}>
+              <div className="max-w-md mx-auto relative">
                 <div className="relative">
                   <input
                     type="text"
                     placeholder="Search stocks by symbol or name..."
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-green-500 pr-10"
-                    onChange={(e) => {
-                      const value = e.target.value.toUpperCase();
-                      if (value && e.nativeEvent instanceof KeyboardEvent && e.nativeEvent.key === 'Enter') {
-                        handleSearchSelect(value);
-                      }
-                    }}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        const value = (e.target as HTMLInputElement).value.toUpperCase();
-                        if (value) {
-                          handleSearchSelect(value);
-                        }
+                      if (e.key === 'Enter' && searchQuery) {
+                        handleSearchSelect(searchQuery);
                       }
                     }}
                     autoFocus
                   />
                   <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
+                
+                {/* Search Suggestions Dropdown */}
+                {(searchResults.length > 0 || (isSearching && searchQuery.length >= 2)) && (
+                  <div className="absolute top-full mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto">
+                    {isSearching ? (
+                      <div className="px-4 py-3 text-gray-400 text-sm">Searching...</div>
+                    ) : (
+                      searchResults.map((result: any, index: number) => (
+                        <button
+                          key={index}
+                          onClick={() => handleSearchSelect(result.symbol)}
+                          className="w-full px-4 py-3 hover:bg-gray-700 transition text-left border-b border-gray-700 last:border-b-0"
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <div className="font-semibold text-white">{result.symbol}</div>
+                              <div className="text-sm text-gray-400">{result.name}</div>
+                            </div>
+                            <div className="text-xs text-gray-500">{result.type}</div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -176,6 +249,9 @@ function Navigation() {
       </nav>
       
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
+      
+      {/* Add padding-top on mobile when nav is sticky */}
+      {!isHomePage && <div className="md:hidden h-16" />}
     </>
   );
 }
