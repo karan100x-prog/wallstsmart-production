@@ -1,188 +1,117 @@
-// 1. Create a new file: src/utils/searchTracking.ts
-// This handles tracking and storing search data locally
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
+import { TrendingUp, Menu, X, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import StockSearch from './components/StockSearch';
+import StockDetail from './components/StockDetail';
+import Screener from './pages/Screener';
+import Portfolio from './components/Portfolio';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Login from './components/Login';
+import MacroDashboard from './components/MacroDashboard';
+import SmartFlow from './components/SmartFlow';
+import { Analytics } from '@vercel/analytics/react';
 
-interface SearchRecord {
-  symbol: string;
-  name: string;
-  count: number;
-  lastSearched: number;
-}
-
-const STORAGE_KEY = 'wallstsmart_search_history';
-const MAX_HISTORY_ITEMS = 20;
-
-export const trackStockSearch = (symbol: string, name: string = '') => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const history: SearchRecord[] = stored ? JSON.parse(stored) : [];
-    
-    const existingIndex = history.findIndex(item => item.symbol === symbol);
-    
-    if (existingIndex >= 0) {
-      // Increment count for existing stock
-      history[existingIndex].count++;
-      history[existingIndex].lastSearched = Date.now();
-      if (name && !history[existingIndex].name) {
-        history[existingIndex].name = name;
-      }
-    } else {
-      // Add new stock
-      history.push({
-        symbol,
-        name,
-        count: 1,
-        lastSearched: Date.now()
-      });
+function Navigation() {
+  const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const { currentUser, logout } = useAuth();
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Failed to log out:', error);
     }
-    
-    // Keep only top items to prevent storage bloat
-    const sorted = history
-      .sort((a, b) => b.count - a.count)
-      .slice(0, MAX_HISTORY_ITEMS);
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
-  } catch (error) {
-    console.error('Error tracking search:', error);
-  }
-};
-
-export const getTopSearchedStocks = (limit: number = 5): SearchRecord[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-    
-    const history: SearchRecord[] = JSON.parse(stored);
-    return history
-      .sort((a, b) => b.count - a.count)
-      .slice(0, limit);
-  } catch (error) {
-    console.error('Error getting top searches:', error);
-    return [];
-  }
-};
-
-// 2. Create a new component: src/components/TopSearchedStocks.tsx
-import React, { useEffect, useState } from 'react';
-import { TrendingUp, Search, BarChart3 } from 'lucide-react';
-import { getTopSearchedStocks } from '../utils/searchTracking';
-
-interface TopSearchedStocksProps {
-  onSelectStock: (symbol: string) => void;
-}
-
-interface SearchRecord {
-  symbol: string;
-  name: string;
-  count: number;
-  lastSearched: number;
-}
-
-const TopSearchedStocks: React.FC<TopSearchedStocksProps> = ({ onSelectStock }) => {
-  const [topStocks, setTopStocks] = useState<SearchRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadTopStocks = () => {
-      const stocks = getTopSearchedStocks(5);
-      setTopStocks(stocks);
-      setIsLoading(false);
-    };
-
-    loadTopStocks();
-    
-    // Refresh every 30 seconds to show latest trends
-    const interval = setInterval(loadTopStocks, 30000);
-    
-    // Listen for storage changes (when user searches)
-    const handleStorageChange = () => loadTopStocks();
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
-
-  if (isLoading || topStocks.length === 0) {
-    return null;
-  }
-
+  };
+  
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
-      <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl border border-gray-800 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="h-5 w-5 text-green-500" />
-          <h3 className="text-lg font-semibold text-white">Trending Searches</h3>
-          <span className="text-xs text-gray-500 ml-2">Real-time</span>
-        </div>
-        
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {topStocks.map((stock, index) => (
-            <button
-              key={stock.symbol}
-              onClick={() => onSelectStock(stock.symbol)}
-              className="group relative bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-green-500/50 rounded-lg p-3 transition-all duration-200"
-            >
-              <div className="flex items-start justify-between mb-1">
-                <span className="text-xs font-bold text-green-500">#{index + 1}</span>
-                <div className="flex items-center gap-1">
-                  <Search className="h-3 w-3 text-gray-500" />
-                  <span className="text-xs text-gray-500">{stock.count}</span>
-                </div>
-              </div>
+    <>
+      <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+              <TrendingUp className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />
+              <span className="text-lg sm:text-xl font-bold">WallStSmart</span>
+            </div>
+            
+            <div className="hidden md:flex items-center gap-6">
+              <Link to="/macro" className="hover:text-green-500 transition">Macro</Link>
+              <Link to="/screener" className="hover:text-green-500 transition">Screener</Link>
+              <Link to="/portfolio" className="hover:text-green-500 transition">Portfolio</Link>
+              <Link to="/smart-flow" className="nav-link">Smart Flow</Link>
               
-              <div className="text-left">
-                <div className="font-semibold text-white group-hover:text-green-400 transition">
-                  {stock.symbol}
+              {currentUser ? (
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-400">{currentUser.email}</span>
+                  <button 
+                    onClick={handleLogout}
+                    className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </button>
                 </div>
-                {stock.name && (
-                  <div className="text-xs text-gray-400 truncate mt-1">
-                    {stock.name}
-                  </div>
+              ) : (
+                <button 
+                  onClick={() => setShowLogin(true)}
+                  className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
+            
+            <button 
+              className="md:hidden p-2"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
+          
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-gray-800 py-4">
+              <div className="flex flex-col gap-4">
+                <Link to="/macro" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+                  Macro
+                </Link>
+                <Link to="/screener" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+                  Screener
+                </Link>
+                <Link to="/portfolio" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+                  Portfolio
+                </Link>
+                {currentUser ? (
+                  <>
+                    <div className="px-2 py-1 text-sm text-gray-400">{currentUser.email}</div>
+                    <button 
+                      onClick={handleLogout}
+                      className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition w-full"
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <button 
+                    onClick={() => setShowLogin(true)}
+                    className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition w-full"
+                  >
+                    Sign In
+                  </button>
                 )}
               </div>
-              
-              {index === 0 && (
-                <div className="absolute -top-2 -right-2">
-                  <span className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold px-2 py-0.5 rounded-full">
-                    🔥 HOT
-                  </span>
-                </div>
-              )}
-            </button>
-          ))}
+            </div>
+          )}
         </div>
-        
-        <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-          <div className="flex items-center gap-1">
-            <BarChart3 className="h-3 w-3" />
-            <span>Based on user searches</span>
-          </div>
-          <span>Updates live</span>
-        </div>
-      </div>
-    </div>
+      </nav>
+      
+      {showLogin && <Login onClose={() => setShowLogin(false)} />}
+    </>
   );
-};
+}
 
-export default TopSearchedStocks;
-
-// 3. Update your StockSearch component to track searches
-// In src/components/StockSearch.tsx, add this to your search handler:
-
-import { trackStockSearch } from '../utils/searchTracking';
-
-// Inside your search/select function:
-const handleSelectStock = (symbol: string, name?: string) => {
-  trackStockSearch(symbol, name || '');
-  onSelectStock(symbol);
-};
-
-// 4. Update your HomePage in App.tsx to include TopSearchedStocks:
-// Add this import at the top:
-import TopSearchedStocks from './components/TopSearchedStocks';
-
-// Then in your HomePage component, add after the search bar and before Popular Stocks:
 function HomePage() {
   const navigate = useNavigate();
   
@@ -209,11 +138,76 @@ function HomePage() {
           <StockSearch onSelectStock={handleSelectStock} />
         </div>
       </div>
-      
-      {/* Add Top Searched Stocks here */}
-      <TopSearchedStocks onSelectStock={handleSelectStock} />
-      
-      {/* Your existing Popular Stocks section continues below */}
     </>
   );
 }
+
+function StockPage() {
+  const { symbol } = useParams<{ symbol: string }>();
+  const navigate = useNavigate();
+  
+  if (!symbol) {
+    navigate('/', { replace: true });
+    return null;
+  }
+  
+  return (
+    <div className="w-full">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+        <StockDetail symbol={symbol} />
+      </div>
+    </div>
+  );
+}
+
+function PortfolioPage() {
+  const { currentUser } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+  
+  if (!currentUser) {
+    return (
+      <>
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-10 text-center">
+          <h2 className="text-2xl font-bold mb-4">Sign in to access your portfolio</h2>
+          <p className="text-gray-400 mb-6">Track your investments and create watchlists</p>
+          <button 
+            onClick={() => setShowLogin(true)}
+            className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-semibold"
+          >
+            Sign In
+          </button>
+        </div>
+        {showLogin && <Login onClose={() => setShowLogin(false)} />}
+      </>
+    );
+  }
+  
+  return (
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-10">
+      <Portfolio />
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-gray-950 text-white">
+          <Navigation />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/stock/:symbol" element={<StockPage />} />
+            <Route path="/screener" element={<Screener />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
+            <Route path="/macro" element={<MacroDashboard />} />
+            <Route path="/smart-flow" element={<SmartFlow />} />
+          </Routes>
+          <Analytics />  {/* Add this line */}
+        </div>
+      </Router>
+    </AuthProvider>
+  );
+}
+
+export default App;
