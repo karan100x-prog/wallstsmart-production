@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ComposedChart, ScatterChart, Scatter } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Globe, Briefcase, Gauge, Coins, ArrowUpRight, ArrowDownRight, Clock, Database, LineChart as LineChartIcon, Calendar, Layers, Eye, EyeOff, Zap, Droplet, Package, Wheat, Bitcoin, ChevronUp, ChevronDown } from 'lucide-react';
-import EconomicIndicatorsChart from './EconomicIndicatorsChart';
 import { 
   fetchHistoricalMarketData, 
   fetchAndProcessMacroData, 
@@ -162,12 +161,12 @@ const MacroDashboard = () => {
     </defs>
   );
 
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-gray-900/95 backdrop-blur border border-gray-700 rounded-lg p-3 shadow-2xl">
           <p className="text-gray-400 text-xs mb-2 font-semibold">{label}</p>
-          {payload.map((entry, index) => (
+          {payload.map((entry: any, index: number) => (
             entry.value && (
               <div key={index} className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
@@ -184,7 +183,7 @@ const MacroDashboard = () => {
     return null;
   };
 
-  const EconomicIndicatorCard = ({ title, data, icon: Icon }) => {
+  const EconomicIndicatorCard = ({ title, data, icon: Icon }: any) => {
     if (!data) return null;
     
     // Parse value to get numeric value for calculation
@@ -250,7 +249,7 @@ const MacroDashboard = () => {
     );
   };
 
-  const CommodityCard = ({ commodity }) => (
+  const CommodityCard = ({ commodity }: any) => (
     <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-4 border border-gray-700/50 hover:border-gray-600/50 transition-all hover:scale-105 hover:shadow-2xl group ${animationComplete ? 'animate-fade-in' : 'opacity-0'}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -278,7 +277,7 @@ const MacroDashboard = () => {
     </div>
   );
 
-  const CryptoCard = ({ crypto }) => (
+  const CryptoCard = ({ crypto }: any) => (
     <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur rounded-2xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition-all hover:shadow-2xl hover:shadow-purple-500/10">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -371,13 +370,7 @@ const MacroDashboard = () => {
                 verticalAlign="top" 
                 height={36}
                 iconType="line"
-                wrapperStyle={{ 
-                  paddingBottom: '20px',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: '20px'
-                }}
-                formatter={(value) => <span style={{ marginRight: '15px' }}>{value}</span>}
+                wrapperStyle={{ paddingBottom: '20px' }}
               />
               
               {showSP500 && (
@@ -452,11 +445,6 @@ const MacroDashboard = () => {
               NASDAQ
             </button>
           </div>
-        </div>
-
-        {/* ADD THE ECONOMIC INDICATORS CHART HERE */}
-        <div className="mb-8">
-          <EconomicIndicatorsChart />
         </div>
 
         <div className="mb-8">
