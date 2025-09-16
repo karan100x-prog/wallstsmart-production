@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import MacroDashboard from './components/MacroDashboard';
 import SmartFlow from './components/SmartFlow';
-import { Analytics } from '@vercel/analytics/react'
+import { Analytics } from '@vercel/analytics/react';
 
 function Navigation() {
   const navigate = useNavigate();
