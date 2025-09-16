@@ -76,108 +76,179 @@ const MacroDashboard = () => {
     }
   };
 
-  // Generate economic historical data from 2000 to 2030
+  // Generate economic historical data from 2000 to 2030 with quarterly granularity
   const generateEconomicHistoricalData = () => {
     const data = [];
     const startYear = 2000;
     const endYear = 2030;
     
     for (let year = startYear; year <= endYear; year++) {
-      let cpi, unemployment, fedRate, gdp, treasury10Y;
-      
-      // Historical patterns based on real economic cycles
-      if (year >= 2000 && year <= 2002) {
-        // Dot-com bubble burst
-        cpi = 2.5 + (year - 2000) * 0.3;
-        unemployment = 4.0 + (year - 2000) * 0.8;
-        fedRate = 6.0 - (year - 2000) * 1.5;
-        gdp = 3.5 - (year - 2000) * 1.0;
-        treasury10Y = 6.0 - (year - 2000) * 0.8;
-      } else if (year >= 2003 && year <= 2007) {
-        // Recovery and housing boom
-        cpi = 2.5 + Math.sin((year - 2003) * 0.5) * 0.5;
-        unemployment = 6.0 - (year - 2003) * 0.4;
-        fedRate = 1.0 + (year - 2003) * 1.0;
-        gdp = 2.5 + Math.sin((year - 2003) * 0.8) * 1.0;
-        treasury10Y = 4.0 + (year - 2003) * 0.3;
-      } else if (year === 2008 || year === 2009) {
-        // Financial crisis
-        cpi = year === 2008 ? 3.8 : 0.4;
-        unemployment = year === 2008 ? 5.8 : 9.3;
-        fedRate = year === 2008 ? 1.9 : 0.25;
-        gdp = year === 2008 ? -0.1 : -2.5;
-        treasury10Y = year === 2008 ? 3.7 : 3.3;
-      } else if (year >= 2010 && year <= 2019) {
-        // Post-crisis recovery
-        cpi = 1.5 + Math.sin((year - 2010) * 0.3) * 0.8;
-        unemployment = 9.0 - (year - 2010) * 0.55;
-        fedRate = 0.25 + (year - 2010) * 0.25;
-        gdp = 2.0 + Math.sin((year - 2010) * 0.4) * 0.5;
-        treasury10Y = 2.5 + (year - 2010) * 0.15;
-      } else if (year === 2020) {
-        // COVID-19 pandemic
-        cpi = 1.2;
-        unemployment = 8.1;
-        fedRate = 0.4;
-        gdp = -3.4;
-        treasury10Y = 0.9;
-      } else if (year === 2021) {
-        // Post-COVID recovery & inflation start
-        cpi = 4.7;
-        unemployment = 5.4;
-        fedRate = 0.25;
-        gdp = 5.9;
-        treasury10Y = 1.5;
-      } else if (year === 2022) {
-        // High inflation period
-        cpi = 8.0;
-        unemployment = 3.6;
-        fedRate = 1.7;
-        gdp = 2.1;
-        treasury10Y = 2.9;
-      } else if (year === 2023) {
-        // Fed tightening
-        cpi = 4.1;
-        unemployment = 3.5;
-        fedRate = 5.0;
-        gdp = 2.5;
-        treasury10Y = 3.9;
-      } else if (year === 2024) {
-        // Current estimates
-        cpi = 2.9;
-        unemployment = 3.7;
-        fedRate = 4.33;
-        gdp = 2.8;
-        treasury10Y = 4.06;
-      } else if (year >= 2025 && year <= 2030) {
-        // Projections - gradual normalization
-        const yearsFromNow = year - 2024;
-        cpi = 2.9 - yearsFromNow * 0.15 + Math.sin(yearsFromNow * 0.5) * 0.3;
-        cpi = Math.max(1.8, Math.min(3.0, cpi));
+      // Generate quarterly data for more granular representation
+      for (let quarter = 0; quarter < 4; quarter++) {
+        // Skip future quarters in current year
+        if (year === 2024 && quarter > 2) continue;
         
-        unemployment = 3.7 + yearsFromNow * 0.1 + Math.sin(yearsFromNow * 0.4) * 0.3;
-        unemployment = Math.max(3.5, Math.min(5.0, unemployment));
+        let cpi, unemployment, fedRate, gdp, treasury10Y;
         
-        fedRate = 4.33 - yearsFromNow * 0.4 + Math.sin(yearsFromNow * 0.3) * 0.2;
-        fedRate = Math.max(2.0, Math.min(4.5, fedRate));
+        // Historical patterns based on real economic cycles with quarterly variation
+        if (year === 2000) {
+          cpi = 3.4 + quarter * 0.1;
+          unemployment = 3.9 + quarter * 0.05;
+          fedRate = 6.0 + quarter * 0.1;
+          gdp = 4.1 - quarter * 0.3;
+          treasury10Y = 6.4 - quarter * 0.1;
+        } else if (year === 2001) {
+          cpi = 2.8 - quarter * 0.2;
+          unemployment = 4.2 + quarter * 0.3;
+          fedRate = 6.0 - quarter * 1.0;
+          gdp = 1.0 - quarter * 0.5;
+          treasury10Y = 5.0 - quarter * 0.2;
+        } else if (year === 2002) {
+          cpi = 1.6 + quarter * 0.1;
+          unemployment = 5.7 + quarter * 0.1;
+          fedRate = 1.75 - quarter * 0.1;
+          gdp = 1.6 + quarter * 0.2;
+          treasury10Y = 4.6 - quarter * 0.2;
+        } else if (year === 2003) {
+          cpi = 2.3 - quarter * 0.1;
+          unemployment = 6.0 - quarter * 0.1;
+          fedRate = 1.25 - quarter * 0.05;
+          gdp = 2.0 + quarter * 0.5;
+          treasury10Y = 4.0 + quarter * 0.1;
+        } else if (year === 2004) {
+          cpi = 2.7 + quarter * 0.2;
+          unemployment = 5.7 - quarter * 0.1;
+          fedRate = 1.0 + quarter * 0.5;
+          gdp = 3.8 - quarter * 0.2;
+          treasury10Y = 4.3 + quarter * 0.1;
+        } else if (year === 2005) {
+          cpi = 3.4 + quarter * 0.1;
+          unemployment = 5.3 - quarter * 0.1;
+          fedRate = 2.5 + quarter * 0.5;
+          gdp = 3.3 - quarter * 0.1;
+          treasury10Y = 4.3 + quarter * 0.05;
+        } else if (year === 2006) {
+          cpi = 3.2 - quarter * 0.2;
+          unemployment = 4.7 - quarter * 0.05;
+          fedRate = 4.75 + quarter * 0.125;
+          gdp = 2.7 - quarter * 0.3;
+          treasury10Y = 4.8 + quarter * 0.05;
+        } else if (year === 2007) {
+          cpi = 2.8 + quarter * 0.3;
+          unemployment = 4.6 + quarter * 0.2;
+          fedRate = 5.25 - quarter * 0.5;
+          gdp = 1.8 - quarter * 0.4;
+          treasury10Y = 4.6 - quarter * 0.1;
+        } else if (year === 2008) {
+          // Financial crisis - sharp changes
+          if (quarter === 0) {
+            cpi = 4.0; unemployment = 5.0; fedRate = 3.0; gdp = -0.7; treasury10Y = 3.7;
+          } else if (quarter === 1) {
+            cpi = 3.9; unemployment = 5.4; fedRate = 2.25; gdp = 0.6; treasury10Y = 3.9;
+          } else if (quarter === 2) {
+            cpi = 5.0; unemployment = 5.8; fedRate = 2.0; gdp = -2.7; treasury10Y = 4.0;
+          } else {
+            cpi = 0.1; unemployment = 6.8; fedRate = 0.25; gdp = -8.4; treasury10Y = 3.3;
+          }
+        } else if (year === 2009) {
+          // Recovery begins
+          if (quarter === 0) {
+            cpi = -0.4; unemployment = 8.2; fedRate = 0.25; gdp = -6.4; treasury10Y = 2.7;
+          } else if (quarter === 1) {
+            cpi = -1.3; unemployment = 9.3; fedRate = 0.25; gdp = -0.7; treasury10Y = 3.3;
+          } else if (quarter === 2) {
+            cpi = -1.4; unemployment = 9.6; fedRate = 0.25; gdp = 1.5; treasury10Y = 3.5;
+          } else {
+            cpi = 1.8; unemployment = 10.0; fedRate = 0.25; gdp = 4.5; treasury10Y = 3.4;
+          }
+        } else if (year >= 2010 && year <= 2019) {
+          // Post-crisis recovery - gradual improvement
+          const yearOffset = year - 2010;
+          cpi = 1.5 + yearOffset * 0.1 + quarter * 0.1;
+          unemployment = 9.6 - yearOffset * 0.6 - quarter * 0.05;
+          fedRate = 0.25 + (yearOffset > 5 ? (yearOffset - 5) * 0.5 : 0);
+          gdp = 2.5 - quarter * 0.2 + (yearOffset % 2) * 0.5;
+          treasury10Y = 2.5 + yearOffset * 0.15 + quarter * 0.05;
+        } else if (year === 2020) {
+          // COVID-19 impact
+          if (quarter === 0) {
+            cpi = 2.5; unemployment = 3.5; fedRate = 1.75; gdp = -5.0; treasury10Y = 1.9;
+          } else if (quarter === 1) {
+            cpi = 0.3; unemployment = 13.3; fedRate = 0.25; gdp = -31.4; treasury10Y = 0.7;
+          } else if (quarter === 2) {
+            cpi = 1.0; unemployment = 8.8; fedRate = 0.25; gdp = 33.4; treasury10Y = 0.6;
+          } else {
+            cpi = 1.2; unemployment = 6.7; fedRate = 0.25; gdp = 4.3; treasury10Y = 0.9;
+          }
+        } else if (year === 2021) {
+          // Inflation begins
+          cpi = 1.4 + quarter * 1.5;
+          unemployment = 6.0 - quarter * 0.6;
+          fedRate = 0.25;
+          gdp = 6.3 - quarter * 0.3;
+          treasury10Y = 1.0 + quarter * 0.2;
+        } else if (year === 2022) {
+          // Peak inflation
+          if (quarter === 0) {
+            cpi = 7.5; unemployment = 4.0; fedRate = 0.25; gdp = -1.6; treasury10Y = 1.9;
+          } else if (quarter === 1) {
+            cpi = 8.6; unemployment = 3.6; fedRate = 0.75; gdp = -0.6; treasury10Y = 2.9;
+          } else if (quarter === 2) {
+            cpi = 9.1; unemployment = 3.5; fedRate = 2.5; gdp = 2.6; treasury10Y = 3.0;
+          } else {
+            cpi = 7.1; unemployment = 3.5; fedRate = 3.75; gdp = 2.9; treasury10Y = 3.8;
+          }
+        } else if (year === 2023) {
+          // Disinflation
+          cpi = 6.0 - quarter * 0.5;
+          unemployment = 3.5 + quarter * 0.05;
+          fedRate = 4.5 + quarter * 0.25;
+          gdp = 2.5 - quarter * 0.1;
+          treasury10Y = 3.5 + quarter * 0.15;
+        } else if (year === 2024) {
+          // Current year
+          if (quarter === 0) {
+            cpi = 3.5; unemployment = 3.8; fedRate = 5.33; gdp = 1.3; treasury10Y = 4.2;
+          } else if (quarter === 1) {
+            cpi = 3.4; unemployment = 3.9; fedRate = 5.33; gdp = 3.0; treasury10Y = 4.4;
+          } else if (quarter === 2) {
+            cpi = 2.9; unemployment = 4.0; fedRate = 5.33; gdp = 2.8; treasury10Y = 4.3;
+          }
+        } else if (year >= 2025 && year <= 2030) {
+          // Projections - normalization with some volatility
+          const yearsFromNow = year - 2024;
+          const baselineAdjustment = yearsFromNow * 0.2;
+          
+          cpi = 3.0 - baselineAdjustment * 0.3 + quarter * 0.05;
+          cpi = Math.max(1.5, Math.min(3.5, cpi));
+          
+          unemployment = 4.0 + baselineAdjustment * 0.15 + quarter * 0.02;
+          unemployment = Math.max(3.5, Math.min(5.5, unemployment));
+          
+          fedRate = 5.0 - baselineAdjustment * 0.5;
+          fedRate = Math.max(2.0, Math.min(5.0, fedRate));
+          
+          gdp = 2.5 - baselineAdjustment * 0.1 + quarter * 0.1;
+          gdp = Math.max(1.0, Math.min(3.5, gdp));
+          
+          treasury10Y = 4.0 - baselineAdjustment * 0.15 + quarter * 0.05;
+          treasury10Y = Math.max(2.5, Math.min(4.5, treasury10Y));
+        }
         
-        gdp = 2.8 - yearsFromNow * 0.05 + Math.sin(yearsFromNow * 0.6) * 0.3;
-        gdp = Math.max(1.5, Math.min(3.5, gdp));
-        
-        treasury10Y = 4.06 - yearsFromNow * 0.2 + Math.sin(yearsFromNow * 0.4) * 0.2;
-        treasury10Y = Math.max(2.5, Math.min(4.5, treasury10Y));
+        // Only add annual data points to avoid overcrowding
+        if (quarter === 0 || (year <= 2010 || year >= 2020)) {
+          data.push({
+            year: quarter === 0 ? year.toString() : '',
+            date: `${year}-Q${quarter + 1}`,
+            cpi: parseFloat(cpi.toFixed(2)),
+            unemployment: parseFloat(unemployment.toFixed(2)),
+            fedRate: parseFloat(fedRate.toFixed(2)),
+            gdp: parseFloat(gdp.toFixed(2)),
+            treasury10Y: parseFloat(treasury10Y.toFixed(2)),
+            isProjection: year > 2024
+          });
+        }
       }
-      
-      data.push({
-        year: year.toString(),
-        date: `${year}-01`,
-        cpi: parseFloat(cpi.toFixed(2)),
-        unemployment: parseFloat(unemployment.toFixed(2)),
-        fedRate: parseFloat(fedRate.toFixed(2)),
-        gdp: parseFloat(gdp.toFixed(2)),
-        treasury10Y: parseFloat(treasury10Y.toFixed(2)),
-        isProjection: year > 2024
-      });
     }
     
     return data;
@@ -634,12 +705,12 @@ const MacroDashboard = () => {
               
               {showCPI && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="cpi"
                   stroke="#ef4444"
                   strokeWidth={2}
                   name="CPI Inflation"
-                  dot={false}
+                  dot={{ r: 1.5, fill: '#ef4444' }}
                   strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
                   animationDuration={2000}
                 />
@@ -647,12 +718,12 @@ const MacroDashboard = () => {
               
               {showUnemployment && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="unemployment"
                   stroke="#f59e0b"
                   strokeWidth={2}
                   name="Unemployment Rate"
-                  dot={false}
+                  dot={{ r: 1.5, fill: '#f59e0b' }}
                   strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
                   animationDuration={2000}
                   animationBegin={300}
@@ -661,12 +732,12 @@ const MacroDashboard = () => {
               
               {showFedRate && (
                 <Line
-                  type="monotone"
+                  type="stepAfter"
                   dataKey="fedRate"
                   stroke="#10b981"
                   strokeWidth={2}
                   name="Federal Funds Rate"
-                  dot={false}
+                  dot={{ r: 1.5, fill: '#10b981' }}
                   strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
                   animationDuration={2000}
                   animationBegin={600}
@@ -675,12 +746,12 @@ const MacroDashboard = () => {
               
               {showGDP && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="gdp"
                   stroke="#3b82f6"
                   strokeWidth={2}
                   name="GDP Growth Rate"
-                  dot={false}
+                  dot={{ r: 1.5, fill: '#3b82f6' }}
                   strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
                   animationDuration={2000}
                   animationBegin={900}
@@ -689,12 +760,12 @@ const MacroDashboard = () => {
               
               {showTreasury && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="treasury10Y"
                   stroke="#a855f7"
                   strokeWidth={2}
                   name="10Y Treasury Yield"
-                  dot={false}
+                  dot={{ r: 1.5, fill: '#a855f7' }}
                   strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
                   animationDuration={2000}
                   animationBegin={1200}
