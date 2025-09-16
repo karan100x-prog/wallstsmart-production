@@ -108,8 +108,30 @@ function Navigation() {
           {/* Search Bar - Shows when search icon is clicked */}
           {showSearch && !isHomePage && (
             <div className="pb-4 px-2">
-              <div className="max-w-xl mx-auto">
-                <StockSearch onSelectStock={handleSearchSelect} />
+              <div className="max-w-md mx-auto">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search stocks by symbol or name..."
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-green-500 pr-10"
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      if (value && e.nativeEvent instanceof KeyboardEvent && e.nativeEvent.key === 'Enter') {
+                        handleSearchSelect(value);
+                      }
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const value = (e.target as HTMLInputElement).value.toUpperCase();
+                        if (value) {
+                          handleSearchSelect(value);
+                        }
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
               </div>
             </div>
           )}
