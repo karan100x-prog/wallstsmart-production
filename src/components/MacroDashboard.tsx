@@ -754,12 +754,128 @@ const MacroDashboard = () => {
           </div>
         </div>
 
-        {/* New Economic Indicators Historical Chart */}
+        {/* Chart 2: Clean Economic Trends Analysis */}
+        <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-white mb-2">Economic Trends Analysis (2000-{new Date().getFullYear()})</h2>
+            <p className="text-sm text-gray-400">Comprehensive view of key economic indicators</p>
+          </div>
+
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={economicHistoricalData.filter(d => !d.isHistorical === false)} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+              {gradients}
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
+              <XAxis 
+                dataKey="year" 
+                stroke="#9ca3af"
+                tick={{ fontSize: 11 }}
+                interval={1}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                stroke="#9ca3af"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(value) => `${value}%`}
+                domain={[-5, 10]}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend 
+                verticalAlign="top" 
+                height={36}
+                iconType="line"
+                wrapperStyle={{ paddingBottom: '20px' }}
+              />
+              
+              <Line
+                type="monotone"
+                dataKey="cpi"
+                stroke="#ef4444"
+                strokeWidth={2.5}
+                name="CPI Inflation"
+                dot={{ r: 3, fill: '#ef4444' }}
+                activeDot={{ r: 5 }}
+                connectNulls={false}
+              />
+              
+              <Line
+                type="monotone"
+                dataKey="unemployment"
+                stroke="#f59e0b"
+                strokeWidth={2.5}
+                name="Unemployment Rate"
+                dot={{ r: 3, fill: '#f59e0b' }}
+                activeDot={{ r: 5 }}
+                connectNulls={false}
+              />
+              
+              <Line
+                type="monotone"
+                dataKey="fedRate"
+                stroke="#10b981"
+                strokeWidth={2.5}
+                name="Federal Funds Rate"
+                dot={{ r: 3, fill: '#10b981' }}
+                activeDot={{ r: 5 }}
+                connectNulls={false}
+              />
+              
+              <Line
+                type="monotone"
+                dataKey="gdp"
+                stroke="#3b82f6"
+                strokeWidth={2.5}
+                name="GDP Growth Rate"
+                dot={{ r: 3, fill: '#3b82f6' }}
+                activeDot={{ r: 5 }}
+                connectNulls={false}
+              />
+              
+              <Line
+                type="monotone"
+                dataKey="treasury10Y"
+                stroke="#a855f7"
+                strokeWidth={2.5}
+                name="10Y Treasury Yield"
+                dot={{ r: 3, fill: '#a855f7' }}
+                activeDot={{ r: 5 }}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+
+          {/* Key Statistics Summary */}
+          <div className="grid grid-cols-5 gap-4 mt-6 pt-6 border-t border-gray-700/50">
+            <div className="text-center">
+              <p className="text-xs text-gray-400 mb-1">CPI Current</p>
+              <p className="text-lg font-bold text-red-400">2.9%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-400 mb-1">Unemployment</p>
+              <p className="text-lg font-bold text-amber-400">3.9%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-400 mb-1">Fed Rate</p>
+              <p className="text-lg font-bold text-green-400">5.33%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-400 mb-1">GDP Growth</p>
+              <p className="text-lg font-bold text-blue-400">2.8%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-400 mb-1">10Y Treasury</p>
+              <p className="text-lg font-bold text-purple-400">4.2%</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Original Economic Indicators Historical Chart */}
         <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Economic Indicators (2000-{new Date().getFullYear() + 5})</h2>
-              <p className="text-sm text-gray-400">Historical data with 5-year runway</p>
+              <h2 className="text-2xl font-bold text-white mb-2">Economic Indicators Detail (2000-{new Date().getFullYear() + 5})</h2>
+              <p className="text-sm text-gray-400">Historical data with 5-year runway and time controls</p>
             </div>
             <TimeIntervalSelector 
               interval={economicTimeInterval} 
