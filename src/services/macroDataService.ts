@@ -3,10 +3,10 @@ import axios from 'axios';
 const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_KEY || 'NMSRS0ZDIOWF3CLL';
 const BASE_URL = 'https://www.alphavantage.co/query';
 
-// Batch fetching
+// Batch fetching with proper TypeScript typing
 const BATCH_DELAY = 200; // 200ms between batch requests
 
-const batchFetch = async (requests) => {
+const batchFetch = async (requests: (() => Promise<any>)[]): Promise<any[]> => {
   const results = [];
   for (const request of requests) {
     results.push(await request());
@@ -14,6 +14,40 @@ const batchFetch = async (requests) => {
   }
   return results;
 };
+
+export interface MacroMetric {
+  value: string;
+  change: string;
+  trend: 'up' | 'down' | 'flat';
+  percentChange?: number;
+  target?: number;
+}
+
+export interface HistoricalDataPoint {
+  date: string;
+  displayDate?: string;
+  year: number;
+  sp500: number;
+  dow: number;
+  nasdaq: number;
+}
+
+export interface CommodityData {
+  name: string;
+  value: number | string;
+  change: number;
+  icon: string;
+  color: string;
+}
+
+export interface CryptoData {
+  name: string;
+  symbol: string;
+  price: number;
+  change: number;
+  marketCap: number;
+  dominance: number;
+}
 
 // Cache management
 const cache = new Map();
@@ -25,7 +59,7 @@ const CACHE_DURATION = {
   HISTORICAL: 86400000  // 24 hours
 };
 
-const getCachedData = (key, duration) => {
+const getCachedData = (key: string, duration: number) => {
   const cached = cache.get(key);
   if (cached && Date.now() - cached.timestamp < duration) {
     return cached.data;
@@ -33,12 +67,12 @@ const getCachedData = (key, duration) => {
   return null;
 };
 
-const setCachedData = (key, data) => {
+const setCachedData = (key: string, data: any) => {
   cache.set(key, { data, timestamp: Date.now() });
 };
 
 // Fetch historical market data (24 years)
-export const fetchHistoricalMarketData = async () => {
+export const fetchHistoricalMarketData = async (): Promise<HistoricalDataPoint[]> => {
   const cacheKey = 'historical_market_data';
   const cachedData = getCachedData(cacheKey, CACHE_DURATION.HISTORICAL);
   
@@ -57,7 +91,7 @@ export const fetchHistoricalMarketData = async () => {
     const diaData = diaResponse.data['Monthly Adjusted Time Series'] || {};
     const qqqData = qqqResponse.data['Monthly Adjusted Time Series'] || {};
 
-    const historicalData = [];
+    const historicalData: HistoricalDataPoint[] = [];
     const startYear = 2000;
     const currentYear = new Date().getFullYear();
 
@@ -92,8 +126,8 @@ export const fetchHistoricalMarketData = async () => {
 };
 
 // Generate simulated historical data as fallback
-const generateSimulatedHistoricalData = () => {
-  const data = [];
+const generateSimulatedHistoricalData = (): HistoricalDataPoint[] => {
+  const data: HistoricalDataPoint[] = [];
   const startYear = 2000;
   const currentYear = 2024;
   
@@ -186,7 +220,7 @@ export const fetchAndProcessMacroData = async () => {
       realRate: {
         value: `${realRate}%`,
         change: '+0.38%',
-        trend: parseFloat(realRate) > 0 ? 'up' : 'down',
+        trend: parseFloat(realRate) > 0 ? 'up' as const : 'down' as const,
         target: 2.0
       }
     };
@@ -199,7 +233,7 @@ export const fetchAndProcessMacroData = async () => {
 };
 
 // Enhanced commodity data fetching
-export const fetchCommodityData = async () => {
+export const fetchCommodityData = async (): Promise<CommodityData[]> => {
   try {
     const [oilResponse, gasResponse, copperResponse, aluminumResponse, wheatResponse, cornResponse] = await Promise.all([
       axios.get(`${BASE_URL}?function=WTI&interval=daily&apikey=${API_KEY}`),
@@ -216,7 +250,7 @@ export const fetchCommodityData = async () => {
       axios.get(`${BASE_URL}?function=GLOBAL_QUOTE&symbol=SLV&apikey=${API_KEY}`)
     ]);
 
-    const commodities = [
+    const commodities: CommodityData[] = [
       processCommodityData(oilResponse.data, 'WTI Oil', '🛢️', '#000000'),
       processCommodityData(gasResponse.data, 'Natural Gas', '⚡', '#3b82f6'),
       processETFData(gldResponse.data, 'Gold', '🥇', '#fbbf24', 10.43),
@@ -236,7 +270,7 @@ export const fetchCommodityData = async () => {
 };
 
 // Fetch cryptocurrency data
-export const fetchCryptoData = async () => {
+export const fetchCryptoData = async (): Promise<CryptoData[]> => {
   try {
     const [btcResponse, ethResponse] = await Promise.all([
       axios.get(`${BASE_URL}?function=CURRENCY_EXCHANGE_RATE&from_currency=BTC&to_currency=USD&apikey=${API_KEY}`),
@@ -272,7 +306,7 @@ export const fetchCryptoData = async () => {
 };
 
 // Helper function to process economic data
-const processEconomicData = (data, type) => {
+const processEconomicData = (data: any, type: string): MacroMetric => {
   const dataArray = data?.data || [];
   
   if (dataArray.length > 1) {
@@ -291,7 +325,7 @@ const processEconomicData = (data, type) => {
 };
 
 // Helper function to process commodity data
-const processCommodityData = (data, name, icon, color) => {
+const processCommodityData = (data: any, name: string, icon: string, color: string): CommodityData => {
   const dataArray = data?.data || [];
   
   if (dataArray.length > 1) {
@@ -312,7 +346,7 @@ const processCommodityData = (data, name, icon, color) => {
 };
 
 // Helper function to process ETF data for precious metals
-const processETFData = (data, name, icon, color, multiplier = 1) => {
+const processETFData = (data: any, name: string, icon: string, color: string, multiplier: number = 1): CommodityData => {
   const quote = data?.['Global Quote'];
   
   if (quote) {
@@ -333,18 +367,18 @@ const processETFData = (data, name, icon, color, multiplier = 1) => {
 
 // Default data getters
 const getDefaultEconomicData = () => ({
-  gdp: { value: '2.8%', change: '+0.3', trend: 'up', target: 2.5 },
-  cpi: { value: '2.9%', change: '-0.3', trend: 'down', target: 2.0 },
-  unemployment: { value: '3.7%', change: '-0.2', trend: 'down', target: 4.0 },
-  fedRate: { value: '4.33%', change: '0', trend: 'flat', target: 3.0 },
-  treasury10Y: { value: '4.06%', change: '+0.05', trend: 'up', target: 3.5 },
-  retailSales: { value: '0.4%', change: '+0.1', trend: 'up', target: 0.3 },
-  nonfarmPayroll: { value: '236', change: '+12', trend: 'up', target: 200 },
-  durableGoods: { value: '0.3%', change: '-0.2', trend: 'down', target: 0.5 },
-  realRate: { value: '1.43%', change: '+0.38', trend: 'up', target: 2.0 }
+  gdp: { value: '2.8%', change: '+0.3', trend: 'up' as const, target: 2.5 },
+  cpi: { value: '2.9%', change: '-0.3', trend: 'down' as const, target: 2.0 },
+  unemployment: { value: '3.7%', change: '-0.2', trend: 'down' as const, target: 4.0 },
+  fedRate: { value: '4.33%', change: '0', trend: 'flat' as const, target: 3.0 },
+  treasury10Y: { value: '4.06%', change: '+0.05', trend: 'up' as const, target: 3.5 },
+  retailSales: { value: '0.4%', change: '+0.1', trend: 'up' as const, target: 0.3 },
+  nonfarmPayroll: { value: '236', change: '+12', trend: 'up' as const, target: 200 },
+  durableGoods: { value: '0.3%', change: '-0.2', trend: 'down' as const, target: 0.5 },
+  realRate: { value: '1.43%', change: '+0.38', trend: 'up' as const, target: 2.0 }
 });
 
-const getDefaultCommodityData = () => [
+const getDefaultCommodityData = (): CommodityData[] => [
   { name: 'WTI Oil', value: 62.60, change: 0.61, icon: '🛢️', color: '#000000' },
   { name: 'Natural Gas', value: 3.10, change: 1.64, icon: '⚡', color: '#3b82f6' },
   { name: 'Gold', value: 2042.30, change: 0.62, icon: '🥇', color: '#fbbf24' },
@@ -355,13 +389,13 @@ const getDefaultCommodityData = () => [
   { name: 'Corn', value: 445.50, change: 0.73, icon: '🌽', color: '#84cc16' }
 ];
 
-const getDefaultCryptoData = () => [
+const getDefaultCryptoData = (): CryptoData[] => [
   { name: 'Bitcoin', symbol: 'BTC', price: 98542, change: 2.23, marketCap: 1940, dominance: 52.3 },
   { name: 'Ethereum', symbol: 'ETH', price: 3845, change: 3.36, marketCap: 462, dominance: 12.5 }
 ];
 
-const getDefaultMetric = (type) => {
-  const defaults = {
+const getDefaultMetric = (type: string): MacroMetric => {
+  const defaults: { [key: string]: MacroMetric } = {
     GDP: { value: '2.8%', change: '+0.3', trend: 'up' },
     CPI: { value: '2.9%', change: '-0.3', trend: 'down' },
     UNEMPLOYMENT: { value: '3.7%', change: '-0.2', trend: 'down' },
