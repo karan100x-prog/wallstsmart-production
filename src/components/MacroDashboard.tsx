@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Globe, Briefcase, Home, Factory, Zap, AlertTriangle, ChevronUp, ChevronDown, Info } from 'lucide-react';
-import { fetchAndProcessMacroData, fetchCommodityData } from '../services/macroDataService';
+//import { fetchAndProcessMacroData, fetchCommodityData } from '../services/macroDataService';
 
 const MacroDashboard = () => {
   const [selectedRegime, setSelectedRegime] = useState('current');
