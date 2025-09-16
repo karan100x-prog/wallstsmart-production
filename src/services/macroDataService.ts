@@ -2,10 +2,11 @@ import axios from 'axios';
 
 const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_KEY || 'NMSRS0ZDIOWF3CLL';
 const BASE_URL = 'https://www.alphavantage.co/query';
-// Add this to your macroDataService.ts for better caching:
+
+// Batch fetching with proper TypeScript typing
 const BATCH_DELAY = 200; // 200ms between batch requests
 
-const batchFetch = async (requests) => {
+const batchFetch = async (requests: (() => Promise<any>)[]): Promise<any[]> => {
   const results = [];
   for (const request of requests) {
     results.push(await request());
@@ -19,6 +20,7 @@ export interface MacroMetric {
   change: string;
   trend: 'up' | 'down' | 'flat';
   percentChange?: number;
+  target?: number;
 }
 
 export interface HistoricalDataPoint {
@@ -177,7 +179,7 @@ const generateSimulatedHistoricalData = (): HistoricalDataPoint[] => {
   return data;
 };
 
-// Existing function - enhanced
+// Enhanced macro data fetching with batch support
 export const fetchAndProcessMacroData = async () => {
   try {
     const [gdpResponse, cpiResponse, unemploymentResponse, fedRateResponse, treasuryResponse, retailResponse, nonfarmResponse, durablesResponse] = await Promise.all([
