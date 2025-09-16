@@ -203,6 +203,7 @@ function App() {
             <Route path="/macro" element={<MacroDashboard />} />
             <Route path="/smart-flow" element={<SmartFlow />} />
           </Routes>
+          <Analytics />  {/* Add this line */}
         </div>
       </Router>
     </AuthProvider>
