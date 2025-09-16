@@ -2,6 +2,17 @@ import axios from 'axios';
 
 const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_KEY || 'NMSRS0ZDIOWF3CLL';
 const BASE_URL = 'https://www.alphavantage.co/query';
+// Add this to your macroDataService.ts for better caching:
+const BATCH_DELAY = 200; // 200ms between batch requests
+
+const batchFetch = async (requests) => {
+  const results = [];
+  for (const request of requests) {
+    results.push(await request());
+    await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+  }
+  return results;
+};
 
 export interface MacroMetric {
   value: string;
