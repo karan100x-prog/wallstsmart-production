@@ -16,6 +16,10 @@ const MacroDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState('Connecting...');
   
+  // State for time intervals
+  const [marketTimeInterval, setMarketTimeInterval] = useState('All');
+  const [economicTimeInterval, setEconomicTimeInterval] = useState('All');
+  
   // State for economic indicators visibility
   const [showCPI, setShowCPI] = useState(true);
   const [showUnemployment, setShowUnemployment] = useState(true);
@@ -534,6 +538,66 @@ const MacroDashboard = () => {
     { name: 'Consumer', value: 20, color: '#ef4444' }
   ];
 
+  // Filter data based on time interval
+  const filterDataByTimeInterval = (data, interval, isEconomicData = false) => {
+    if (!data || data.length === 0) return data;
+    
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    let cutoffDate;
+    
+    switch(interval) {
+      case '1Y':
+        cutoffDate = new Date(currentYear - 1, currentDate.getMonth(), 1);
+        break;
+      case '5Y':
+        cutoffDate = new Date(currentYear - 5, currentDate.getMonth(), 1);
+        break;
+      case '20Y':
+        cutoffDate = new Date(currentYear - 20, currentDate.getMonth(), 1);
+        break;
+      case 'All':
+      default:
+        return data;
+    }
+    
+    return data.filter(item => {
+      if (isEconomicData) {
+        // For economic data, parse the year directly
+        const itemYear = parseInt(item.year) || parseInt(item.date.split('-')[0]);
+        const cutoffYear = cutoffDate.getFullYear();
+        return itemYear >= cutoffYear;
+      } else {
+        // For market data, use the date field
+        const itemDate = new Date(item.date);
+        return itemDate >= cutoffDate;
+      }
+    });
+  };
+
+  // Get filtered data for charts
+  const filteredHistoricalData = filterDataByTimeInterval(historicalData, marketTimeInterval);
+  const filteredEconomicHistoricalData = filterDataByTimeInterval(economicHistoricalData, economicTimeInterval, true);
+
+  // Time interval selector component
+  const TimeIntervalSelector = ({ interval, setInterval, chartType }) => (
+    <div className="flex items-center gap-2 bg-gray-800/50 rounded-lg p-1">
+      {['1Y', '5Y', '20Y', 'All'].map((option) => (
+        <button
+          key={option}
+          onClick={() => setInterval(option)}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+            interval === option
+              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+              : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+          }`}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex items-center justify-center">
@@ -557,13 +621,20 @@ const MacroDashboard = () => {
         </div>
 
         <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">US Market Indices Since 2000</h2>
-            <p className="text-sm text-gray-400">24-year historical performance of major indices</p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">US Market Indices Since 2000</h2>
+              <p className="text-sm text-gray-400">24-year historical performance of major indices</p>
+            </div>
+            <TimeIntervalSelector 
+              interval={marketTimeInterval} 
+              setInterval={setMarketTimeInterval} 
+              chartType="market"
+            />
           </div>
 
           <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={historicalData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+            <AreaChart data={filteredHistoricalData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
               {gradients}
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
               <XAxis 
@@ -661,36 +732,43 @@ const MacroDashboard = () => {
 
         {/* New Economic Indicators Historical Chart */}
         <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">Economic Indicators (2000-2030)</h2>
-            <p className="text-sm text-gray-400">Historical data and projections for key economic metrics</p>
-            <div className="flex items-center gap-4 mt-2">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-0.5 bg-gray-500"></div>
-                <span className="text-xs text-gray-400">Historical</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-0.5 bg-gray-500 border-b-2 border-dotted border-gray-500"></div>
-                <span className="text-xs text-gray-400">Projected (2025-2030)</span>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">Economic Indicators (2000-2030)</h2>
+              <p className="text-sm text-gray-400">Historical data and projections for key economic metrics</p>
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-0.5 bg-gray-500"></div>
+                  <span className="text-xs text-gray-400">Historical</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-0.5 bg-gray-500 border-b-2 border-dotted border-gray-500"></div>
+                  <span className="text-xs text-gray-400">Projected (2025-2030)</span>
+                </div>
               </div>
             </div>
+            <TimeIntervalSelector 
+              interval={economicTimeInterval} 
+              setInterval={setEconomicTimeInterval} 
+              chartType="economic"
+            />
           </div>
 
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={economicHistoricalData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+            <LineChart data={filteredEconomicHistoricalData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
               {gradients}
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
               <XAxis 
                 dataKey="year" 
                 stroke="#9ca3af"
                 tick={{ fontSize: 11 }}
-                interval={2}
+                interval={economicTimeInterval === '1Y' ? 0 : economicTimeInterval === '5Y' ? 1 : 2}
               />
               <YAxis 
                 stroke="#9ca3af"
                 tick={{ fontSize: 11 }}
                 tickFormatter={(value) => `${value}%`}
-                domain={[-5, 10]}
+                domain={economicTimeInterval === '1Y' ? [0, 6] : [-5, 10]}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend 
