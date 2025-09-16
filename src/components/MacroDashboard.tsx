@@ -262,12 +262,15 @@ const MacroDashboard = () => {
   const generateSimulatedHistoricalData = () => {
     const data = [];
     const startYear = 2000;
-    const currentYear = 2024;
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    const endYear = currentYear + 5; // 5-year runway
     
-    for (let year = startYear; year <= currentYear; year++) {
-      for (let month = 0; month < 12; month++) {
-        if (year === currentYear && month > 8) break;
-        
+    for (let year = startYear; year <= endYear; year++) {
+      // Only generate yearly data points for cleaner visualization
+      // Stop at current year for actual data
+      if (year <= currentYear) {
         let sp500Base = 1400;
         let dowBase = 10000;
         let nasdaqBase = 2500;
@@ -295,15 +298,28 @@ const MacroDashboard = () => {
           nasdaqBase = 2200 + growthYears * 980;
         }
         
-        const monthlyVolatility = Math.sin(month * 0.5) * 0.03 + Math.random() * 0.02;
+        // Add some variation for realistic feel
+        const yearlyVolatility = Math.sin(year * 0.5) * 0.03 + Math.random() * 0.02;
         
         data.push({
-          date: `${year}-${String(month + 1).padStart(2, '0')}`,
-          displayDate: month === 0 ? year.toString() : '',
+          date: `${year}-01`,
+          displayDate: year.toString(),
           year: year,
-          sp500: Math.round(sp500Base * (1 + monthlyVolatility)),
-          dow: Math.round(dowBase * (1 + monthlyVolatility)),
-          nasdaq: Math.round(nasdaqBase * (1 + monthlyVolatility))
+          sp500: Math.round(sp500Base * (1 + yearlyVolatility)),
+          dow: Math.round(dowBase * (1 + yearlyVolatility)),
+          nasdaq: Math.round(nasdaqBase * (1 + yearlyVolatility)),
+          isHistorical: true
+        });
+      } else {
+        // Add empty runway years for future
+        data.push({
+          date: `${year}-01`,
+          displayDate: year.toString(),
+          year: year,
+          sp500: null,
+          dow: null,
+          nasdaq: null,
+          isHistorical: false
         });
       }
     }
@@ -641,12 +657,14 @@ const MacroDashboard = () => {
                 dataKey="displayDate" 
                 stroke="#9ca3af"
                 tick={{ fontSize: 11 }}
-                interval="preserveStartEnd"
+                interval={marketTimeInterval === '1Y' ? 0 : marketTimeInterval === '5Y' ? 0 : 1}
+                angle={0}
+                textAnchor="middle"
               />
               <YAxis 
                 stroke="#9ca3af"
                 tick={{ fontSize: 11 }}
-                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                tickFormatter={(value) => value ? `${(value / 1000).toFixed(0)}k` : ''}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend 
@@ -658,19 +676,21 @@ const MacroDashboard = () => {
               
               {showSP500 && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="sp500"
                   stroke="#3b82f6"
                   strokeWidth={2}
                   fill="url(#sp500Gradient)"
                   name="S&P 500"
                   animationDuration={2000}
+                  connectNulls={false}
+                  dot={{ r: 2 }}
                 />
               )}
               
               {showDOW && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="dow"
                   stroke="#10b981"
                   strokeWidth={2}
@@ -678,12 +698,14 @@ const MacroDashboard = () => {
                   name="DOW Jones"
                   animationDuration={2000}
                   animationBegin={300}
+                  connectNulls={false}
+                  dot={{ r: 2 }}
                 />
               )}
               
               {showNASDAQ && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="nasdaq"
                   stroke="#a855f7"
                   strokeWidth={2}
@@ -691,6 +713,8 @@ const MacroDashboard = () => {
                   name="NASDAQ"
                   animationDuration={2000}
                   animationBegin={600}
+                  connectNulls={false}
+                  dot={{ r: 2 }}
                 />
               )}
             </AreaChart>
@@ -734,18 +758,8 @@ const MacroDashboard = () => {
         <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Economic Indicators (2000-2030)</h2>
-              <p className="text-sm text-gray-400">Historical data and projections for key economic metrics</p>
-              <div className="flex items-center gap-4 mt-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-0.5 bg-gray-500"></div>
-                  <span className="text-xs text-gray-400">Historical</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-0.5 bg-gray-500 border-b-2 border-dotted border-gray-500"></div>
-                  <span className="text-xs text-gray-400">Projected (2025-2030)</span>
-                </div>
-              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Economic Indicators (2000-{new Date().getFullYear() + 5})</h2>
+              <p className="text-sm text-gray-400">Historical data with 5-year runway</p>
             </div>
             <TimeIntervalSelector 
               interval={economicTimeInterval} 
@@ -789,7 +803,7 @@ const MacroDashboard = () => {
                   strokeWidth={2}
                   name="CPI Inflation"
                   dot={{ r: 1.5, fill: '#ef4444' }}
-                  strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
+                  connectNulls={false}
                   animationDuration={2000}
                 />
               )}
@@ -802,7 +816,7 @@ const MacroDashboard = () => {
                   strokeWidth={2}
                   name="Unemployment Rate"
                   dot={{ r: 1.5, fill: '#f59e0b' }}
-                  strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
+                  connectNulls={false}
                   animationDuration={2000}
                   animationBegin={300}
                 />
@@ -816,7 +830,7 @@ const MacroDashboard = () => {
                   strokeWidth={2}
                   name="Federal Funds Rate"
                   dot={{ r: 1.5, fill: '#10b981' }}
-                  strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
+                  connectNulls={false}
                   animationDuration={2000}
                   animationBegin={600}
                 />
@@ -830,7 +844,7 @@ const MacroDashboard = () => {
                   strokeWidth={2}
                   name="GDP Growth Rate"
                   dot={{ r: 1.5, fill: '#3b82f6' }}
-                  strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
+                  connectNulls={false}
                   animationDuration={2000}
                   animationBegin={900}
                 />
@@ -844,7 +858,7 @@ const MacroDashboard = () => {
                   strokeWidth={2}
                   name="10Y Treasury Yield"
                   dot={{ r: 1.5, fill: '#a855f7' }}
-                  strokeDasharray={(data) => data.isProjection ? "5 5" : "0"}
+                  connectNulls={false}
                   animationDuration={2000}
                   animationBegin={1200}
                 />
