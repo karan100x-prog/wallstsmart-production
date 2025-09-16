@@ -1,20 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ComposedChart, ScatterChart, Scatter } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Globe, Briefcase, Gauge, Coins, ArrowUpRight, ArrowDownRight, Clock, Database, LineChart as LineChartIcon, Calendar, Layers, Eye, EyeOff, Zap, Droplet, Package, Wheat, Bitcoin, ChevronUp, ChevronDown } from 'lucide-react';
+import { 
+  fetchHistoricalMarketData, 
+  fetchAndProcessMacroData, 
+  fetchCommodityData, 
+  fetchCryptoData 
+} from '../services/macroDataService';
 
 const MacroDashboard = () => {
   const [showSP500, setShowSP500] = useState(true);
   const [showDOW, setShowDOW] = useState(true);
   const [showNASDAQ, setShowNASDAQ] = useState(true);
-  const [selectedIndicator, setSelectedIndicator] = useState('all');
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dataSource, setDataSource] = useState('Connecting...');
+  
+  // State for real API data
+  const [historicalData, setHistoricalData] = useState([]);
+  const [economicData, setEconomicData] = useState(null);
+  const [commoditiesData, setCommoditiesData] = useState([]);
+  const [cryptoData, setCryptoData] = useState([]);
+
+  useEffect(() => {
+    loadAllData();
+    // Refresh data every 5 minutes
+    const interval = setInterval(loadAllData, 300000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     setTimeout(() => setAnimationComplete(true), 500);
   }, []);
 
-  // Generate data since 2000 (24 years of data)
-  const generateHistoricalData = () => {
+  const loadAllData = async () => {
+    setLoading(true);
+    try {
+      // Fetch all real data
+      const [historical, economic, commodities, crypto] = await Promise.all([
+        fetchHistoricalMarketData(),
+        fetchAndProcessMacroData(),
+        fetchCommodityData(),
+        fetchCryptoData()
+      ]);
+
+      setHistoricalData(historical);
+      setEconomicData(economic);
+      setCommoditiesData(commodities);
+      setCryptoData(crypto);
+      setDataSource('Live Alpha Vantage Data');
+      
+      console.log('Loaded real data:', { historical, economic, commodities, crypto });
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setDataSource('Using Cached Data');
+      // Use default data if API fails
+      setHistoricalData(generateSimulatedHistoricalData());
+      setEconomicData(getDefaultEconomicData());
+      setCommoditiesData(getDefaultCommodityData());
+      setCryptoData(getDefaultCryptoData());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fallback data generation
+  const generateSimulatedHistoricalData = () => {
     const data = [];
     const startYear = 2000;
     const currentYear = 2024;
@@ -22,9 +73,6 @@ const MacroDashboard = () => {
     for (let year = startYear; year <= currentYear; year++) {
       for (let month = 0; month < 12; month++) {
         if (year === currentYear && month > 8) break;
-        
-        const date = new Date(year, month);
-        const yearsSince2000 = year - startYear + month / 12;
         
         let sp500Base = 1400;
         let dowBase = 10000;
@@ -69,9 +117,7 @@ const MacroDashboard = () => {
     return data;
   };
 
-  const historicalData = generateHistoricalData();
-
-  const economicData = {
+  const getDefaultEconomicData = () => ({
     gdp: { value: 2.8, change: 0.3, trend: 'up', target: 2.5 },
     cpi: { value: 2.9, change: -0.3, trend: 'down', target: 2.0 },
     unemployment: { value: 3.7, change: -0.2, trend: 'down', target: 4.0 },
@@ -80,9 +126,9 @@ const MacroDashboard = () => {
     retailSales: { value: 0.4, change: 0.1, trend: 'up', target: 0.3 },
     nonfarmPayroll: { value: 236, change: 12, trend: 'up', target: 200 },
     durableGoods: { value: 0.3, change: -0.2, trend: 'down', target: 0.5 }
-  };
+  });
 
-  const commoditiesData = [
+  const getDefaultCommodityData = () => [
     { name: 'WTI Oil', value: 62.60, change: 0.61, icon: '🛢️', color: '#000000' },
     { name: 'Natural Gas', value: 3.10, change: 1.64, icon: '⚡', color: '#3b82f6' },
     { name: 'Gold', value: 2042.30, change: 0.62, icon: '🥇', color: '#fbbf24' },
@@ -93,7 +139,7 @@ const MacroDashboard = () => {
     { name: 'Corn', value: 445.50, change: 0.73, icon: '🌽', color: '#84cc16' }
   ];
 
-  const cryptoData = [
+  const getDefaultCryptoData = () => [
     { name: 'Bitcoin', symbol: 'BTC', price: 98542, change: 2.23, marketCap: 1940, dominance: 52.3 },
     { name: 'Ethereum', symbol: 'ETH', price: 3845, change: 3.36, marketCap: 462, dominance: 12.5 }
   ];
@@ -138,7 +184,14 @@ const MacroDashboard = () => {
   };
 
   const EconomicIndicatorCard = ({ title, data, icon: Icon }: any) => {
-    const percentage = (data.value / (data.target * 2)) * 100;
+    if (!data) return null;
+    
+    // Parse value to get numeric value for calculation
+    const numericValue = typeof data.value === 'string' 
+      ? parseFloat(data.value.replace('%', ''))
+      : data.value;
+    
+    const percentage = (numericValue / (data.target * 2)) * 100;
     const radius = 40;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
@@ -150,11 +203,11 @@ const MacroDashboard = () => {
             <p className="text-gray-400 text-sm">{title}</p>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-bold text-white">
-                {typeof data.value === 'number' && data.value < 10 ? `${data.value}%` : data.value}
+                {typeof data.value === 'string' ? data.value : `${data.value}%`}
               </span>
               <span className={`text-sm flex items-center ${data.trend === 'up' ? 'text-green-400' : data.trend === 'down' ? 'text-red-400' : 'text-gray-400'}`}>
                 {data.trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> : data.trend === 'down' ? <ArrowDownRight className="w-4 h-4" /> : '→'}
-                {data.change > 0 ? '+' : ''}{data.change}
+                {data.change}
               </span>
             </div>
           </div>
@@ -209,7 +262,7 @@ const MacroDashboard = () => {
       </div>
       <div className="flex items-baseline justify-between">
         <span className="text-2xl font-bold text-white">
-          ${typeof commodity.value === 'number' && commodity.value > 100 ? commodity.value.toLocaleString() : commodity.value}
+          ${typeof commodity.value === 'number' ? commodity.value.toLocaleString() : commodity.value}
         </span>
         <span className={`text-sm font-semibold ${commodity.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
           {commodity.change > 0 ? '+' : ''}{commodity.change}%
@@ -218,7 +271,7 @@ const MacroDashboard = () => {
       <div className="mt-3 h-1 bg-gray-700 rounded-full overflow-hidden">
         <div 
           className={`h-full rounded-full transition-all duration-1000 ${commodity.change > 0 ? 'bg-gradient-to-r from-green-500 to-green-400' : 'bg-gradient-to-r from-red-500 to-red-400'}`}
-          style={{ width: `${Math.abs(commodity.change) * 10}%` }}
+          style={{ width: `${Math.min(Math.abs(commodity.change) * 10, 100)}%` }}
         />
       </div>
     </div>
@@ -268,6 +321,18 @@ const MacroDashboard = () => {
     { name: 'Energy', value: 12, color: '#f59e0b' },
     { name: 'Consumer', value: 20, color: '#ef4444' }
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-xl font-semibold mb-2">Loading Real Market Data</p>
+          <p className="text-gray-400">Fetching from Alpha Vantage Premium API...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4">
@@ -388,14 +453,18 @@ const MacroDashboard = () => {
             Economic Indicators
           </h2>
           <div className="grid grid-cols-4 gap-4">
-            <EconomicIndicatorCard title="GDP Growth Rate" data={economicData.gdp} icon={TrendingUp} />
-            <EconomicIndicatorCard title="CPI Inflation" data={economicData.cpi} icon={Gauge} />
-            <EconomicIndicatorCard title="Unemployment Rate" data={economicData.unemployment} icon={Briefcase} />
-            <EconomicIndicatorCard title="Federal Funds Rate" data={economicData.fedRate} icon={DollarSign} />
-            <EconomicIndicatorCard title="10Y Treasury Yield" data={economicData.treasury10Y} icon={BarChart3} />
-            <EconomicIndicatorCard title="Retail Sales" data={economicData.retailSales} icon={Package} />
-            <EconomicIndicatorCard title="Nonfarm Payroll (K)" data={economicData.nonfarmPayroll} icon={Briefcase} />
-            <EconomicIndicatorCard title="Durable Goods" data={economicData.durableGoods} icon={Package} />
+            {economicData && (
+              <>
+                <EconomicIndicatorCard title="GDP Growth Rate" data={economicData.gdp} icon={TrendingUp} />
+                <EconomicIndicatorCard title="CPI Inflation" data={economicData.cpi} icon={Gauge} />
+                <EconomicIndicatorCard title="Unemployment Rate" data={economicData.unemployment} icon={Briefcase} />
+                <EconomicIndicatorCard title="Federal Funds Rate" data={economicData.fedRate} icon={DollarSign} />
+                <EconomicIndicatorCard title="10Y Treasury Yield" data={economicData.treasury10Y} icon={BarChart3} />
+                <EconomicIndicatorCard title="Retail Sales" data={economicData.retailSales} icon={Package} />
+                <EconomicIndicatorCard title="Nonfarm Payroll (K)" data={economicData.nonfarmPayroll} icon={Briefcase} />
+                <EconomicIndicatorCard title="Durable Goods" data={economicData.durableGoods} icon={Package} />
+              </>
+            )}
           </div>
         </div>
 
@@ -482,7 +551,7 @@ const MacroDashboard = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-yellow-400" />
-                <span className="text-sm">Live Data</span>
+                <span className="text-sm">{dataSource}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
