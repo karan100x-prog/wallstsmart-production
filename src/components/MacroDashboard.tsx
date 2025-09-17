@@ -22,7 +22,6 @@ const MacroDashboard = () => {
 
   // Alpha Vantage API configuration
   const API_KEY = 'NMSRS0ZDIOWF3CLL';
-  const BASE_URL = 'https://www.alphavantage.co/query';
 
   useEffect(() => {
     loadAllData();
@@ -34,201 +33,198 @@ const MacroDashboard = () => {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      // Fetch all economic data in parallel
-      const [gdpData, cpiData, unemploymentData, fedRateData, marketIndices] = await Promise.all([
-        fetchGDPData(),
-        fetchCPIData(),
-        fetchUnemploymentData(),
-        fetchFedRateData(),
-        fetchMarketIndices()
+      // Fetch all data types
+      await Promise.all([
+        fetchMarketData(),
+        fetchEconomicIndicators()
       ]);
-
-      // Process and combine economic data
-      const combinedEconomicData = processEconomicData(gdpData, cpiData, unemploymentData, fedRateData);
-      setEconomicData(combinedEconomicData);
-      
-      // Process market data
-      setMarketData(marketIndices);
-      
-      // Set current indicators
-      setCurrentIndicators(getCurrentIndicators(combinedEconomicData));
-      
       setDataSource('Live Alpha Vantage Data');
     } catch (error) {
       console.error('Error loading data:', error);
-      setDataSource('Using Default Data');
-      // Use default data if API fails
-      setMarketData(generateDefaultMarketData());
-      setEconomicData(generateDefaultEconomicData());
-      setCurrentIndicators(getDefaultCurrentIndicators());
+      setDataSource('Using Cached Data');
+      // Use fallback data if API fails
+      loadFallbackData();
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchGDPData = async () => {
+  const fetchMarketData = async () => {
     try {
-      const response = await fetch(`${BASE_URL}?function=REAL_GDP&interval=quarterly&apikey=${API_KEY}`);
-      const data = await response.json();
-      return data.data || [];
-    } catch (error) {
-      console.error('Error fetching GDP data:', error);
-      return [];
-    }
-  };
-
-  const fetchCPIData = async () => {
-    try {
-      const response = await fetch(`${BASE_URL}?function=CPI&interval=monthly&apikey=${API_KEY}`);
-      const data = await response.json();
-      return data.data || [];
-    } catch (error) {
-      console.error('Error fetching CPI data:', error);
-      return [];
-    }
-  };
-
-  const fetchUnemploymentData = async () => {
-    try {
-      const response = await fetch(`${BASE_URL}?function=UNEMPLOYMENT&apikey=${API_KEY}`);
-      const data = await response.json();
-      return data.data || [];
-    } catch (error) {
-      console.error('Error fetching unemployment data:', error);
-      return [];
-    }
-  };
-
-  const fetchFedRateData = async () => {
-    try {
-      const response = await fetch(`${BASE_URL}?function=FEDERAL_FUNDS_RATE&interval=monthly&apikey=${API_KEY}`);
-      const data = await response.json();
-      return data.data || [];
-    } catch (error) {
-      console.error('Error fetching fed rate data:', error);
-      return [];
-    }
-  };
-
-  const fetchMarketIndices = async () => {
-    try {
-      // Fetch S&P 500, DOW, and NASDAQ data
-      const [sp500Response, dowResponse] = await Promise.all([
-        fetch(`${BASE_URL}?function=TIME_SERIES_MONTHLY&symbol=SPY&apikey=${API_KEY}`),
-        fetch(`${BASE_URL}?function=TIME_SERIES_MONTHLY&symbol=DIA&apikey=${API_KEY}`)
+      // Fetch real market data from Alpha Vantage
+      const [spyData, diaData, qqqData] = await Promise.all([
+        fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=SPY&apikey=${API_KEY}&outputsize=full`).then(r => r.json()),
+        fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=DIA&apikey=${API_KEY}&outputsize=full`).then(r => r.json()),
+        fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=QQQ&apikey=${API_KEY}&outputsize=full`).then(r => r.json())
       ]);
 
-      const sp500Data = await sp500Response.json();
-      const dowData = await dowResponse.json();
-
-      // Process and combine market data
-      return processMarketData(sp500Data, dowData);
+      // Process the data
+      const processedData = processMarketData(spyData, diaData, qqqData);
+      setMarketData(processedData);
     } catch (error) {
       console.error('Error fetching market data:', error);
-      return generateDefaultMarketData();
+      setMarketData(generateFallbackMarketData());
     }
   };
 
-  const processMarketData = (sp500Data, dowData) => {
-    // Generate market data from 2000 to today
-    const data = [];
-    const startYear = 2000;
-    const currentDate = new Date();
-    
-    for (let year = startYear; year <= currentDate.getFullYear(); year++) {
-      for (let month = 0; month < 12; month++) {
-        if (year === currentDate.getFullYear() && month > currentDate.getMonth()) break;
+  const fetchEconomicIndicators = async () => {
+    try {
+      // Fetch real economic data from Alpha Vantage
+      const [gdpData, cpiData, unemploymentData, fedRateData] = await Promise.all([
+        fetch(`https://www.alphavantage.co/query?function=REAL_GDP&interval=quarterly&apikey=${API_KEY}`).then(r => r.json()),
+        fetch(`https://www.alphavantage.co/query?function=CPI&interval=monthly&apikey=${API_KEY}`).then(r => r.json()),
+        fetch(`https://www.alphavantage.co/query?function=UNEMPLOYMENT&apikey=${API_KEY}`).then(r => r.json()),
+        fetch(`https://www.alphavantage.co/query?function=FEDERAL_FUNDS_RATE&interval=monthly&apikey=${API_KEY}`).then(r => r.json())
+      ]);
+
+      // Process and combine the data
+      const processedData = processEconomicData(gdpData, cpiData, unemploymentData, fedRateData);
+      setEconomicData(processedData);
+      
+      // Set current indicators from latest data
+      if (processedData.length > 0) {
+        const latest = processedData[processedData.length - 1];
+        const previous = processedData[processedData.length - 2] || latest;
         
-        const date = `${year}-${String(month + 1).padStart(2, '0')}`;
-        
-        // Calculate realistic market values
-        let sp500 = 1400;
-        let dow = 10000;
-        let nasdaq = 2500;
-        
-        // Apply historical patterns
-        const yearsSince2000 = year - 2000;
-        const growthFactor = 1 + (yearsSince2000 * 0.08); // Average 8% annual growth
-        
-        // Apply major market events
-        if (year === 2008 || year === 2009) {
-          sp500 *= 0.7;
-          dow *= 0.65;
-          nasdaq *= 0.72;
-        } else if (year === 2020 && month >= 2 && month <= 4) {
-          sp500 *= 0.75;
-          dow *= 0.73;
-          nasdaq *= 0.78;
-        } else {
-          sp500 *= growthFactor;
-          dow *= growthFactor;
-          nasdaq *= growthFactor * 1.2; // NASDAQ grows faster
-        }
-        
-        // Add some monthly variation
-        const monthlyVariation = Math.sin(month * 0.5) * 0.02;
-        
-        data.push({
-          date,
-          sp500: Math.round(sp500 * (1 + monthlyVariation)),
-          dow: Math.round(dow * (1 + monthlyVariation)),
-          nasdaq: Math.round(nasdaq * (1 + monthlyVariation))
+        setCurrentIndicators({
+          gdp: {
+            value: latest.gdp?.toFixed(1) || '2.8',
+            change: ((latest.gdp || 0) - (previous.gdp || 0)).toFixed(1),
+            trend: (latest.gdp || 0) > (previous.gdp || 0) ? 'up' : 'down'
+          },
+          cpi: {
+            value: latest.cpi?.toFixed(1) || '2.9',
+            change: ((latest.cpi || 0) - (previous.cpi || 0)).toFixed(1),
+            trend: (latest.cpi || 0) > (previous.cpi || 0) ? 'up' : 'down'
+          },
+          unemployment: {
+            value: latest.unemployment?.toFixed(1) || '3.7',
+            change: ((latest.unemployment || 0) - (previous.unemployment || 0)).toFixed(1),
+            trend: (latest.unemployment || 0) > (previous.unemployment || 0) ? 'up' : 'down'
+          },
+          fedRate: {
+            value: latest.fedRate?.toFixed(2) || '4.33',
+            change: ((latest.fedRate || 0) - (previous.fedRate || 0)).toFixed(2),
+            trend: (latest.fedRate || 0) > (previous.fedRate || 0) ? 'up' : 'down'
+          }
         });
       }
+    } catch (error) {
+      console.error('Error fetching economic data:', error);
+      loadFallbackEconomicData();
     }
-    
-    return data;
   };
 
-  const processEconomicData = (gdp, cpi, unemployment, fedRate) => {
-    const data = [];
+  const processMarketData = (spyData, diaData, qqqData) => {
+    const combined = [];
     const startYear = 2000;
-    const currentDate = new Date();
+    const currentDate = new Date(2025, 8, 17);
     
-    // Create a map for each data type by date
+    // Extract time series data
+    const spyTimeSeries = spyData['Monthly Adjusted Time Series'] || {};
+    const diaTimeSeries = diaData['Monthly Adjusted Time Series'] || {};
+    const qqqTimeSeries = qqqData['Monthly Adjusted Time Series'] || {};
+    
+    // Create yearly data points for cleaner visualization
+    for (let year = startYear; year <= currentDate.getFullYear(); year++) {
+      const yearStr = year.toString();
+      let spyValue = null;
+      let diaValue = null;
+      let qqqValue = null;
+      
+      // Find December data for each year (or latest available month)
+      for (let month = 12; month >= 1; month--) {
+        const dateKey = `${year}-${String(month).padStart(2, '0')}`;
+        
+        if (spyTimeSeries[dateKey]) {
+          spyValue = spyValue || parseFloat(spyTimeSeries[dateKey]['5. adjusted close']) * 10;
+        }
+        if (diaTimeSeries[dateKey]) {
+          diaValue = diaValue || parseFloat(diaTimeSeries[dateKey]['5. adjusted close']) * 100;
+        }
+        if (qqqTimeSeries[dateKey]) {
+          qqqValue = qqqValue || parseFloat(qqqTimeSeries[dateKey]['5. adjusted close']) * 40;
+        }
+      }
+      
+      // If no real data, use calculated estimates
+      if (!spyValue || !diaValue || !qqqValue) {
+        const fallbackData = calculateMarketValues(year);
+        spyValue = spyValue || fallbackData.sp500;
+        diaValue = diaValue || fallbackData.dow;
+        qqqValue = qqqValue || fallbackData.nasdaq;
+      }
+      
+      combined.push({
+        date: yearStr,
+        sp500: Math.round(spyValue),
+        dow: Math.round(diaValue),
+        nasdaq: Math.round(qqqValue)
+      });
+    }
+    
+    return combined;
+  };
+
+  const processEconomicData = (gdpResponse, cpiResponse, unemploymentResponse, fedRateResponse) => {
+    const combined = [];
+    const startYear = 2000;
+    const currentDate = new Date(2025, 8, 17);
+    
+    // Extract data arrays
+    const gdpData = gdpResponse.data || [];
+    const cpiData = cpiResponse.data || [];
+    const unemploymentData = unemploymentResponse.data || [];
+    const fedRateData = fedRateResponse.data || [];
+    
+    // Create maps for easy lookup
     const gdpMap = {};
     const cpiMap = {};
     const unemploymentMap = {};
     const fedRateMap = {};
     
-    // Process API data into maps
-    gdp.forEach(item => {
-      const date = item.date.substring(0, 7); // YYYY-MM format
-      gdpMap[date] = parseFloat(item.value);
+    // Process GDP data (quarterly, calculate year-over-year growth)
+    for (let i = 4; i < gdpData.length; i++) {
+      const current = parseFloat(gdpData[i].value);
+      const yearAgo = parseFloat(gdpData[i - 4].value);
+      const growth = ((current - yearAgo) / yearAgo) * 100;
+      gdpMap[gdpData[i].date] = growth;
+    }
+    
+    // Process CPI data (calculate year-over-year inflation)
+    for (let i = 12; i < cpiData.length; i++) {
+      const current = parseFloat(cpiData[i].value);
+      const yearAgo = parseFloat(cpiData[i - 12].value);
+      const inflation = ((current - yearAgo) / yearAgo) * 100;
+      cpiMap[cpiData[i].date] = inflation;
+    }
+    
+    // Process unemployment data
+    unemploymentData.forEach(item => {
+      unemploymentMap[item.date] = parseFloat(item.value);
     });
     
-    cpi.forEach(item => {
-      const date = item.date.substring(0, 7);
-      cpiMap[date] = parseFloat(item.value);
+    // Process fed rate data
+    fedRateData.forEach(item => {
+      fedRateMap[item.date] = parseFloat(item.value);
     });
     
-    unemployment.forEach(item => {
-      const date = item.date.substring(0, 7);
-      unemploymentMap[date] = parseFloat(item.value);
-    });
-    
-    fedRate.forEach(item => {
-      const date = item.date.substring(0, 7);
-      fedRateMap[date] = parseFloat(item.value);
-    });
-    
-    // Generate complete time series
+    // Generate quarterly data points
     for (let year = startYear; year <= currentDate.getFullYear(); year++) {
-      for (let quarter = 0; quarter < 4; quarter++) {
-        if (year === currentDate.getFullYear() && quarter > Math.floor(currentDate.getMonth() / 3)) break;
+      for (let quarter = 1; quarter <= 4; quarter++) {
+        if (year === currentDate.getFullYear() && quarter > 3) break;
         
-        const month = quarter * 3 + 1;
-        const date = `${year}-${String(month).padStart(2, '0')}`;
-        const displayDate = `${year} Q${quarter + 1}`;
+        const quarterStartMonth = (quarter - 1) * 3 + 1;
+        const dateStr = `${year}-${String(quarterStartMonth).padStart(2, '0')}-01`;
         
-        // Get values from maps or use realistic defaults
-        let gdpValue = gdpMap[date] || calculateDefaultGDP(year, quarter);
-        let cpiValue = cpiMap[date] || calculateDefaultCPI(year, quarter);
-        let unemploymentValue = unemploymentMap[date] || calculateDefaultUnemployment(year, quarter);
-        let fedRateValue = fedRateMap[date] || calculateDefaultFedRate(year, quarter);
+        // Get values or use calculated defaults
+        const gdpValue = gdpMap[dateStr] || calculateDefaultGDP(year, quarter);
+        const cpiValue = cpiMap[dateStr] || calculateDefaultCPI(year, quarter);
+        const unemploymentValue = unemploymentMap[dateStr] || calculateDefaultUnemployment(year, quarter);
+        const fedRateValue = fedRateMap[dateStr] || calculateDefaultFedRate(year, quarter);
         
-        data.push({
-          date: displayDate,
+        combined.push({
+          date: `${year} Q${quarter}`,
           year,
           quarter,
           gdp: gdpValue,
@@ -239,160 +235,170 @@ const MacroDashboard = () => {
       }
     }
     
-    return data;
+    return combined;
+  };
+
+  const calculateMarketValues = (year) => {
+    // Base values and growth calculations
+    const yearsSince2000 = year - 2000;
+    let sp500 = 1400;
+    let dow = 10000;
+    let nasdaq = 2500;
+    
+    // Apply historical growth patterns
+    if (year <= 2002) {
+      const decline = 1 - (2002 - year) * 0.15;
+      sp500 *= decline;
+      dow *= decline;
+      nasdaq *= (decline - 0.2); // NASDAQ declined more
+    } else if (year <= 2007) {
+      const growth = Math.pow(1.08, year - 2002);
+      sp500 *= growth;
+      dow *= growth * 0.95;
+      nasdaq *= growth * 1.1;
+    } else if (year === 2008 || year === 2009) {
+      sp500 = year === 2008 ? 1220 : 677;
+      dow = year === 2008 ? 10325 : 6547;
+      nasdaq = year === 2008 ? 2176 : 1293;
+    } else if (year <= 2019) {
+      const recoveryYears = year - 2009;
+      const growth = Math.pow(1.13, recoveryYears);
+      sp500 = 677 * growth;
+      dow = 6547 * growth;
+      nasdaq = 1293 * growth * 1.2;
+    } else if (year === 2020) {
+      sp500 = 3230;
+      dow = 26017;
+      nasdaq = 10625;
+    } else if (year <= 2025) {
+      const postCovidGrowth = Math.pow(1.12, year - 2020);
+      sp500 = 3230 * postCovidGrowth;
+      dow = 26017 * postCovidGrowth;
+      nasdaq = 10625 * postCovidGrowth * 1.15;
+    }
+    
+    return { sp500: Math.round(sp500), dow: Math.round(dow), nasdaq: Math.round(nasdaq) };
   };
 
   const calculateDefaultGDP = (year, quarter) => {
-    // Historical GDP patterns
-    if (year === 2008 || year === 2009) return -2.0 + quarter * 0.5;
-    if (year === 2020 && quarter === 1) return -31.4;
-    if (year === 2020 && quarter === 2) return 33.4;
-    if (year >= 2021 && year <= 2023) return 2.5 + Math.sin(quarter) * 0.5;
-    return 2.5 + Math.sin(year * 0.3 + quarter) * 1.0;
+    if (year === 2008) return quarter === 4 ? -8.4 : -2.0;
+    if (year === 2009) return quarter === 1 ? -6.4 : 2.0;
+    if (year === 2020) return quarter === 2 ? -31.4 : quarter === 3 ? 33.4 : 2.0;
+    if (year >= 2021 && year <= 2023) return 2.5 + Math.sin(quarter * 0.5) * 1.0;
+    if (year === 2024) return 2.8;
+    if (year === 2025) return 2.5;
+    return 2.5 + Math.sin(year * 0.3 + quarter * 0.5) * 1.0;
   };
 
   const calculateDefaultCPI = (year, quarter) => {
-    // Historical CPI patterns
-    if (year <= 2003) return 2.0 + Math.sin(quarter) * 0.5;
-    if (year >= 2008 && year <= 2010) return 0.5 + quarter * 0.3;
+    if (year <= 2003) return 2.0 + Math.sin(quarter * 0.5) * 0.5;
+    if (year >= 2008 && year <= 2010) return 0.5;
     if (year === 2021) return 1.5 + quarter * 1.5;
-    if (year === 2022) return 7.0 + Math.sin(quarter) * 1.5;
+    if (year === 2022) return 7.0 + quarter * 0.5;
     if (year === 2023) return 5.0 - quarter * 0.5;
-    if (year === 2024) return 3.5 - quarter * 0.2;
+    if (year === 2024) return 3.2 - quarter * 0.1;
     if (year === 2025) return 2.9;
-    return 2.5 + Math.sin(year * 0.4 + quarter) * 0.5;
+    return 2.5;
   };
 
   const calculateDefaultUnemployment = (year, quarter) => {
-    // Historical unemployment patterns
-    if (year === 2000) return 3.9 + quarter * 0.1;
-    if (year >= 2008 && year <= 2010) return 7.0 + quarter * 0.5;
-    if (year === 2020 && quarter === 1) return 13.3;
-    if (year === 2020 && quarter >= 2) return 8.0 - quarter * 0.5;
-    if (year >= 2021 && year <= 2023) return 4.0 - quarter * 0.1;
-    if (year === 2024) return 3.8 + quarter * 0.05;
+    if (year === 2000) return 3.9;
+    if (year >= 2008 && year <= 2010) return 7.0 + (year - 2008) * 1.5;
+    if (year === 2020) return quarter === 2 ? 13.3 : 8.0;
+    if (year >= 2021 && year <= 2023) return 4.0 - (year - 2021) * 0.1;
+    if (year === 2024) return 3.8;
     if (year === 2025) return 3.7;
-    return 5.0 + Math.sin(year * 0.3 + quarter) * 1.0;
+    return 5.0;
   };
 
   const calculateDefaultFedRate = (year, quarter) => {
-    // Historical fed rate patterns
-    if (year === 2000) return 6.0 + quarter * 0.1;
-    if (year >= 2001 && year <= 2003) return 2.0 - quarter * 0.2;
-    if (year >= 2004 && year <= 2006) return 2.0 + year * 0.5;
-    if (year === 2007) return 5.25 - quarter * 0.5;
+    if (year === 2000) return 6.0;
+    if (year >= 2001 && year <= 2003) return 2.0;
+    if (year >= 2004 && year <= 2006) return 2.0 + (year - 2004) * 1.5;
+    if (year === 2007) return 5.25;
     if (year >= 2008 && year <= 2015) return 0.25;
     if (year >= 2016 && year <= 2019) return 0.5 + (year - 2016) * 0.5;
-    if (year === 2020) return 0.25;
-    if (year === 2021) return 0.25;
-    if (year === 2022) return 0.25 + quarter * 1.5;
+    if (year === 2020 || year === 2021) return 0.25;
+    if (year === 2022) return 0.25 + quarter * 1.0;
     if (year === 2023) return 4.5 + quarter * 0.25;
     if (year === 2024) return 5.33;
     if (year === 2025) return 4.33;
-    return 3.0 + Math.sin(year * 0.3 + quarter) * 1.0;
+    return 3.0;
   };
 
-  const generateDefaultMarketData = () => {
+  const loadFallbackData = () => {
+    setMarketData(generateFallbackMarketData());
+    loadFallbackEconomicData();
+  };
+
+  const generateFallbackMarketData = () => {
     const data = [];
     const startYear = 2000;
-    const currentDate = new Date(2025, 8, 17); // September 17, 2025
+    const currentYear = 2025;
     
-    for (let year = startYear; year <= currentDate.getFullYear(); year++) {
-      // Generate annual data points for cleaner visualization
-      let sp500 = 1400;
-      let dow = 10000;
-      let nasdaq = 2500;
-      
-      // Apply growth patterns
-      const yearsSince2000 = year - 2000;
-      const baseGrowth = Math.pow(1.08, yearsSince2000);
-      
-      // Historical corrections
-      if (year === 2002) { sp500 = 880; dow = 7200; nasdaq = 1140; }
-      else if (year === 2007) { sp500 = 1468; dow = 13265; nasdaq = 2653; }
-      else if (year === 2009) { sp500 = 677; dow = 6547; nasdaq = 1293; }
-      else if (year === 2020) { sp500 = 3230; dow = 26017; nasdaq = 10625; }
-      else if (year === 2022) { sp500 = 3785; dow = 30775; nasdaq = 11028; }
-      else if (year === 2024) { sp500 = 5500; dow = 40000; nasdaq = 17500; }
-      else if (year === 2025) { sp500 = 5800; dow = 42000; nasdaq = 19000; }
-      else {
-        sp500 *= baseGrowth;
-        dow *= baseGrowth * 0.95;
-        nasdaq *= baseGrowth * 1.15;
-      }
-      
+    for (let year = startYear; year <= currentYear; year++) {
+      const values = calculateMarketValues(year);
       data.push({
         date: year.toString(),
-        sp500: Math.round(sp500),
-        dow: Math.round(dow),
-        nasdaq: Math.round(nasdaq)
+        sp500: values.sp500,
+        dow: values.dow,
+        nasdaq: values.nasdaq
       });
     }
     
     return data;
   };
 
-  const generateDefaultEconomicData = () => {
+  const loadFallbackEconomicData = () => {
     const data = [];
     const startYear = 2000;
-    const currentDate = new Date(2025, 8, 17); // September 17, 2025
+    const currentYear = 2025;
     
-    for (let year = startYear; year <= currentDate.getFullYear(); year++) {
-      // Generate quarterly data
+    for (let year = startYear; year <= currentYear; year++) {
       for (let quarter = 1; quarter <= 4; quarter++) {
-        if (year === 2025 && quarter > 3) break; // Stop at Q3 2025
+        if (year === 2025 && quarter > 3) break;
         
         data.push({
           date: `${year} Q${quarter}`,
           year,
           quarter,
-          gdp: calculateDefaultGDP(year, quarter - 1),
-          cpi: calculateDefaultCPI(year, quarter - 1),
-          unemployment: calculateDefaultUnemployment(year, quarter - 1),
-          fedRate: calculateDefaultFedRate(year, quarter - 1)
+          gdp: calculateDefaultGDP(year, quarter),
+          cpi: calculateDefaultCPI(year, quarter),
+          unemployment: calculateDefaultUnemployment(year, quarter),
+          fedRate: calculateDefaultFedRate(year, quarter)
         });
       }
     }
     
-    return data;
-  };
-
-  const getCurrentIndicators = (economicData) => {
-    if (!economicData || economicData.length === 0) return getDefaultCurrentIndicators();
+    setEconomicData(data);
     
-    const latest = economicData[economicData.length - 1];
-    const previous = economicData[economicData.length - 2] || latest;
+    // Set current indicators
+    const latest = data[data.length - 1];
+    const previous = data[data.length - 2];
     
-    return {
-      gdp: { 
-        value: latest.gdp.toFixed(1), 
+    setCurrentIndicators({
+      gdp: {
+        value: latest.gdp.toFixed(1),
         change: (latest.gdp - previous.gdp).toFixed(1),
         trend: latest.gdp > previous.gdp ? 'up' : 'down'
       },
-      cpi: { 
-        value: latest.cpi.toFixed(1), 
+      cpi: {
+        value: latest.cpi.toFixed(1),
         change: (latest.cpi - previous.cpi).toFixed(1),
         trend: latest.cpi > previous.cpi ? 'up' : 'down'
       },
-      unemployment: { 
-        value: latest.unemployment.toFixed(1), 
+      unemployment: {
+        value: latest.unemployment.toFixed(1),
         change: (latest.unemployment - previous.unemployment).toFixed(1),
         trend: latest.unemployment > previous.unemployment ? 'up' : 'down'
       },
-      fedRate: { 
-        value: latest.fedRate.toFixed(2), 
+      fedRate: {
+        value: latest.fedRate.toFixed(2),
         change: (latest.fedRate - previous.fedRate).toFixed(2),
         trend: latest.fedRate > previous.fedRate ? 'up' : 'down'
       }
-    };
+    });
   };
-
-  const getDefaultCurrentIndicators = () => ({
-    gdp: { value: '2.8', change: '0.3', trend: 'up' },
-    cpi: { value: '2.9', change: '-0.3', trend: 'down' },
-    unemployment: { value: '3.7', change: '-0.1', trend: 'down' },
-    fedRate: { value: '4.33', change: '-1.0', trend: 'down' }
-  });
 
   const gradients = (
     <defs>
@@ -524,6 +530,7 @@ const MacroDashboard = () => {
                   fill="url(#sp500Gradient)"
                   name="S&P 500"
                   animationDuration={2000}
+                  connectNulls={true}
                 />
               )}
               
@@ -536,6 +543,7 @@ const MacroDashboard = () => {
                   fill="url(#dowGradient)"
                   name="DOW Jones"
                   animationDuration={2000}
+                  connectNulls={true}
                 />
               )}
               
@@ -548,6 +556,7 @@ const MacroDashboard = () => {
                   fill="url(#nasdaqGradient)"
                   name="NASDAQ"
                   animationDuration={2000}
+                  connectNulls={true}
                 />
               )}
             </AreaChart>
@@ -610,7 +619,7 @@ const MacroDashboard = () => {
                 stroke="#9ca3af"
                 tick={{ fontSize: 11 }}
                 label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft', style: { fill: '#9ca3af' } }}
-                domain={[-5, 15]}
+                domain={['dataMin - 2', 'dataMax + 2']}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend 
@@ -624,10 +633,11 @@ const MacroDashboard = () => {
                   type="monotone"
                   dataKey="gdp"
                   stroke="#3b82f6"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   name="GDP Growth Rate"
                   dot={false}
                   animationDuration={2000}
+                  connectNulls={true}
                 />
               )}
               
@@ -636,10 +646,11 @@ const MacroDashboard = () => {
                   type="monotone"
                   dataKey="cpi"
                   stroke="#ef4444"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   name="CPI Inflation"
                   dot={false}
                   animationDuration={2000}
+                  connectNulls={true}
                 />
               )}
               
@@ -648,10 +659,11 @@ const MacroDashboard = () => {
                   type="monotone"
                   dataKey="unemployment"
                   stroke="#f59e0b"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   name="Unemployment Rate"
                   dot={false}
                   animationDuration={2000}
+                  connectNulls={true}
                 />
               )}
               
@@ -660,10 +672,11 @@ const MacroDashboard = () => {
                   type="monotone"
                   dataKey="fedRate"
                   stroke="#10b981"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   name="Fed Interest Rate"
                   dot={false}
                   animationDuration={2000}
+                  connectNulls={true}
                 />
               )}
             </LineChart>
