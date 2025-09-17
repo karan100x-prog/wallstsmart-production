@@ -174,7 +174,7 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
             </a>
           </div>
 
-        // Load line gap
+     
         <div className="text-center text-gray-400 text-sm">
           <p className="mb-2"> </p>
           <p> </p>
