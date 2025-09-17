@@ -8,7 +8,7 @@ const MacroDashboard = () => {
   const [showNASDAQ, setShowNASDAQ] = useState(true);
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState('Connecting...');
-  const [marketTimeInterval, setMarketTimeInterval] = useState('All');
+
   const [historicalData, setHistoricalData] = useState([]);
 
   useEffect(() => {
@@ -260,54 +260,6 @@ const MacroDashboard = () => {
     return null;
   };
 
-  const filterDataByTimeInterval = (data, interval) => {
-    if (!data || data.length === 0) return data;
-    
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    let cutoffDate;
-    
-    switch(interval) {
-      case '1Y':
-        cutoffDate = new Date(currentYear - 1, currentDate.getMonth(), 1);
-        break;
-      case '5Y':
-        cutoffDate = new Date(currentYear - 5, currentDate.getMonth(), 1);
-        break;
-      case '20Y':
-        cutoffDate = new Date(currentYear - 20, currentDate.getMonth(), 1);
-        break;
-      case 'All':
-      default:
-        return data;
-    }
-    
-    return data.filter(item => {
-      const itemDate = new Date(item.date);
-      return itemDate >= cutoffDate;
-    });
-  };
-
-  const TimeIntervalSelector = ({ interval, setInterval }) => (
-    <div className="flex items-center gap-2 bg-gray-800/50 rounded-lg p-1">
-      {['1Y', '5Y', '20Y', 'All'].map((option) => (
-        <button
-          key={option}
-          onClick={() => setInterval(option)}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-            interval === option
-              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
-              : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
-          }`}
-        >
-          {option}
-        </button>
-      ))}
-    </div>
-  );
-
-  const filteredHistoricalData = filterDataByTimeInterval(historicalData, marketTimeInterval);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex items-center justify-center">
@@ -331,26 +283,22 @@ const MacroDashboard = () => {
         </div>
 
         <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6">
             <div>
               <h2 className="text-2xl font-bold text-white mb-2">US Market Indices Since 2000</h2>
               <p className="text-sm text-gray-400">24-year historical performance - Close Prices</p>
             </div>
-            <TimeIntervalSelector 
-              interval={marketTimeInterval} 
-              setInterval={setMarketTimeInterval}
-            />
           </div>
 
           <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={filteredHistoricalData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+            <AreaChart data={historicalData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
               {gradients}
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
               <XAxis 
                 dataKey="displayDate" 
                 stroke="#9ca3af"
                 tick={{ fontSize: 11 }}
-                interval={marketTimeInterval === '1Y' ? 2 : marketTimeInterval === '5Y' ? 11 : 23}
+                interval={23}
                 angle={0}
                 textAnchor="middle"
               />
