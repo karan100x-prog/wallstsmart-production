@@ -173,8 +173,11 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
               </svg>
             </a>
           </div>
-
-
+//extra line gap
+        <div className="text-center text-gray-400 text-sm">
+          <p className="mb-2"> </p>
+          <p> </p>
+        </div>
         
         <div className="text-center text-gray-400 text-sm">
           <p className="mb-2">© 2025 WallStSmart. Professional financial analysis.</p>
