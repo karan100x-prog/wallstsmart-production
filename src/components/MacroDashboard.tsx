@@ -139,9 +139,9 @@ const MacroDashboard = () => {
       
       // Add current year's actual values
       if (year === currentYear) {
-        sp500Base = 5975;  // Current S&P 500 level
-        dowBase = 43870;   // Current DOW level  
-        nasdaqBase = 19280; // Current NASDAQ level
+        sp500Base = 6606;  // Current S&P 500 level (as shown in Google)
+        dowBase = 44296;   // Current DOW level  
+        nasdaqBase = 19003; // Current NASDAQ level
       }
       
       const yearlyVolatility = Math.sin(year * 0.5) * 0.03 + Math.random() * 0.02;
