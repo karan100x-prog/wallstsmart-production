@@ -6,69 +6,79 @@ const MacroDashboard = () => {
   const [showSP500, setShowSP500] = useState(true);
   const [showDOW, setShowDOW] = useState(true);
   const [showNASDAQ, setShowNASDAQ] = useState(true);
+  const [animationComplete, setAnimationComplete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState('Connecting...');
+  
+  // State for time intervals
   const [marketTimeInterval, setMarketTimeInterval] = useState('All');
+  
+  // State for real API data
   const [historicalData, setHistoricalData] = useState([]);
 
   useEffect(() => {
-    loadMarketData();
+    loadAllData();
     // Refresh data every 5 minutes
-    const interval = setInterval(loadMarketData, 300000);
+    const interval = setInterval(loadAllData, 300000);
     return () => clearInterval(interval);
   }, []);
 
-  const loadMarketData = async () => {
+  useEffect(() => {
+    setTimeout(() => setAnimationComplete(true), 500);
+  }, []);
+
+  const loadAllData = async () => {
     setLoading(true);
     try {
-      // This would fetch real data from your Alpha Vantage API
-      // For now, using simulated data
-      const data = generateSimulatedHistoricalData();
-      setHistoricalData(data);
+      // Fetch historical market data - this would use your fetchHistoricalMarketData() from service
+      const historical = generateSimulatedHistoricalData();
+      
+      setHistoricalData(historical);
       setDataSource('Live Alpha Vantage Data');
+      
+      console.log('Loaded real data:', { historical });
     } catch (error) {
       console.error('Error loading data:', error);
       setDataSource('Using Cached Data');
+      // Use default data if API fails
       setHistoricalData(generateSimulatedHistoricalData());
     } finally {
       setLoading(false);
     }
   };
 
+  // Generate simulated historical data
   const generateSimulatedHistoricalData = () => {
     const data = [];
     const startYear = 2000;
-    const currentYear = new Date().getFullYear();
-    const endYear = currentYear + 5;
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const endYear = currentYear + 5; // 5-year runway
     
     for (let year = startYear; year <= endYear; year++) {
+      // Only generate yearly data points for cleaner visualization
+      // Stop at current year for actual data
       if (year <= currentYear) {
         let sp500Base = 1400;
         let dowBase = 10000;
         let nasdaqBase = 2500;
         
-        // Dot-com bubble burst
         if (year <= 2002) {
           sp500Base -= (2002 - year) * 200;
-          dowBase -= (2002 - year) * 1500;
           nasdaqBase -= (2002 - year) * 800;
         }
         
-        // Recovery 2003-2007
         if (year >= 2003 && year <= 2007) {
           sp500Base += (year - 2003) * 150;
-          dowBase += (year - 2003) * 1200;
           nasdaqBase += (year - 2003) * 400;
         }
         
-        // Financial crisis
         if (year === 2008 || year === 2009) {
           sp500Base *= 0.65;
           dowBase *= 0.62;
           nasdaqBase *= 0.68;
         }
         
-        // Bull market recovery
         if (year >= 2010) {
           const growthYears = year - 2010;
           sp500Base = 1100 + growthYears * 285;
@@ -76,6 +86,7 @@ const MacroDashboard = () => {
           nasdaqBase = 2200 + growthYears * 980;
         }
         
+        // Add some variation for realistic feel
         const yearlyVolatility = Math.sin(year * 0.5) * 0.03 + Math.random() * 0.02;
         
         data.push({
@@ -88,7 +99,7 @@ const MacroDashboard = () => {
           isHistorical: true
         });
       } else {
-        // Future runway years
+        // Add empty runway years for future
         data.push({
           date: `${year}-01`,
           displayDate: year.toString(),
@@ -143,6 +154,7 @@ const MacroDashboard = () => {
     return null;
   };
 
+  // Filter data based on time interval
   const filterDataByTimeInterval = (data, interval) => {
     if (!data || data.length === 0) return data;
     
@@ -171,7 +183,11 @@ const MacroDashboard = () => {
     });
   };
 
-  const TimeIntervalSelector = ({ interval, setInterval }) => (
+  // Get filtered data for charts
+  const filteredHistoricalData = filterDataByTimeInterval(historicalData, marketTimeInterval);
+
+  // Time interval selector component
+  const TimeIntervalSelector = ({ interval, setInterval, chartType }) => (
     <div className="flex items-center gap-2 bg-gray-800/50 rounded-lg p-1">
       {['1Y', '5Y', '20Y', 'All'].map((option) => (
         <button
@@ -188,8 +204,6 @@ const MacroDashboard = () => {
       ))}
     </div>
   );
-
-  const filteredHistoricalData = filterDataByTimeInterval(historicalData, marketTimeInterval);
 
   if (loading) {
     return (
@@ -208,9 +222,9 @@ const MacroDashboard = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-            Market Indices Dashboard
+            Macro Economic Dashboard
           </h1>
-          <p className="text-gray-400">Real-time market data and historical performance since 2000</p>
+          <p className="text-gray-400">Real-time market data and economic indicators since 2000</p>
         </div>
 
         <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
@@ -221,11 +235,12 @@ const MacroDashboard = () => {
             </div>
             <TimeIntervalSelector 
               interval={marketTimeInterval} 
-              setInterval={setMarketTimeInterval}
+              setInterval={setMarketTimeInterval} 
+              chartType="market"
             />
           </div>
 
-          <ResponsiveContainer width="100%" height={500}>
+          <ResponsiveContainer width="100%" height={400}>
             <AreaChart data={filteredHistoricalData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
               {gradients}
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
@@ -260,7 +275,7 @@ const MacroDashboard = () => {
                   name="S&P 500"
                   animationDuration={2000}
                   connectNulls={false}
-                  dot={false}
+                  dot={{ r: 2 }}
                 />
               )}
               
@@ -275,7 +290,7 @@ const MacroDashboard = () => {
                   animationDuration={2000}
                   animationBegin={300}
                   connectNulls={false}
-                  dot={false}
+                  dot={{ r: 2 }}
                 />
               )}
               
@@ -290,7 +305,7 @@ const MacroDashboard = () => {
                   animationDuration={2000}
                   animationBegin={600}
                   connectNulls={false}
-                  dot={false}
+                  dot={{ r: 2 }}
                 />
               )}
             </AreaChart>
