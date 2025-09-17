@@ -103,125 +103,91 @@ const MacroDashboard = () => {
   // Generate simulated historical data (fallback)
   const generateSimulatedHistoricalData = () => {
     const data = [];
-    const startYear = 2000;
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
+    const startDate = new Date('2000-01-01');
+    const endDate = new Date();
     
-    for (let year = startYear; year <= currentYear; year++) {
+    // Generate monthly data points for better detail
+    let currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const progress = (year - 2000) + (month / 12);
+      
       let sp500, dow, nasdaq;
       
-      // Historical accurate values for each index
-      if (year === 2000) {
-        sp500 = 1469;
-        dow = 10786;
-        nasdaq = 3940;
-      } else if (year === 2001) {
-        sp500 = 1148;
-        dow = 10021;
-        nasdaq = 1950;
-      } else if (year === 2002) {
-        sp500 = 879;
-        dow = 8341;
-        nasdaq = 1335;
-      } else if (year === 2003) {
-        sp500 = 1111;
-        dow = 10453;
-        nasdaq = 2003;
-      } else if (year === 2004) {
-        sp500 = 1211;
-        dow = 10783;
-        nasdaq = 2175;
-      } else if (year === 2005) {
-        sp500 = 1248;
-        dow = 10717;
-        nasdaq = 2205;
-      } else if (year === 2006) {
-        sp500 = 1418;
-        dow = 12463;
-        nasdaq = 2415;
-      } else if (year === 2007) {
-        sp500 = 1468;
-        dow = 13264;
-        nasdaq = 2652;
-      } else if (year === 2008) {
-        sp500 = 903;
-        dow = 8776;
-        nasdaq = 1577;
-      } else if (year === 2009) {
-        sp500 = 1115;
-        dow = 10428;
-        nasdaq = 2269;
-      } else if (year === 2010) {
-        sp500 = 1257;
-        dow = 11577;
-        nasdaq = 2652;
-      } else if (year === 2011) {
-        sp500 = 1257;
-        dow = 12217;
-        nasdaq = 2605;
-      } else if (year === 2012) {
-        sp500 = 1426;
-        dow = 13104;
-        nasdaq = 3019;
-      } else if (year === 2013) {
-        sp500 = 1848;
-        dow = 16576;
-        nasdaq = 4176;
-      } else if (year === 2014) {
-        sp500 = 2058;
-        dow = 17823;
-        nasdaq = 4736;
-      } else if (year === 2015) {
-        sp500 = 2043;
-        dow = 17425;
-        nasdaq = 5007;
-      } else if (year === 2016) {
-        sp500 = 2238;
-        dow = 19762;
-        nasdaq = 5383;
-      } else if (year === 2017) {
-        sp500 = 2673;
-        dow = 24719;
-        nasdaq = 6903;
-      } else if (year === 2018) {
-        sp500 = 2506;
-        dow = 23327;
-        nasdaq = 6635;
-      } else if (year === 2019) {
-        sp500 = 3230;
-        dow = 28538;
-        nasdaq = 8972;
+      // Base calculation with monthly granularity
+      const timeFromStart = (currentDate - startDate) / (1000 * 60 * 60 * 24 * 365.25);
+      
+      // S&P 500 trajectory with realistic volatility
+      if (year <= 2002) {
+        sp500 = 1469 - (progress * 70) + Math.sin(progress * 4) * 50;
+      } else if (year <= 2007) {
+        sp500 = 900 + ((progress - 2) * 100) + Math.sin(progress * 3) * 30;
+      } else if (year <= 2009) {
+        sp500 = 1468 - ((progress - 7) * 300) + Math.sin(progress * 6) * 40;
+      } else if (year <= 2019) {
+        sp500 = 700 + ((progress - 9) * 250) + Math.sin(progress * 2) * 60;
       } else if (year === 2020) {
-        sp500 = 3756;
-        dow = 30606;
-        nasdaq = 12888;
-      } else if (year === 2021) {
-        sp500 = 4766;
-        dow = 36338;
-        nasdaq = 15644;
-      } else if (year === 2022) {
-        sp500 = 3839;
-        dow = 33147;
-        nasdaq = 10466;
-      } else if (year === 2023) {
-        sp500 = 4769;
-        dow = 37689;
-        nasdaq = 15011;
-      } else if (year === 2024) {
-        sp500 = 6606;  // Current S&P 500
-        dow = 44296;    // Current DOW
-        nasdaq = 19003; // Current NASDAQ
+        sp500 = 3200 + (month - 2) * (month < 3 ? -200 : 100);
+      } else if (year <= 2024) {
+        sp500 = 3756 + ((progress - 20) * 700) + Math.sin(progress) * 100;
       }
       
+      // DOW trajectory
+      if (year <= 2002) {
+        dow = 10786 - (progress * 500) + Math.sin(progress * 4) * 300;
+      } else if (year <= 2007) {
+        dow = 8500 + ((progress - 2) * 1000) + Math.sin(progress * 3) * 200;
+      } else if (year <= 2009) {
+        dow = 13264 - ((progress - 7) * 2500) + Math.sin(progress * 6) * 300;
+      } else if (year <= 2019) {
+        dow = 8000 + ((progress - 9) * 2000) + Math.sin(progress * 2) * 500;
+      } else if (year === 2020) {
+        dow = 28000 + (month - 2) * (month < 3 ? -2000 : 800);
+      } else if (year <= 2024) {
+        dow = 30606 + ((progress - 20) * 3400) + Math.sin(progress) * 800;
+      }
+      
+      // NASDAQ trajectory
+      if (year <= 2002) {
+        nasdaq = 3940 - (progress * 1100) + Math.sin(progress * 4) * 200;
+      } else if (year <= 2007) {
+        nasdaq = 1400 + ((progress - 2) * 250) + Math.sin(progress * 3) * 100;
+      } else if (year <= 2009) {
+        nasdaq = 2652 - ((progress - 7) * 600) + Math.sin(progress * 6) * 150;
+      } else if (year <= 2019) {
+        nasdaq = 1600 + ((progress - 9) * 700) + Math.sin(progress * 2) * 200;
+      } else if (year === 2020) {
+        nasdaq = 8900 + (month - 2) * (month < 3 ? -500 : 400);
+      } else if (year <= 2024) {
+        nasdaq = 12888 + ((progress - 20) * 1500) + Math.sin(progress) * 400;
+      }
+      
+      // Ensure we end at correct current values
+      if (currentDate.getTime() === endDate.getTime() || 
+          (year === endDate.getFullYear() && month === endDate.getMonth())) {
+        sp500 = 6606;
+        dow = 44296;
+        nasdaq = 19003;
+      }
+      
+      // Add data point (show label only for January or current month)
+      const isJanuary = month === 0;
+      const isCurrent = currentDate.getTime() === endDate.getTime();
+      
       data.push({
-        date: year === currentYear ? `${year}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}` : `${year}-01-01`,
-        displayDate: year === currentYear ? 'Today' : year.toString(),
+        date: currentDate.toISOString().split('T')[0],
+        displayDate: isCurrent ? 'Today' : (isJanuary ? year.toString() : ''),
         year: year,
-        sp500: sp500,
-        dow: dow,
-        nasdaq: nasdaq,
+        sp500: Math.round(Math.max(sp500, 400)),  // Ensure no negative values
+        dow: Math.round(Math.max(dow, 3000)),
+        nasdaq: Math.round(Math.max(nasdaq, 800)),
         isHistorical: true
       });
+      
+      // Move to next month
+      currentDate.setMonth(currentDate.getMonth() + 1);
     }
     
     return data;
