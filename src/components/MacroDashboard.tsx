@@ -15,6 +15,10 @@ const MacroDashboard = () => {
   const [showUnemployment, setShowUnemployment] = useState(true);
   const [showFedRate, setShowFedRate] = useState(true);
   
+  // State for time intervals (default to 10Y)
+  const [marketTimeInterval, setMarketTimeInterval] = useState('10Y');
+  const [economicTimeInterval, setEconomicTimeInterval] = useState('10Y');
+  
   // State for data
   const [marketData, setMarketData] = useState([]);
   const [economicData, setEconomicData] = useState([]);
@@ -417,6 +421,61 @@ const MacroDashboard = () => {
     </defs>
   );
 
+  // Filter data based on time interval
+  const filterDataByTimeInterval = (data, interval) => {
+    if (!data || data.length === 0) return data;
+    
+    const currentDate = new Date(2025, 8, 17); // September 17, 2025
+    const currentYear = currentDate.getFullYear();
+    let cutoffYear;
+    
+    switch(interval) {
+      case '5Y':
+        cutoffYear = currentYear - 5;
+        break;
+      case '10Y':
+        cutoffYear = currentYear - 10;
+        break;
+      case '20Y':
+        cutoffYear = currentYear - 20;
+        break;
+      case 'All':
+      default:
+        return data;
+    }
+    
+    // For market data (yearly)
+    if (data[0].date && data[0].date.length === 4) {
+      return data.filter(item => parseInt(item.date) >= cutoffYear);
+    }
+    
+    // For economic data (quarterly)
+    return data.filter(item => item.year >= cutoffYear);
+  };
+
+  // Get filtered data for charts
+  const filteredMarketData = filterDataByTimeInterval(marketData, marketTimeInterval);
+  const filteredEconomicData = filterDataByTimeInterval(economicData, economicTimeInterval);
+
+  // Time interval selector component
+  const TimeIntervalSelector = ({ interval, setInterval }) => (
+    <div className="flex items-center gap-2 bg-gray-800/50 rounded-lg p-1">
+      {['5Y', '10Y', '20Y', 'All'].map((option) => (
+        <button
+          key={option}
+          onClick={() => setInterval(option)}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+            interval === option
+              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+              : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+          }`}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -491,13 +550,19 @@ const MacroDashboard = () => {
 
         {/* Market Indices Chart */}
         <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">US Market Indices Since 2000</h2>
-            <p className="text-sm text-gray-400">25-year historical performance of major indices</p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">US Market Indices Since 2000</h2>
+              <p className="text-sm text-gray-400">25-year historical performance of major indices</p>
+            </div>
+            <TimeIntervalSelector 
+              interval={marketTimeInterval} 
+              setInterval={setMarketTimeInterval}
+            />
           </div>
 
           <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={marketData} margin={{ top: 10, right: 30, left: 60, bottom: 40 }}>
+            <AreaChart data={filteredMarketData} margin={{ top: 10, right: 30, left: 60, bottom: 40 }}>
               {gradients}
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
               <XAxis 
@@ -523,7 +588,7 @@ const MacroDashboard = () => {
               
               {showSP500 && (
                 <Area
-                  type="linear"
+                  type="monotone"
                   dataKey="sp500"
                   stroke="#3b82f6"
                   strokeWidth={2}
@@ -536,7 +601,7 @@ const MacroDashboard = () => {
               
               {showDOW && (
                 <Area
-                  type="linear"
+                  type="monotone"
                   dataKey="dow"
                   stroke="#10b981"
                   strokeWidth={2}
@@ -549,7 +614,7 @@ const MacroDashboard = () => {
               
               {showNASDAQ && (
                 <Area
-                  type="linear"
+                  type="monotone"
                   dataKey="nasdaq"
                   stroke="#a855f7"
                   strokeWidth={2}
@@ -598,13 +663,19 @@ const MacroDashboard = () => {
 
         {/* Economic Indicators Chart */}
         <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/50 backdrop-blur rounded-3xl p-6 border border-gray-700/50 mb-8 shadow-2xl">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">Economic Indicators Since 2000</h2>
-            <p className="text-sm text-gray-400">GDP Growth, CPI Inflation, Unemployment, and Fed Interest Rate trends</p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">Economic Indicators Since 2000</h2>
+              <p className="text-sm text-gray-400">GDP Growth, CPI Inflation, Unemployment, and Fed Interest Rate trends</p>
+            </div>
+            <TimeIntervalSelector 
+              interval={economicTimeInterval} 
+              setInterval={setEconomicTimeInterval}
+            />
           </div>
 
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={economicData} margin={{ top: 10, right: 30, left: 60, bottom: 60 }}>
+            <LineChart data={filteredEconomicData} margin={{ top: 10, right: 30, left: 60, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
               <XAxis 
                 dataKey="date" 
@@ -630,7 +701,7 @@ const MacroDashboard = () => {
               
               {showGDP && (
                 <Line
-                  type="linear"
+                  type="monotone"
                   dataKey="gdp"
                   stroke="#3b82f6"
                   strokeWidth={2.5}
@@ -643,7 +714,7 @@ const MacroDashboard = () => {
               
               {showCPI && (
                 <Line
-                  type="linear"
+                  type="monotone"
                   dataKey="cpi"
                   stroke="#ef4444"
                   strokeWidth={2.5}
@@ -656,7 +727,7 @@ const MacroDashboard = () => {
               
               {showUnemployment && (
                 <Line
-                  type="linear"
+                  type="monotone"
                   dataKey="unemployment"
                   stroke="#f59e0b"
                   strokeWidth={2.5}
@@ -669,7 +740,7 @@ const MacroDashboard = () => {
               
               {showFedRate && (
                 <Line
-                  type="linear"
+                  type="monotone"
                   dataKey="fedRate"
                   stroke="#10b981"
                   strokeWidth={2.5}
