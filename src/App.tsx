@@ -130,6 +130,10 @@ function HomePage() {
           <p className="text-lg sm:text-xl text-gray-400 mb-6 sm:mb-8 px-4 sm:px-0">
             Smarter Decision. Smarter Returns.
           </p>
+
+         <p className="text-lg sm:text-xl text-gray-400 mb-6 sm:mb-8 px-4 sm:px-0">
+            Under Construction - Official Launch on 20 Oct 2025.
+          </p>
         </div>
       </div>
       
