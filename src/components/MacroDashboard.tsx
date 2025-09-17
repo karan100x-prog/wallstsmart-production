@@ -30,13 +30,24 @@ const MacroDashboard = () => {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      // Fetch historical market data - this would use your fetchHistoricalMarketData() from service
-      const historical = generateSimulatedHistoricalData();
+      // Fetch real data from Alpha Vantage API
+      const [sp500Response, dowResponse, nasdaqResponse] = await Promise.all([
+        fetch('/api/alpha-vantage/TIME_SERIES_DAILY?symbol=SPY&outputsize=full'),
+        fetch('/api/alpha-vantage/TIME_SERIES_DAILY?symbol=DIA&outputsize=full'),
+        fetch('/api/alpha-vantage/TIME_SERIES_DAILY?symbol=QQQ&outputsize=full')
+      ]);
+
+      const sp500Data = await sp500Response.json();
+      const dowData = await dowResponse.json();
+      const nasdaqData = await nasdaqResponse.json();
+
+      // Process the data into chart format
+      const processedData = processMarketData(sp500Data, dowData, nasdaqData);
       
-      setHistoricalData(historical);
+      setHistoricalData(processedData);
       setDataSource('Live Alpha Vantage Data');
       
-      console.log('Loaded real data:', { historical });
+      console.log('Loaded real market data from Alpha Vantage');
     } catch (error) {
       console.error('Error loading data:', error);
       setDataSource('Using Cached Data');
@@ -47,69 +58,103 @@ const MacroDashboard = () => {
     }
   };
 
-  // Generate simulated historical data
+  // Process real market data from Alpha Vantage
+  const processMarketData = (sp500Data, dowData, nasdaqData) => {
+    const data = [];
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    
+    // Get the time series data
+    const sp500TimeSeries = sp500Data['Time Series (Daily)'] || {};
+    const dowTimeSeries = dowData['Time Series (Daily)'] || {};
+    const nasdaqTimeSeries = nasdaqData['Time Series (Daily)'] || {};
+    
+    // Combine and sort dates
+    const allDates = new Set([
+      ...Object.keys(sp500TimeSeries),
+      ...Object.keys(dowTimeSeries),
+      ...Object.keys(nasdaqTimeSeries)
+    ]);
+    
+    const sortedDates = Array.from(allDates).sort();
+    
+    // Filter to get yearly data points from 2000 to today
+    sortedDates.forEach(date => {
+      const year = parseInt(date.split('-')[0]);
+      const month = date.split('-')[1];
+      
+      // Only include January data for each year (yearly points) and today's data
+      if (year >= 2000 && (month === '01' || date === sortedDates[sortedDates.length - 1])) {
+        data.push({
+          date: date,
+          displayDate: date === sortedDates[sortedDates.length - 1] ? 'Today' : year.toString(),
+          year: year,
+          sp500: sp500TimeSeries[date] ? parseFloat(sp500TimeSeries[date]['4. close']) : null,
+          dow: dowTimeSeries[date] ? parseFloat(dowTimeSeries[date]['4. close']) * 100 : null, // Adjust scale
+          nasdaq: nasdaqTimeSeries[date] ? parseFloat(nasdaqTimeSeries[date]['4. close']) * 100 : null, // Adjust scale
+          isHistorical: true
+        });
+      }
+    });
+    
+    return data;
+  };
+
+  // Generate simulated historical data (fallback)
   const generateSimulatedHistoricalData = () => {
     const data = [];
     const startYear = 2000;
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
-    const endYear = currentYear + 5; // 5-year runway
     
-    for (let year = startYear; year <= endYear; year++) {
-      // Only generate yearly data points for cleaner visualization
-      // Stop at current year for actual data
-      if (year <= currentYear) {
-        let sp500Base = 1400;
-        let dowBase = 10000;
-        let nasdaqBase = 2500;
-        
-        if (year <= 2002) {
-          sp500Base -= (2002 - year) * 200;
-          nasdaqBase -= (2002 - year) * 800;
-        }
-        
-        if (year >= 2003 && year <= 2007) {
-          sp500Base += (year - 2003) * 150;
-          nasdaqBase += (year - 2003) * 400;
-        }
-        
-        if (year === 2008 || year === 2009) {
-          sp500Base *= 0.65;
-          dowBase *= 0.62;
-          nasdaqBase *= 0.68;
-        }
-        
-        if (year >= 2010) {
-          const growthYears = year - 2010;
-          sp500Base = 1100 + growthYears * 285;
-          dowBase = 10000 + growthYears * 2100;
-          nasdaqBase = 2200 + growthYears * 980;
-        }
-        
-        // Add some variation for realistic feel
-        const yearlyVolatility = Math.sin(year * 0.5) * 0.03 + Math.random() * 0.02;
-        
-        data.push({
-          date: `${year}-01`,
-          displayDate: year.toString(),
-          year: year,
-          sp500: Math.round(sp500Base * (1 + yearlyVolatility)),
-          dow: Math.round(dowBase * (1 + yearlyVolatility)),
-          nasdaq: Math.round(nasdaqBase * (1 + yearlyVolatility)),
-          isHistorical: true
-        });
-      } else {
-        // Add empty runway years for future
-        data.push({
-          date: `${year}-01`,
-          displayDate: year.toString(),
-          year: year,
-          sp500: null,
-          dow: null,
-          nasdaq: null,
-          isHistorical: false
-        });
+    for (let year = startYear; year <= currentYear; year++) {
+      let sp500Base = 1400;
+      let dowBase = 10000;
+      let nasdaqBase = 2500;
+      
+      if (year <= 2002) {
+        sp500Base -= (2002 - year) * 200;
+        dowBase -= (2002 - year) * 1500;
+        nasdaqBase -= (2002 - year) * 800;
       }
+      
+      if (year >= 2003 && year <= 2007) {
+        sp500Base += (year - 2003) * 150;
+        dowBase += (year - 2003) * 1200;
+        nasdaqBase += (year - 2003) * 400;
+      }
+      
+      if (year === 2008 || year === 2009) {
+        sp500Base *= 0.65;
+        dowBase *= 0.62;
+        nasdaqBase *= 0.68;
+      }
+      
+      if (year >= 2010) {
+        const growthYears = year - 2010;
+        sp500Base = 1100 + growthYears * 285;
+        dowBase = 10000 + growthYears * 2100;
+        nasdaqBase = 2200 + growthYears * 980;
+      }
+      
+      // Add current year's actual values
+      if (year === currentYear) {
+        sp500Base = 5975;  // Current S&P 500 level
+        dowBase = 43870;   // Current DOW level  
+        nasdaqBase = 19280; // Current NASDAQ level
+      }
+      
+      const yearlyVolatility = Math.sin(year * 0.5) * 0.03 + Math.random() * 0.02;
+      
+      data.push({
+        date: year === currentYear ? `${year}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}` : `${year}-01-01`,
+        displayDate: year === currentYear ? 'Today' : year.toString(),
+        year: year,
+        sp500: Math.round(sp500Base * (1 + yearlyVolatility)),
+        dow: Math.round(dowBase * (1 + yearlyVolatility)),
+        nasdaq: Math.round(nasdaqBase * (1 + yearlyVolatility)),
+        isHistorical: true
+      });
     }
     
     return data;
