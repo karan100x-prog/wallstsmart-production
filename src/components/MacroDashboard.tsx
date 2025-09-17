@@ -339,15 +339,22 @@ const MacroDashboard = () => {
     const data = [];
     const startYear = 2000;
     const currentYear = 2025;
+    const currentMonth = 8; // September
     
     for (let year = startYear; year <= currentYear; year++) {
-      const values = calculateMarketValues(year);
-      data.push({
-        date: year.toString(),
-        sp500: values.sp500,
-        dow: values.dow,
-        nasdaq: values.nasdaq
-      });
+      for (let quarter = 0; quarter < 4; quarter++) {
+        if (year === currentYear && quarter > 2) break; // Stop at Q3 2025
+        
+        const month = quarter * 3;
+        const values = calculateMarketValues(year, month);
+        
+        data.push({
+          date: year + (quarter > 0 ? ` Q${quarter + 1}` : ''),
+          sp500: values.sp500,
+          dow: values.dow,
+          nasdaq: values.nasdaq
+        });
+      }
     }
     
     return data;
@@ -588,40 +595,43 @@ const MacroDashboard = () => {
               
               {showSP500 && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="sp500"
                   stroke="#3b82f6"
-                  strokeWidth={2}
+                  strokeWidth={1.5}
                   fill="url(#sp500Gradient)"
                   name="S&P 500"
                   animationDuration={2000}
                   connectNulls={true}
+                  dot={false}
                 />
               )}
               
               {showDOW && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="dow"
                   stroke="#10b981"
-                  strokeWidth={2}
+                  strokeWidth={1.5}
                   fill="url(#dowGradient)"
                   name="DOW Jones"
                   animationDuration={2000}
                   connectNulls={true}
+                  dot={false}
                 />
               )}
               
               {showNASDAQ && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="nasdaq"
                   stroke="#a855f7"
-                  strokeWidth={2}
+                  strokeWidth={1.5}
                   fill="url(#nasdaqGradient)"
                   name="NASDAQ"
                   animationDuration={2000}
                   connectNulls={true}
+                  dot={false}
                 />
               )}
             </AreaChart>
@@ -701,10 +711,10 @@ const MacroDashboard = () => {
               
               {showGDP && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="gdp"
                   stroke="#3b82f6"
-                  strokeWidth={2.5}
+                  strokeWidth={1.5}
                   name="GDP Growth Rate"
                   dot={false}
                   animationDuration={2000}
@@ -714,10 +724,10 @@ const MacroDashboard = () => {
               
               {showCPI && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="cpi"
                   stroke="#ef4444"
-                  strokeWidth={2.5}
+                  strokeWidth={1.5}
                   name="CPI Inflation"
                   dot={false}
                   animationDuration={2000}
@@ -727,10 +737,10 @@ const MacroDashboard = () => {
               
               {showUnemployment && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="unemployment"
                   stroke="#f59e0b"
-                  strokeWidth={2.5}
+                  strokeWidth={1.5}
                   name="Unemployment Rate"
                   dot={false}
                   animationDuration={2000}
@@ -740,10 +750,10 @@ const MacroDashboard = () => {
               
               {showFedRate && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="fedRate"
                   stroke="#10b981"
-                  strokeWidth={2.5}
+                  strokeWidth={1.5}
                   name="Fed Interest Rate"
                   dot={false}
                   animationDuration={2000}
