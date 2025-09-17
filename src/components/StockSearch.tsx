@@ -140,11 +140,8 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
 
       {/* Footer */}
       <footer className="mt-16 pt-8 border-t border-gray-700">
-        <div className="text-center text-gray-400 text-sm">
-          <p className="mb-2">© 2025 WallStSmart. Professional financial analysis.</p>
-          <p>Real-time market data •Professional-grade analytics</p>
-        </div>
-            {/* Navigation Links */}
+
+         {/* Navigation Links */}
           <div className="flex flex-wrap justify-center gap-6 mb-4 md:mb-0">
             <a 
               href="/contact" 
@@ -176,6 +173,15 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
               </svg>
             </a>
           </div>
+
+
+        
+        <div className="text-center text-gray-400 text-sm">
+          <p className="mb-2">© 2025 WallStSmart. Professional financial analysis.</p>
+          <p>Real-time market data •Professional-grade analytics</p>
+        </div>
+           
+        
       </footer>
     </div>
   );
