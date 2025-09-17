@@ -523,7 +523,7 @@ const MacroDashboard = () => {
               
               {showSP500 && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="sp500"
                   stroke="#3b82f6"
                   strokeWidth={2}
@@ -536,7 +536,7 @@ const MacroDashboard = () => {
               
               {showDOW && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="dow"
                   stroke="#10b981"
                   strokeWidth={2}
@@ -549,7 +549,7 @@ const MacroDashboard = () => {
               
               {showNASDAQ && (
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey="nasdaq"
                   stroke="#a855f7"
                   strokeWidth={2}
@@ -630,7 +630,7 @@ const MacroDashboard = () => {
               
               {showGDP && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="gdp"
                   stroke="#3b82f6"
                   strokeWidth={2.5}
@@ -643,7 +643,7 @@ const MacroDashboard = () => {
               
               {showCPI && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="cpi"
                   stroke="#ef4444"
                   strokeWidth={2.5}
@@ -656,7 +656,7 @@ const MacroDashboard = () => {
               
               {showUnemployment && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="unemployment"
                   stroke="#f59e0b"
                   strokeWidth={2.5}
@@ -669,7 +669,7 @@ const MacroDashboard = () => {
               
               {showFedRate && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="fedRate"
                   stroke="#10b981"
                   strokeWidth={2.5}
