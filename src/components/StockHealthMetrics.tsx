@@ -1,6 +1,7 @@
 // StockHealthMetrics.tsx - Fixed Version
 import React, { useEffect, useState } from 'react';
 import metricsCalculator from '../services/metricsCalculator';
+import RevenueAnalysis from './RevenueAnalysis';
 import { 
   getCompanyOverview,
   fetchIncomeStatement, 
