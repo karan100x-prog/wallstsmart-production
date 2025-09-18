@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-//import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
-//import { TrendingUp, Calendar, DollarSign, Activity } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
+import { TrendingUp, Calendar, DollarSign, Activity } from 'lucide-react';
 
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
-import { DollarSign } from 'lucide-react';
+//import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
+//import { DollarSign } from 'lucide-react';
 
 interface RevenueAnalysisProps {
   symbol: string;
