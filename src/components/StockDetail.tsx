@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 import { StockHealthMetrics } from './StockHealthMetrics';
-import RevenueAnalysis from './RevenueAnalysis';  // ADD THIS IMPORT
+import RevenueAnalysis from './RevenueAnalysis';
 
 interface StockDetailProps {
   symbol: string;
@@ -142,14 +142,12 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     return `${(num * 100).toFixed(2)}%`;
   };
 
-// ✅ Format ownership percentage function
-const formatOwnershipPercent = (value: any) => {
-  const num = parseFloat(value);
-  if (isNaN(num)) return 'N/A';
-  return `${num.toFixed(2)}%`; // no *100 here, since API already returns percent
-};
+  const formatOwnershipPercent = (value: any) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return 'N/A';
+    return `${num.toFixed(2)}%`;
+  };
 
-  
   return (
     <div>
       {/* Header */}
@@ -177,7 +175,7 @@ const formatOwnershipPercent = (value: any) => {
       {/* Advanced Health Metrics */}
       <StockHealthMetrics symbol={symbol} />
 
-      {/* NEW: Revenue Analysis & Projections - ADD THIS COMPONENT HERE */}
+      {/* Revenue Analysis & Projections */}
       <RevenueAnalysis symbol={symbol} />
 
       {/* SIDE BY SIDE: Valuation Metrics & Analyst Targets */}
@@ -383,7 +381,7 @@ const formatOwnershipPercent = (value: any) => {
           </div>
         </div>
 
-       {/* RIGHT SIDE: Ownership & Short Interest */}
+        {/* RIGHT SIDE: Ownership & Short Interest */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
           <h3 className="text-xl font-bold mb-4">Ownership & Short Interest</h3>
           <div className="grid grid-cols-1 gap-4">
@@ -429,7 +427,7 @@ const formatOwnershipPercent = (value: any) => {
             </div>
           </div>
         </div>
-      </div> {/* This closes the grid container for Trading Metrics & Ownership */}
+      </div>
 
       {/* Latest News Section */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
@@ -525,9 +523,8 @@ const formatOwnershipPercent = (value: any) => {
           </div>
         )}
       </div>
-    </div> {/* This closes the main container div */}
+    </div>
   );
 };
 
 export default StockDetail;
-
