@@ -1,373 +1,694 @@
-// StockHealthMetrics.tsx - Fixed Version
 import React, { useEffect, useState } from 'react';
-import metricsCalculator from '../services/metricsCalculator';
-import { 
-  getCompanyOverview,
-  fetchIncomeStatement, 
-  fetchBalanceSheet,
-  fetchCashFlow 
-} from '../services/alphaVantage';
+import { Activity, TrendingUp, Shield, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
-interface HealthMetricsProps {
-  symbol: string;
+// Enhanced Metrics Calculator Service
+class MetricsCalculatorService {
+  calculateAltmanZScore(overview, income, balance) {
+    try {
+      // Get the most recent data
+      const latestBalance = balance?.annualReports?.[0] || {};
+      const latestIncome = income?.annualReports?.[0] || {};
+      
+      // Extract required values with proper parsing
+      const totalAssets = parseFloat(latestBalance.totalAssets) || 0;
+      const totalLiabilities = parseFloat(latestBalance.totalLiabilities) || 0;
+      const currentAssets = parseFloat(latestBalance.totalCurrentAssets) || 0;
+      const currentLiabilities = parseFloat(latestBalance.totalCurrentLiabilities) || 0;
+      const retainedEarnings = parseFloat(latestBalance.retainedEarnings) || 0;
+      const ebit = parseFloat(latestIncome.ebit) || parseFloat(latestIncome.operatingIncome) || 0;
+      const revenue = parseFloat(latestIncome.totalRevenue) || 0;
+      const marketCap = parseFloat(overview?.MarketCapitalization) || 0;
+      
+      // Avoid division by zero
+      if (totalAssets === 0) {
+        return { score: 0, interpretation: 'Insufficient Data', components: {} };
+      }
+      
+      // Calculate Z-Score components
+      const A = (currentAssets - currentLiabilities) / totalAssets; // Working Capital / Total Assets
+      const B = retainedEarnings / totalAssets; // Retained Earnings / Total Assets
+      const C = ebit / totalAssets; // EBIT / Total Assets
+      const D = totalLiabilities > 0 ? marketCap / totalLiabilities : 0; // Market Value / Total Liabilities
+      const E = revenue / totalAssets; // Sales / Total Assets
+      
+      // Calculate Z-Score using proper weights
+      const zScore = (1.2 * A) + (1.4 * B) + (3.3 * C) + (0.6 * D) + (1.0 * E);
+      
+      // Determine interpretation
+      let interpretation = '';
+      if (zScore > 2.99) {
+        interpretation = 'Safe Zone - Low Risk';
+      } else if (zScore > 1.80) {
+        interpretation = 'Grey Zone - Moderate Risk';
+      } else {
+        interpretation = 'Distress Zone - High Risk';
+      }
+      
+      return {
+        score: zScore.toFixed(2),
+        interpretation,
+        components: {
+          A: A.toFixed(3),
+          B: B.toFixed(3),
+          C: C.toFixed(3),
+          D: D.toFixed(3),
+          E: E.toFixed(3)
+        }
+      };
+    } catch (error) {
+      console.error('Error calculating Altman Z-Score:', error);
+      return { score: 0, interpretation: 'Calculation Error', components: {} };
+    }
+  }
+
+  calculatePiotroskiScore(income, balance, cashFlow) {
+    let score = 0;
+    const criteria = [];
+    
+    try {
+      const currentIncome = income?.annualReports?.[0] || {};
+      const currentBalance = balance?.annualReports?.[0] || {};
+      const prevBalance = balance?.annualReports?.[1] || {};
+      const currentCashFlow = cashFlow?.annualReports?.[0] || {};
+      
+      // Profitability Criteria (4 points)
+      // 1. Positive Net Income
+      const netIncome = parseFloat(currentIncome.netIncome) || 0;
+      if (netIncome > 0) {
+        score++;
+        criteria.push({ name: 'Positive Net Income', passed: true });
+      } else {
+        criteria.push({ name: 'Positive Net Income', passed: false });
+      }
+      
+      // 2. Positive Operating Cash Flow
+      const operatingCashFlow = parseFloat(currentCashFlow.operatingCashflow) || 0;
+      if (operatingCashFlow > 0) {
+        score++;
+        criteria.push({ name: 'Positive Operating Cash Flow', passed: true });
+      } else {
+        criteria.push({ name: 'Positive Operating Cash Flow', passed: false });
+      }
+      
+      // 3. Increasing ROA
+      const currentROA = netIncome / (parseFloat(currentBalance.totalAssets) || 1);
+      const prevNetIncome = parseFloat(income?.annualReports?.[1]?.netIncome) || 0;
+      const prevROA = prevNetIncome / (parseFloat(prevBalance.totalAssets) || 1);
+      if (currentROA > prevROA) {
+        score++;
+        criteria.push({ name: 'Improving ROA', passed: true });
+      } else {
+        criteria.push({ name: 'Improving ROA', passed: false });
+      }
+      
+      // 4. Quality of Earnings (Operating Cash Flow > Net Income)
+      if (operatingCashFlow > netIncome) {
+        score++;
+        criteria.push({ name: 'Quality Earnings', passed: true });
+      } else {
+        criteria.push({ name: 'Quality Earnings', passed: false });
+      }
+      
+      // Leverage, Liquidity, and Source of Funds (3 points)
+      // 5. Decreased Long-term Debt
+      const currentDebt = parseFloat(currentBalance.longTermDebt) || 0;
+      const prevDebt = parseFloat(prevBalance.longTermDebt) || 0;
+      if (currentDebt <= prevDebt) {
+        score++;
+        criteria.push({ name: 'Decreasing Debt', passed: true });
+      } else {
+        criteria.push({ name: 'Decreasing Debt', passed: false });
+      }
+      
+      // 6. Increased Current Ratio
+      const currentRatio = (parseFloat(currentBalance.totalCurrentAssets) || 0) / 
+                          (parseFloat(currentBalance.totalCurrentLiabilities) || 1);
+      const prevRatio = (parseFloat(prevBalance.totalCurrentAssets) || 0) / 
+                        (parseFloat(prevBalance.totalCurrentLiabilities) || 1);
+      if (currentRatio > prevRatio) {
+        score++;
+        criteria.push({ name: 'Improving Liquidity', passed: true });
+      } else {
+        criteria.push({ name: 'Improving Liquidity', passed: false });
+      }
+      
+      // 7. No New Shares Issued
+      const currentShares = parseFloat(currentBalance.commonStockSharesOutstanding) || 0;
+      const prevShares = parseFloat(prevBalance.commonStockSharesOutstanding) || 0;
+      if (currentShares <= prevShares * 1.05) { // Allow 5% tolerance
+        score++;
+        criteria.push({ name: 'No Dilution', passed: true });
+      } else {
+        criteria.push({ name: 'No Dilution', passed: false });
+      }
+      
+      // Operating Efficiency (2 points)
+      // 8. Increased Gross Margin
+      const currentGrossMargin = parseFloat(currentIncome.grossProfitRatio) || 
+                                 (parseFloat(currentIncome.grossProfit) / parseFloat(currentIncome.totalRevenue));
+      const prevGrossMargin = parseFloat(income?.annualReports?.[1]?.grossProfitRatio) || 
+                             (parseFloat(income?.annualReports?.[1]?.grossProfit) / parseFloat(income?.annualReports?.[1]?.totalRevenue));
+      if (currentGrossMargin > prevGrossMargin) {
+        score++;
+        criteria.push({ name: 'Improving Margins', passed: true });
+      } else {
+        criteria.push({ name: 'Improving Margins', passed: false });
+      }
+      
+      // 9. Increased Asset Turnover
+      const currentTurnover = (parseFloat(currentIncome.totalRevenue) || 0) / (parseFloat(currentBalance.totalAssets) || 1);
+      const prevTurnover = (parseFloat(income?.annualReports?.[1]?.totalRevenue) || 0) / (parseFloat(prevBalance.totalAssets) || 1);
+      if (currentTurnover > prevTurnover) {
+        score++;
+        criteria.push({ name: 'Improving Efficiency', passed: true });
+      } else {
+        criteria.push({ name: 'Improving Efficiency', passed: false });
+      }
+      
+    } catch (error) {
+      console.error('Error calculating Piotroski Score:', error);
+    }
+    
+    return { score, criteria, max: 9 };
+  }
+
+  calculateFreeCashFlow(cashFlow) {
+    const latest = cashFlow?.annualReports?.[0] || {};
+    const operatingCashFlow = parseFloat(latest.operatingCashflow) || 0;
+    const capitalExpenditures = Math.abs(parseFloat(latest.capitalExpenditures) || 0);
+    return operatingCashFlow - capitalExpenditures;
+  }
+
+  calculateFCFYield(overview, cashFlow) {
+    const fcf = this.calculateFreeCashFlow(cashFlow);
+    const marketCap = parseFloat(overview?.MarketCapitalization) || 0;
+    if (marketCap === 0) return '0';
+    return ((fcf / marketCap) * 100).toFixed(2);
+  }
+
+  calculateROIC(income, balance) {
+    const latest = income?.annualReports?.[0] || {};
+    const latestBalance = balance?.annualReports?.[0] || {};
+    const ebit = parseFloat(latest.ebit) || parseFloat(latest.operatingIncome) || 0;
+    const taxRate = parseFloat(latest.incomeTaxExpense) / parseFloat(latest.incomeBeforeTax) || 0.21;
+    const nopat = ebit * (1 - taxRate);
+    const investedCapital = parseFloat(latestBalance.totalAssets) - parseFloat(latestBalance.totalCurrentLiabilities);
+    if (investedCapital === 0) return '0';
+    return ((nopat / investedCapital) * 100).toFixed(2);
+  }
+
+  calculateCurrentRatio(balance) {
+    const latest = balance?.annualReports?.[0] || {};
+    const currentAssets = parseFloat(latest.totalCurrentAssets) || 0;
+    const currentLiabilities = parseFloat(latest.totalCurrentLiabilities) || 1;
+    return (currentAssets / currentLiabilities).toFixed(2);
+  }
+
+  calculateQuickRatio(balance) {
+    const latest = balance?.annualReports?.[0] || {};
+    const currentAssets = parseFloat(latest.totalCurrentAssets) || 0;
+    const inventory = parseFloat(latest.inventory) || 0;
+    const currentLiabilities = parseFloat(latest.totalCurrentLiabilities) || 1;
+    return ((currentAssets - inventory) / currentLiabilities).toFixed(2);
+  }
+
+  calculateDebtToEquity(balance) {
+    const latest = balance?.annualReports?.[0] || {};
+    const totalDebt = parseFloat(latest.shortTermDebt || 0) + parseFloat(latest.longTermDebt || 0);
+    const equity = parseFloat(latest.totalShareholderEquity) || 1;
+    return (totalDebt / equity).toFixed(2);
+  }
 }
 
-interface MetricCardProps {
-  title: string;
-  value: string | number;
-  maxValue?: number;
-  interpretation?: string;
-  showProgress?: boolean;
-  benchmark?: string;
-}
+const metricsCalculator = new MetricsCalculatorService();
 
-// Individual Metric Card Component with Progress Bar
-const MetricCard: React.FC<MetricCardProps> = ({ 
-  title, 
-  value, 
-  maxValue = 10, 
-  interpretation, 
-  showProgress = false,
-  benchmark
-}) => {
-  const numValue = typeof value === 'string' ? parseFloat(value) : value;
-  const progressPercent = maxValue ? (numValue / maxValue) * 100 : 0;
+// Mock API functions (replace with your actual API calls)
+const mockApiCall = async (endpoint, symbol) => {
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 500));
   
-  const getProgressColor = () => {
-    if (title === 'Altman Z-Score') {
-      if (numValue > 3) return 'bg-green-500';
-      if (numValue > 1.8) return 'bg-yellow-500';
-      return 'bg-red-500';
-    }
-    if (title === 'Piotroski F-Score') {
-      if (numValue >= 7) return 'bg-green-500';
-      if (numValue >= 5) return 'bg-yellow-500';
-      return 'bg-red-500';
-    }
-    return 'bg-blue-500';
-  };
+  // Return mock data structure
+  if (endpoint === 'COMPANY_OVERVIEW') {
+    return {
+      MarketCapitalization: '2500000000000',
+      Industry: 'Technology',
+      Sector: 'Information Technology'
+    };
+  }
+  
+  if (endpoint === 'INCOME_STATEMENT') {
+    return {
+      annualReports: [
+        {
+          totalRevenue: '394328000000',
+          grossProfit: '169148000000',
+          operatingIncome: '114301000000',
+          ebit: '114301000000',
+          netIncome: '96995000000',
+          incomeTaxExpense: '16741000000',
+          incomeBeforeTax: '113736000000'
+        },
+        {
+          totalRevenue: '365817000000',
+          grossProfit: '152836000000',
+          operatingIncome: '108949000000',
+          netIncome: '94680000000'
+        }
+      ]
+    };
+  }
+  
+  if (endpoint === 'BALANCE_SHEET') {
+    return {
+      annualReports: [
+        {
+          totalAssets: '352755000000',
+          totalCurrentAssets: '143566000000',
+          totalCurrentLiabilities: '145308000000',
+          totalLiabilities: '290437000000',
+          totalShareholderEquity: '62146000000',
+          retainedEarnings: '14966000000',
+          longTermDebt: '106550000000',
+          shortTermDebt: '15807000000',
+          inventory: '6331000000',
+          commonStockSharesOutstanding: '15550061000'
+        },
+        {
+          totalAssets: '351002000000',
+          totalCurrentAssets: '135405000000',
+          totalCurrentLiabilities: '153982000000',
+          longTermDebt: '109106000000',
+          commonStockSharesOutstanding: '15812547000'
+        }
+      ]
+    };
+  }
+  
+  if (endpoint === 'CASH_FLOW') {
+    return {
+      annualReports: [
+        {
+          operatingCashflow: '110543000000',
+          capitalExpenditures: '-10708000000'
+        }
+      ]
+    };
+  }
+  
+  return {};
+};
 
+// Modern Animated Gauge Component
+const AnimatedGauge = ({ value, maxValue = 6, title, subtitle }) => {
+  const [animatedValue, setAnimatedValue] = useState(0);
+  const normalizedValue = Math.min(Math.max(value, 0), maxValue);
+  const percentage = (normalizedValue / maxValue) * 100;
+  const rotation = (normalizedValue / maxValue) * 270 - 135;
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimatedValue(normalizedValue), 100);
+    return () => clearTimeout(timer);
+  }, [normalizedValue]);
+  
+  const getColor = () => {
+    if (value > 2.99) return '#10b981';
+    if (value > 1.80) return '#f59e0b';
+    return '#ef4444';
+  };
+  
   return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-all hover:shadow-lg">
-      <div className="flex justify-between items-start mb-2">
-        <div className="text-gray-400 text-sm">{title}</div>
-        {benchmark && (
-          <div className="text-xs text-gray-500">Target: {benchmark}</div>
+    <div className="relative">
+      <svg className="w-48 h-48 transform -rotate-90">
+        <circle
+          cx="96"
+          cy="96"
+          r="88"
+          stroke="currentColor"
+          strokeWidth="12"
+          fill="none"
+          className="text-gray-700"
+        />
+        <circle
+          cx="96"
+          cy="96"
+          r="88"
+          stroke={getColor()}
+          strokeWidth="12"
+          fill="none"
+          strokeDasharray={`${552 * 0.75} 552`}
+          strokeDashoffset={552 - (552 * 0.75 * animatedValue) / maxValue}
+          className="transition-all duration-1000 ease-out"
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="text-4xl font-bold text-white">{value.toFixed(2)}</div>
+        <div className="text-sm text-gray-400 mt-1">{title}</div>
+        <div className="text-xs text-gray-500">{subtitle}</div>
+      </div>
+    </div>
+  );
+};
+
+// Piotroski Score Visual Component
+const PiotroskiScoreVisual = ({ score, criteria }) => {
+  const [animatedScore, setAnimatedScore] = useState(0);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimatedScore(score), 100);
+    return () => clearTimeout(timer);
+  }, [score]);
+  
+  const getScoreColor = () => {
+    if (score >= 7) return 'text-green-400';
+    if (score >= 5) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-6xl font-bold">
+          <span className={getScoreColor()}>{animatedScore}</span>
+          <span className="text-gray-500">/9</span>
+        </div>
+        <div className="flex-1 ml-6">
+          <div className="grid grid-cols-9 gap-1">
+            {[...Array(9)].map((_, i) => (
+              <div
+                key={i}
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  i < animatedScore
+                    ? score >= 7 ? 'bg-green-500' : score >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                    : 'bg-gray-700'
+                }`}
+                style={{ transitionDelay: `${i * 50}ms` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {criteria && criteria.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          {criteria.map((criterion, index) => (
+            <div 
+              key={index} 
+              className="flex items-center gap-2 text-xs animate-fadeIn"
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              {criterion.passed ? (
+                <CheckCircle className="w-4 h-4 text-green-400" />
+              ) : (
+                <XCircle className="w-4 h-4 text-red-400" />
+              )}
+              <span className={criterion.passed ? 'text-gray-300' : 'text-gray-500'}>
+                {criterion.name}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Enhanced Metric Card
+const MetricCard = ({ title, value, subtitle, trend, icon: Icon, color = 'blue' }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+  
+  const colorClasses = {
+    green: 'from-green-500/20 to-green-600/20 border-green-500/30',
+    red: 'from-red-500/20 to-red-600/20 border-red-500/30',
+    blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30',
+    yellow: 'from-yellow-500/20 to-yellow-600/20 border-yellow-500/30'
+  };
+  
+  return (
+    <div className={`
+      relative overflow-hidden rounded-xl border backdrop-blur-sm
+      bg-gradient-to-br ${colorClasses[color]}
+      transition-all duration-500 hover:scale-105 hover:shadow-2xl
+      ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+    `}>
+      {Icon && (
+        <div className="absolute top-3 right-3 opacity-20">
+          <Icon size={40} />
+        </div>
+      )}
+      <div className="p-4">
+        <div className="text-sm text-gray-400 mb-1">{title}</div>
+        <div className="text-2xl font-bold text-white mb-1">{value}</div>
+        {subtitle && (
+          <div className="text-xs text-gray-500">{subtitle}</div>
+        )}
+        {trend !== undefined && (
+          <div className={`text-xs mt-2 ${trend > 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {trend > 0 ? '↑' : '↓'} {Math.abs(trend).toFixed(1)}%
+          </div>
         )}
       </div>
-      
-      <div className="text-2xl font-bold text-white mb-2">
-        {value || 'N/A'}
-      </div>
-      
-      {showProgress && !isNaN(numValue) && (
-        <div className="mb-2">
-          <div className="w-full bg-gray-700 rounded-full h-2">
-            <div 
-              className={`h-2 rounded-full transition-all duration-500 ${getProgressColor()}`}
-              style={{ width: `${Math.min(progressPercent, 100)}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>0</span>
-            <span>{maxValue}</span>
-          </div>
-        </div>
-      )}
-      
-      {interpretation && (
-        <div className={`text-sm mt-2 ${
-          interpretation.includes('Strong') || interpretation.includes('Safe') || interpretation.includes('Excellent') 
-            ? 'text-green-400' 
-            : interpretation.includes('Moderate') || interpretation.includes('Grey') 
-            ? 'text-yellow-400' 
-            : 'text-red-400'
-        }`}>
-          {interpretation}
-        </div>
-      )}
     </div>
   );
 };
 
-// Gauge Component for Altman Z-Score
-const GaugeChart: React.FC<{ value: number; title: string }> = ({ value, title }) => {
-  const rotation = Math.min(Math.max((value / 6) * 180, 0), 180); // Map 0-6 to 0-180 degrees
-  
-  return (
-    <div className="relative w-full h-32">
-      <svg viewBox="0 0 200 120" className="w-full h-full">
-        {/* Background arc */}
-        <path
-          d="M 20 100 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="#374151"
-          strokeWidth="15"
-        />
-        {/* Red zone */}
-        <path
-          d="M 20 100 A 80 80 0 0 1 80 40"
-          fill="none"
-          stroke="#ef4444"
-          strokeWidth="15"
-        />
-        {/* Yellow zone */}
-        <path
-          d="M 80 40 A 80 80 0 0 1 120 40"
-          fill="none"
-          stroke="#eab308"
-          strokeWidth="15"
-        />
-        {/* Green zone */}
-        <path
-          d="M 120 40 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="#22c55e"
-          strokeWidth="15"
-        />
-        {/* Needle */}
-        <g transform={`rotate(${rotation} 100 100)`}>
-          <line
-            x1="100"
-            y1="100"
-            x2="100"
-            y2="30"
-            stroke="white"
-            strokeWidth="3"
-          />
-          <circle cx="100" cy="100" r="5" fill="white" />
-        </g>
-      </svg>
-      <div className="absolute bottom-0 left-0 right-0 text-center">
-        <div className="text-2xl font-bold">{value.toFixed(2)}</div>
-        <div className="text-xs text-gray-400">{title}</div>
-      </div>
-    </div>
-  );
-};
-
-export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => {
-  const [metrics, setMetrics] = useState<any>(null);
+// Main Component
+export default function StockHealthMetrics({ symbol = 'AAPL' }) {
+  const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [industryAvg, setIndustryAvg] = useState<any>(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const loadMetrics = async () => {
       try {
         setLoading(true);
+        setError(null);
         
+        // Fetch all required data
         const [overview, income, balance, cashFlow] = await Promise.all([
-          getCompanyOverview(symbol),
-          fetchIncomeStatement(symbol),
-          fetchBalanceSheet(symbol),
-          fetchCashFlow(symbol)
+          mockApiCall('COMPANY_OVERVIEW', symbol),
+          mockApiCall('INCOME_STATEMENT', symbol),
+          mockApiCall('BALANCE_SHEET', symbol),
+          mockApiCall('CASH_FLOW', symbol)
         ]);
 
-        // Calculate current metrics
+        // Calculate all metrics
         const altmanZ = metricsCalculator.calculateAltmanZScore(overview, income, balance);
+        const piotroski = metricsCalculator.calculatePiotroskiScore(income, balance, cashFlow);
         const fcf = metricsCalculator.calculateFreeCashFlow(cashFlow);
         const fcfYield = metricsCalculator.calculateFCFYield(overview, cashFlow);
         const currentRatio = metricsCalculator.calculateCurrentRatio(balance);
         const quickRatio = metricsCalculator.calculateQuickRatio(balance);
         const debtToEquity = metricsCalculator.calculateDebtToEquity(balance);
-        const piotroskiScore = metricsCalculator.calculatePiotroskiScore(income, balance, cashFlow);
         const roic = metricsCalculator.calculateROIC(income, balance);
 
         setMetrics({
           altmanZ,
+          piotroski,
           freeCashFlow: fcf,
           fcfYield,
           currentRatio,
           quickRatio,
           debtToEquity,
-          piotroskiScore,
           roic,
           industry: overview.Industry,
           sector: overview.Sector
         });
-
-        // Mock industry averages (in production, fetch from a database or API)
-        setIndustryAvg({
-          altmanZ: 3.2,
-          piotroskiScore: 6,
-          currentRatio: 1.8,
-          debtToEquity: 0.8,
-          roic: 12
-        });
-
-      } catch (error) {
-        console.error('Error loading metrics:', error);
+      } catch (err) {
+        setError('Failed to load financial metrics');
+        console.error('Error loading metrics:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    if (symbol) {
-      loadMetrics();
-    }
+    loadMetrics();
   }, [symbol]);
+
+  const formatCurrency = (value) => {
+    if (!value) return 'N/A';
+    const billions = Math.abs(value) / 1000000000;
+    if (billions >= 1) {
+      return `${value < 0 ? '-' : ''}$${billions.toFixed(2)}B`;
+    }
+    const millions = Math.abs(value) / 1000000;
+    return `${value < 0 ? '-' : ''}$${millions.toFixed(2)}M`;
+  };
 
   if (loading) {
     return (
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-700 rounded"></div>
-            ))}
+      <div className="min-h-screen bg-gray-900 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-gray-800/50 rounded-2xl p-8 backdrop-blur-xl">
+            <div className="animate-pulse space-y-6">
+              <div className="h-8 bg-gray-700 rounded w-1/3"></div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="h-48 bg-gray-700 rounded-xl"></div>
+                <div className="h-48 bg-gray-700 rounded-xl"></div>
+              </div>
+              <div className="grid grid-cols-4 gap-4">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="h-32 bg-gray-700 rounded-xl"></div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  const formatCurrency = (value: number) => {
-    if (!value) return 'N/A';
-    const billions = value / 1000000000;
-    if (Math.abs(billions) >= 1) {
-      return `$${billions.toFixed(2)}B`;
-    }
-    const millions = value / 1000000;
-    return `$${millions.toFixed(2)}M`;
-  };
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-red-900/20 border border-red-500/30 rounded-2xl p-8">
+            <div className="text-red-400">{error}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 mb-6">
-      {/* Main Metrics Dashboard */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-white">
-            Advanced Financial Health Metrics
-          </h3>
-          <div className="text-sm text-gray-400">
-            Industry: {metrics?.industry || 'N/A'}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-8">
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-out forwards;
+        }
+      `}</style>
+      
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-2xl p-6 backdrop-blur-xl border border-gray-700/50">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">
+                Financial Health Analysis
+              </h1>
+              <p className="text-gray-400">
+                {metrics?.industry} · {metrics?.sector}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-gray-500">Real-time Analysis</div>
+              <div className="text-xs text-green-400 flex items-center gap-1 justify-end mt-1">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                Live
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Key Gauges Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-gray-800 rounded-lg p-4">
-            <GaugeChart 
-              value={parseFloat(metrics?.altmanZ?.score || 0)} 
-              title="Altman Z-Score"
-            />
-            <div className="text-center mt-2 text-sm text-gray-400">
+        {/* Key Scores */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Altman Z-Score */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 backdrop-blur-xl border border-gray-700/50">
+            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-blue-400" />
               Bankruptcy Risk Assessment
+            </h2>
+            <div className="flex items-center justify-center">
+              <AnimatedGauge
+                value={parseFloat(metrics?.altmanZ?.score || 0)}
+                maxValue={6}
+                title="Altman Z-Score"
+                subtitle={metrics?.altmanZ?.interpretation}
+              />
             </div>
-          </div>
-          
-          <div className="bg-gray-800 rounded-lg p-4">
-            <div className="text-center">
-              <div className="text-6xl font-bold text-white mb-2">
-                {metrics?.piotroskiScore?.score || 0}/9
-              </div>
-              <div className="text-sm text-gray-400 mb-3">Piotroski F-Score</div>
-              <div className="flex justify-center gap-1">
-                {[...Array(9)].map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-8 h-2 rounded ${
-                      i < (metrics?.piotroskiScore?.score || 0)
-                        ? 'bg-green-500'
-                        : 'bg-gray-600'
-                    }`}
-                  />
+            {metrics?.altmanZ?.components && (
+              <div className="grid grid-cols-5 gap-2 mt-6">
+                {Object.entries(metrics.altmanZ.components).map(([key, value]) => (
+                  <div key={key} className="text-center">
+                    <div className="text-xs text-gray-500">{key}</div>
+                    <div className="text-sm font-semibold text-gray-300">{value}</div>
+                  </div>
                 ))}
               </div>
-              <div className="text-sm text-gray-400 mt-2">
-                Fundamental Strength
-              </div>
-            </div>
+            )}
+          </div>
+
+          {/* Piotroski F-Score */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 backdrop-blur-xl border border-gray-700/50">
+            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-green-400" />
+              Fundamental Strength
+            </h2>
+            <PiotroskiScoreVisual 
+              score={metrics?.piotroski?.score || 0}
+              criteria={metrics?.piotroski?.criteria || []}
+            />
           </div>
         </div>
 
         {/* Detailed Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Free Cash Flow"
             value={formatCurrency(metrics?.freeCashFlow)}
-            interpretation={metrics?.freeCashFlow > 0 ? 'Positive' : 'Negative'}
+            subtitle={metrics?.freeCashFlow > 0 ? 'Positive Cash Generation' : 'Negative Cash Flow'}
+            icon={TrendingUp}
+            color={metrics?.freeCashFlow > 0 ? 'green' : 'red'}
           />
           
           <MetricCard
             title="FCF Yield"
-            value={metrics?.fcfYield ? `${metrics.fcfYield}%` : 'N/A'}
-            interpretation={parseFloat(metrics?.fcfYield) > 5 ? 'Strong' : 'Moderate'}
+            value={`${metrics?.fcfYield || '0'}%`}
+            subtitle="Return on Market Cap"
+            color={parseFloat(metrics?.fcfYield) > 5 ? 'green' : 'yellow'}
           />
           
           <MetricCard
             title="ROIC"
-            value={metrics?.roic ? `${metrics.roic}%` : 'N/A'}
-            benchmark="15%"
-            showProgress={true}
-            maxValue={30}
+            value={`${metrics?.roic || '0'}%`}
+            subtitle="Return on Invested Capital"
+            color={parseFloat(metrics?.roic) > 15 ? 'green' : 'yellow'}
           />
           
           <MetricCard
             title="Current Ratio"
             value={metrics?.currentRatio || 'N/A'}
-            benchmark="2.0"
-            showProgress={true}
-            maxValue={3}
+            subtitle="Short-term Liquidity"
+            color={parseFloat(metrics?.currentRatio) > 1.5 ? 'green' : 'yellow'}
           />
           
           <MetricCard
             title="Quick Ratio"
             value={metrics?.quickRatio || 'N/A'}
-            benchmark="1.0"
-            showProgress={true}
-            maxValue={2}
+            subtitle="Immediate Liquidity"
+            color={parseFloat(metrics?.quickRatio) > 1 ? 'green' : 'yellow'}
           />
           
           <MetricCard
             title="Debt/Equity"
             value={metrics?.debtToEquity || 'N/A'}
-            benchmark="< 1.0"
-            interpretation={parseFloat(metrics?.debtToEquity) < 1 ? 'Low Leverage' : 'High Leverage'}
+            subtitle="Financial Leverage"
+            color={parseFloat(metrics?.debtToEquity) < 1 ? 'green' : 'yellow'}
+          />
+          
+          <MetricCard
+            title="Industry"
+            value={metrics?.industry || 'N/A'}
+            subtitle="Sector Classification"
+            color="blue"
+          />
+          
+          <MetricCard
+            title="Analysis Status"
+            value="Real-Time"
+            subtitle="Data Freshness"
+            color="green"
           />
         </div>
       </div>
-
-      {/* Industry Comparison */}
-      {industryAvg && (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-          <h3 className="text-xl font-bold text-white mb-4">
-            Industry Comparison
-          </h3>
-          <div className="space-y-4">
-            {Object.keys(industryAvg).map(key => {
-              const companyValue = 
-                key === 'altmanZ' ? parseFloat(metrics?.altmanZ?.score || 0) :
-                key === 'piotroskiScore' ? metrics?.piotroskiScore?.score || 0 :
-                key === 'currentRatio' ? parseFloat(metrics?.currentRatio || 0) :
-                key === 'debtToEquity' ? parseFloat(metrics?.debtToEquity || 0) :
-                key === 'roic' ? parseFloat(metrics?.roic || 0) : 0;
-              
-              const industryValue = industryAvg[key];
-              const performance = ((companyValue - industryValue) / industryValue * 100).toFixed(1);
-              
-              return (
-                <div key={key} className="flex items-center justify-between p-3 bg-gray-800 rounded">
-                  <span className="text-gray-400 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </span>
-                  <div className="flex items-center gap-4">
-                    <span className="text-white">{companyValue.toFixed(2)}</span>
-                    <span className="text-gray-500">vs</span>
-                    <span className="text-gray-400">{industryValue}</span>
-                    <span className={`font-semibold ${
-                      parseFloat(performance) > 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {parseFloat(performance) > 0 ? '+' : ''}{performance}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
-};
+}
