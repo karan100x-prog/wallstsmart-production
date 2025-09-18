@@ -1,5 +1,5 @@
 // services/metricsCalculator.ts
-// Complete fixed metrics calculator for WallStSmart
+// Verified financial metrics calculator with correct formulas
 
 interface CompanyOverview {
   MarketCapitalization?: string;
@@ -41,6 +41,8 @@ interface BalanceSheet {
     currentLongTermDebt?: string;
     totalNonCurrentLiabilities?: string;
     longTermDebt?: string;
+    longTermDebtNoncurrent?: string;
+    shortLongTermDebtTotal?: string;
     totalShareholderEquity?: string;
     retainedEarnings?: string;
     commonStock?: string;
@@ -72,14 +74,22 @@ class MetricsCalculator {
     return isNaN(parsed) ? 0 : parsed;
   }
 
-  // Calculate Altman Z-Score for public companies
+  /**
+   * ALTMAN Z-SCORE (for public companies)
+   * Formula: Z = 1.2A + 1.4B + 3.3C + 0.6D + 1.0E
+   * Where:
+   * A = Working Capital / Total Assets
+   * B = Retained Earnings / Total Assets
+   * C = EBIT / Total Assets
+   * D = Market Value of Equity / Total Liabilities
+   * E = Sales / Total Assets
+   */
   calculateAltmanZScore(
     overview: CompanyOverview,
     income: IncomeStatement,
     balance: BalanceSheet
   ): { score: string; interpretation: string; components: any } {
     try {
-      // Get the most recent annual reports
       const latestBalance = balance?.annualReports?.[0];
       const latestIncome = income?.annualReports?.[0];
       
@@ -99,15 +109,15 @@ class MetricsCalculator {
       const retainedEarnings = this.parseFloat(latestBalance.retainedEarnings);
       const revenue = this.parseFloat(latestIncome.totalRevenue);
       
-      // For EBIT, try multiple fields in order of preference
+      // EBIT calculation - try multiple fields
       const ebit = this.parseFloat(latestIncome.ebit) || 
                    this.parseFloat(latestIncome.operatingIncome) ||
-                   this.parseFloat(latestIncome.ebitda);
+                   (this.parseFloat(latestIncome.incomeBeforeTax) + this.parseFloat(latestIncome.incomeTaxExpense));
       
-      // Market capitalization from overview
+      // Market capitalization
       const marketCap = this.parseFloat(overview?.MarketCapitalization);
       
-      // Avoid division by zero
+      // Validation
       if (totalAssets === 0) {
         return {
           score: '0.00',
@@ -116,34 +126,25 @@ class MetricsCalculator {
         };
       }
 
-      // Calculate Altman Z-Score components
+      // Calculate components
       const workingCapital = currentAssets - currentLiabilities;
       
-      // A = Working Capital / Total Assets
       const A = workingCapital / totalAssets;
-      
-      // B = Retained Earnings / Total Assets
       const B = retainedEarnings / totalAssets;
-      
-      // C = EBIT / Total Assets
       const C = ebit / totalAssets;
-      
-      // D = Market Value of Equity / Total Liabilities
       const D = totalLiabilities > 0 ? (marketCap / totalLiabilities) : 0;
-      
-      // E = Sales / Total Assets
       const E = revenue / totalAssets;
       
-      // Calculate Z-Score using the Altman formula weights
+      // Calculate Z-Score
       const zScore = (1.2 * A) + (1.4 * B) + (3.3 * C) + (0.6 * D) + (1.0 * E);
       
-      // Interpret the score
+      // Interpretation
       let interpretation = '';
       if (zScore > 2.99) {
         interpretation = 'Safe Zone - Low Bankruptcy Risk';
-      } else if (zScore >= 1.81 && zScore <= 2.99) {
+      } else if (zScore >= 1.81) {
         interpretation = 'Grey Zone - Moderate Risk';
-      } else if (zScore < 1.81) {
+      } else {
         interpretation = 'Distress Zone - High Bankruptcy Risk';
       }
 
@@ -171,7 +172,10 @@ class MetricsCalculator {
     }
   }
 
-  // Calculate Piotroski F-Score
+  /**
+   * PIOTROSKI F-SCORE
+   * 9-point scoring system for fundamental strength
+   */
   calculatePiotroskiScore(
     income: IncomeStatement,
     balance: BalanceSheet,
@@ -181,7 +185,6 @@ class MetricsCalculator {
     const criteria: Array<{ name: string; passed: boolean }> = [];
     
     try {
-      // Get current and previous year data
       const currentIncome = income?.annualReports?.[0];
       const prevIncome = income?.annualReports?.[1];
       const currentBalance = balance?.annualReports?.[0];
@@ -192,7 +195,9 @@ class MetricsCalculator {
         return { score: 0, criteria: [] };
       }
 
-      // 1. Positive Net Income (Profitability)
+      // === PROFITABILITY SIGNALS (4 points) ===
+      
+      // 1. Net Income > 0
       const netIncome = this.parseFloat(currentIncome.netIncome);
       if (netIncome > 0) {
         score++;
@@ -201,16 +206,16 @@ class MetricsCalculator {
         criteria.push({ name: 'Positive Net Income', passed: false });
       }
 
-      // 2. Positive Operating Cash Flow
+      // 2. Operating Cash Flow > 0
       const operatingCashFlow = this.parseFloat(currentCashFlow.operatingCashflow);
       if (operatingCashFlow > 0) {
         score++;
-        criteria.push({ name: 'Positive Operating Cash Flow', passed: true });
+        criteria.push({ name: 'Positive Cash Flow', passed: true });
       } else {
-        criteria.push({ name: 'Positive Operating Cash Flow', passed: false });
+        criteria.push({ name: 'Positive Cash Flow', passed: false });
       }
 
-      // 3. Increasing ROA (Return on Assets)
+      // 3. ROA increasing
       if (prevIncome && prevBalance) {
         const currentAssets = this.parseFloat(currentBalance.totalAssets);
         const prevAssets = this.parseFloat(prevBalance.totalAssets);
@@ -227,7 +232,7 @@ class MetricsCalculator {
         }
       }
 
-      // 4. Quality of Earnings (Operating Cash Flow > Net Income)
+      // 4. Quality of Earnings (OCF > Net Income)
       if (operatingCashFlow > netIncome) {
         score++;
         criteria.push({ name: 'Quality Earnings', passed: true });
@@ -235,10 +240,14 @@ class MetricsCalculator {
         criteria.push({ name: 'Quality Earnings', passed: false });
       }
 
-      // 5. Decreasing Long-term Debt
+      // === LEVERAGE, LIQUIDITY & SOURCE OF FUNDS (3 points) ===
+      
+      // 5. Long-term Debt decreasing
       if (prevBalance) {
-        const currentLTDebt = this.parseFloat(currentBalance.longTermDebt);
-        const prevLTDebt = this.parseFloat(prevBalance.longTermDebt);
+        const currentLTDebt = this.parseFloat(currentBalance.longTermDebt) || 
+                              this.parseFloat(currentBalance.longTermDebtNoncurrent) || 0;
+        const prevLTDebt = this.parseFloat(prevBalance.longTermDebt) || 
+                           this.parseFloat(prevBalance.longTermDebtNoncurrent) || 0;
         
         if (currentLTDebt <= prevLTDebt) {
           score++;
@@ -248,7 +257,7 @@ class MetricsCalculator {
         }
       }
 
-      // 6. Increasing Current Ratio
+      // 6. Current Ratio increasing
       if (prevBalance) {
         const currentCA = this.parseFloat(currentBalance.totalCurrentAssets);
         const currentCL = this.parseFloat(currentBalance.totalCurrentLiabilities);
@@ -266,12 +275,13 @@ class MetricsCalculator {
         }
       }
 
-      // 7. No New Shares Issued
+      // 7. No new shares issued
       if (prevBalance) {
         const currentShares = this.parseFloat(currentBalance.commonStockSharesOutstanding);
         const prevShares = this.parseFloat(prevBalance.commonStockSharesOutstanding);
         
-        if (currentShares <= prevShares * 1.05) { // Allow 5% tolerance
+        // Allow 2% tolerance for rounding/splits
+        if (currentShares <= prevShares * 1.02) {
           score++;
           criteria.push({ name: 'No Dilution', passed: true });
         } else {
@@ -279,7 +289,9 @@ class MetricsCalculator {
         }
       }
 
-      // 8. Increasing Gross Margin
+      // === OPERATING EFFICIENCY (2 points) ===
+      
+      // 8. Gross Margin increasing
       if (prevIncome) {
         const currentRevenue = this.parseFloat(currentIncome.totalRevenue);
         const currentGrossProfit = this.parseFloat(currentIncome.grossProfit);
@@ -297,7 +309,7 @@ class MetricsCalculator {
         }
       }
 
-      // 9. Increasing Asset Turnover
+      // 9. Asset Turnover increasing
       if (prevIncome && prevBalance) {
         const currentRevenue = this.parseFloat(currentIncome.totalRevenue);
         const currentAssets = this.parseFloat(currentBalance.totalAssets);
@@ -322,13 +334,17 @@ class MetricsCalculator {
     return { score, criteria };
   }
 
-  // Calculate Free Cash Flow
+  /**
+   * FREE CASH FLOW
+   * Formula: Operating Cash Flow - Capital Expenditures
+   */
   calculateFreeCashFlow(cashFlow: CashFlow): number {
     try {
       const latest = cashFlow?.annualReports?.[0];
       if (!latest) return 0;
       
       const operatingCashFlow = this.parseFloat(latest.operatingCashflow);
+      // Capital expenditures are typically negative in cash flow statements
       const capitalExpenditures = Math.abs(this.parseFloat(latest.capitalExpenditures));
       
       return operatingCashFlow - capitalExpenditures;
@@ -338,7 +354,10 @@ class MetricsCalculator {
     }
   }
 
-  // Calculate FCF Yield
+  /**
+   * FREE CASH FLOW YIELD
+   * Formula: (Free Cash Flow / Market Capitalization) × 100
+   */
   calculateFCFYield(overview: CompanyOverview, cashFlow: CashFlow): string {
     try {
       const fcf = this.calculateFreeCashFlow(cashFlow);
@@ -354,7 +373,12 @@ class MetricsCalculator {
     }
   }
 
-  // Calculate ROIC (Return on Invested Capital)
+  /**
+   * RETURN ON INVESTED CAPITAL (ROIC)
+   * Formula: NOPAT / Invested Capital
+   * NOPAT = EBIT × (1 - Tax Rate)
+   * Invested Capital = Total Assets - Current Liabilities (excluding short-term debt) + Short-term Debt
+   */
   calculateROIC(income: IncomeStatement, balance: BalanceSheet): string {
     try {
       const latestIncome = income?.annualReports?.[0];
@@ -362,24 +386,26 @@ class MetricsCalculator {
       
       if (!latestIncome || !latestBalance) return '0.00';
       
-      // Get EBIT (or Operating Income as fallback)
+      // Get EBIT
       const ebit = this.parseFloat(latestIncome.ebit) || 
-                   this.parseFloat(latestIncome.operatingIncome) || 0;
+                   this.parseFloat(latestIncome.operatingIncome) ||
+                   (this.parseFloat(latestIncome.incomeBeforeTax) + this.parseFloat(latestIncome.incomeTaxExpense));
       
-      // Calculate tax rate
+      // Calculate effective tax rate
       const incomeBeforeTax = this.parseFloat(latestIncome.incomeBeforeTax);
       const incomeTaxExpense = this.parseFloat(latestIncome.incomeTaxExpense);
-      const taxRate = incomeBeforeTax > 0 ? incomeTaxExpense / incomeBeforeTax : 0.21; // Default 21% if can't calculate
+      const taxRate = incomeBeforeTax > 0 ? incomeTaxExpense / incomeBeforeTax : 0.21;
       
-      // NOPAT (Net Operating Profit After Tax)
+      // NOPAT
       const nopat = ebit * (1 - taxRate);
       
-      // Invested Capital = Total Assets - Current Liabilities (excluding short-term debt)
+      // Invested Capital = Total Assets - Non-interest bearing current liabilities
       const totalAssets = this.parseFloat(latestBalance.totalAssets);
       const currentLiabilities = this.parseFloat(latestBalance.totalCurrentLiabilities);
       const shortTermDebt = this.parseFloat(latestBalance.shortTermDebt) || 0;
       
-      const investedCapital = totalAssets - (currentLiabilities - shortTermDebt);
+      // Add back short-term debt to invested capital (it's interest-bearing)
+      const investedCapital = totalAssets - currentLiabilities + shortTermDebt;
       
       if (investedCapital <= 0) return '0.00';
       
@@ -391,7 +417,11 @@ class MetricsCalculator {
     }
   }
 
-  // Calculate Current Ratio
+  /**
+   * CURRENT RATIO
+   * Formula: Current Assets / Current Liabilities
+   * Good benchmark: > 1.5
+   */
   calculateCurrentRatio(balance: BalanceSheet): string {
     try {
       const latest = balance?.annualReports?.[0];
@@ -400,7 +430,7 @@ class MetricsCalculator {
       const currentAssets = this.parseFloat(latest.totalCurrentAssets);
       const currentLiabilities = this.parseFloat(latest.totalCurrentLiabilities);
       
-      if (currentLiabilities === 0) return '0.00';
+      if (currentLiabilities === 0) return '999.99';
       
       return (currentAssets / currentLiabilities).toFixed(2);
     } catch (error) {
@@ -409,17 +439,21 @@ class MetricsCalculator {
     }
   }
 
-  // Calculate Quick Ratio (Acid Test)
+  /**
+   * QUICK RATIO (ACID TEST)
+   * Formula: (Current Assets - Inventory) / Current Liabilities
+   * Good benchmark: > 1.0
+   */
   calculateQuickRatio(balance: BalanceSheet): string {
     try {
       const latest = balance?.annualReports?.[0];
       if (!latest) return '0.00';
       
       const currentAssets = this.parseFloat(latest.totalCurrentAssets);
-      const inventory = this.parseFloat(latest.inventory);
+      const inventory = this.parseFloat(latest.inventory) || 0;
       const currentLiabilities = this.parseFloat(latest.totalCurrentLiabilities);
       
-      if (currentLiabilities === 0) return '0.00';
+      if (currentLiabilities === 0) return '999.99';
       
       const quickAssets = currentAssets - inventory;
       return (quickAssets / currentLiabilities).toFixed(2);
@@ -429,25 +463,86 @@ class MetricsCalculator {
     }
   }
 
-  // Calculate Debt-to-Equity Ratio
+  /**
+   * DEBT-TO-EQUITY RATIO
+   * Formula: Total Debt / Total Shareholders' Equity
+   * 
+   * CORRECTED: We should use TOTAL LIABILITIES or TOTAL DEBT, not just long-term debt
+   * 
+   * Option 1 (Conservative): Total Liabilities / Shareholders' Equity
+   * Option 2 (Traditional): (Short-term Debt + Long-term Debt) / Shareholders' Equity
+   * 
+   * Good benchmark: < 1.0 (varies by industry)
+   */
   calculateDebtToEquity(balance: BalanceSheet): string {
     try {
       const latest = balance?.annualReports?.[0];
       if (!latest) return '0.00';
       
+      // Method 1: Using Total Liabilities (most conservative)
+      // const totalLiabilities = this.parseFloat(latest.totalLiabilities);
+      
+      // Method 2: Using only interest-bearing debt (more accurate)
+      // This is the preferred method as it focuses on actual debt, not all liabilities
       const shortTermDebt = this.parseFloat(latest.shortTermDebt) || 0;
       const currentLongTermDebt = this.parseFloat(latest.currentLongTermDebt) || 0;
-      const longTermDebt = this.parseFloat(latest.longTermDebt) || 0;
-      const totalDebt = shortTermDebt + currentLongTermDebt + longTermDebt;
+      const longTermDebt = this.parseFloat(latest.longTermDebt) || 
+                           this.parseFloat(latest.longTermDebtNoncurrent) || 0;
       
-      const equity = this.parseFloat(latest.totalShareholderEquity);
+      // Some companies report shortLongTermDebtTotal which includes everything
+      const totalDebtAlternative = this.parseFloat(latest.shortLongTermDebtTotal);
       
-      if (equity === 0) return '999.99'; // Max value for infinite debt/equity
+      // Use the alternative total if available, otherwise sum components
+      const totalDebt = totalDebtAlternative || (shortTermDebt + currentLongTermDebt + longTermDebt);
       
-      return (totalDebt / equity).toFixed(2);
+      const shareholderEquity = this.parseFloat(latest.totalShareholderEquity);
+      
+      // Handle edge cases
+      if (shareholderEquity === 0) {
+        return '999.99'; // Infinite or undefined
+      }
+      
+      if (shareholderEquity < 0) {
+        // Negative equity is a serious red flag
+        return '-999.99';
+      }
+      
+      const debtToEquity = totalDebt / shareholderEquity;
+      
+      // Cap at reasonable maximum for display
+      if (debtToEquity > 999.99) {
+        return '999.99';
+      }
+      
+      return debtToEquity.toFixed(2);
     } catch (error) {
       console.error('Error calculating Debt to Equity:', error);
       return '0.00';
+    }
+  }
+
+  /**
+   * Additional helper method to get interpretation for Debt/Equity ratio
+   */
+  getDebtToEquityInterpretation(debtToEquity: string): string {
+    const value = parseFloat(debtToEquity);
+    
+    if (value < 0) {
+      return 'Negative Equity - Critical';
+    } else if (value === 0) {
+      return 'No Debt - Excellent';
+    } else if (value < 0.3) {
+      return 'Very Low Leverage - Conservative';
+    } else if (value < 0.5) {
+      return 'Low Leverage - Strong';
+    } else if (value < 1.0) {
+      return 'Moderate Leverage - Healthy';
+    } else if (value < 2.0) {
+      return 'High Leverage - Monitor';
+    } else if (value < 5.0) {
+      return 'Very High Leverage - Risky';
+    } else {
+      return 'Excessive Leverage - Critical';
     }
   }
 }
