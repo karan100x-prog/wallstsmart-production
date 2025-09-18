@@ -383,55 +383,54 @@ const formatOwnershipPercent = (value: any) => {
           </div>
         </div>
 
-        {/* RIGHT SIDE: Ownership & Short Interest */}
-<div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-  <h3 className="text-xl font-bold mb-4">Ownership & Short Interest</h3>
-  <div className="grid grid-cols-1 gap-4">
-    <div className="flex justify-between">
-      <span className="text-gray-400 text-sm">Institutional Ownership</span>
-      <span className="text-lg font-semibold">
-        {formatOwnershipPercent(company?.PercentInstitutions)}
-      </span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-400 text-sm">Insider Ownership</span>
-      <span className="text-lg font-semibold">
-        {formatOwnershipPercent(company?.PercentInsiders)}
-      </span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-400 text-sm">Shares Outstanding</span>
-      <span className="text-lg font-semibold">
-        {formatLargeNumber(parseFloat(company?.SharesOutstanding || '0'))}
-      </span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-400 text-sm">Float</span>
-      <span className="text-lg font-semibold">
-        {formatLargeNumber(parseFloat(company?.SharesFloat || '0'))}
-      </span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-400 text-sm">Short Interest</span>
-      <span className="text-lg font-semibold">
-        {formatLargeNumber(parseFloat(company?.SharesShort || '0'))}
-      </span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-400 text-sm">Short % of Float</span>
-      <span className="text-lg font-semibold">
-        {formatPercent(company?.ShortPercentFloat)}
-      </span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-400 text-sm">Short Ratio</span>
-      <span className="text-lg font-semibold">{company?.ShortRatio || 'N/A'}</span>
-    </div>
-  </div>
-</div>
+       {/* RIGHT SIDE: Ownership & Short Interest */}
+        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+          <h3 className="text-xl font-bold mb-4">Ownership & Short Interest</h3>
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Institutional Ownership</span>
+              <span className="text-lg font-semibold">
+                {formatOwnershipPercent(company?.PercentInstitutions)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Insider Ownership</span>
+              <span className="text-lg font-semibold">
+                {formatOwnershipPercent(company?.PercentInsiders)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Shares Outstanding</span>
+              <span className="text-lg font-semibold">
+                {formatLargeNumber(parseFloat(company?.SharesOutstanding || '0'))}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Float</span>
+              <span className="text-lg font-semibold">
+                {formatLargeNumber(parseFloat(company?.SharesFloat || '0'))}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Short Interest</span>
+              <span className="text-lg font-semibold">
+                {formatLargeNumber(parseFloat(company?.SharesShort || '0'))}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Short % of Float</span>
+              <span className="text-lg font-semibold">
+                {formatPercent(company?.ShortPercentFloat)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-sm">Short Ratio</span>
+              <span className="text-lg font-semibold">{company?.ShortRatio || 'N/A'}</span>
+            </div>
+          </div>
+        </div>
+      </div> {/* This closes the grid container for Trading Metrics & Ownership */}
 
-
-        
       {/* Latest News Section */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
         <div className="flex items-center justify-between mb-6">
@@ -526,8 +525,9 @@ const formatOwnershipPercent = (value: any) => {
           </div>
         )}
       </div>
-    </div>
+    </div> {/* This closes the main container div */}
   );
 };
 
 export default StockDetail;
+
