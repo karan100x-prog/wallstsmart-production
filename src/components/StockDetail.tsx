@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 import { StockHealthMetrics } from './StockHealthMetrics';
@@ -31,6 +31,16 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
       
       setQuote(quoteData);
       setCompany(companyData);
+      
+      // Log ownership data for verification (remove in production)
+      if (companyData) {
+        console.log(`${symbol} Ownership Data:`, {
+          insiders: companyData.PercentInsiders,
+          institutions: companyData.PercentInstitutions,
+          float: companyData.SharesFloat,
+          outstanding: companyData.SharesOutstanding
+        });
+      }
     } catch (error) {
       console.error('Error loading stock data:', error);
     } finally {
@@ -142,11 +152,66 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     return `${(num * 100).toFixed(2)}%`;
   };
 
+  // Enhanced ownership percentage formatter with validation
   const formatOwnershipPercent = (value: any) => {
     const num = parseFloat(value);
-    if (isNaN(num)) return 'N/A';
+    
+    // Handle invalid or missing data
+    if (isNaN(num) || num < 0) return 'N/A';
+    
+    // Sanity check: ownership shouldn't exceed 100%
+    if (num > 100) {
+      console.warn(`${symbol}: Ownership percentage exceeds 100%: ${num}%`);
+      return `${num.toFixed(2)}%*`; // Asterisk indicates unusual data
+    }
+    
+    // For very small percentages, show more precision if needed
+    if (num > 0 && num < 0.01) {
+      return `<0.01%`;
+    }
+    
     return `${num.toFixed(2)}%`;
   };
+
+  // Validate and format short interest data
+  const formatShortInterest = (value: any, isPercent: boolean = false) => {
+    const num = parseFloat(value);
+    
+    if (isNaN(num) || num < 0) return 'N/A';
+    
+    if (isPercent) {
+      // Short percent of float - already in percentage format from API
+      if (num > 100) {
+        console.warn(`${symbol}: Short % of float exceeds 100%: ${num}%`);
+        return `${num.toFixed(2)}%*`;
+      }
+      return `${num.toFixed(2)}%`;
+    }
+    
+    // For share counts
+    return formatLargeNumber(num);
+  };
+
+  // Calculate ownership totals for validation
+  const calculateOwnershipTotals = () => {
+    const insiders = parseFloat(company?.PercentInsiders || '0');
+    const institutions = parseFloat(company?.PercentInstitutions || '0');
+    const total = insiders + institutions;
+    
+    // Log if ownership seems unusual
+    if (total > 100) {
+      console.warn(`${symbol}: Total ownership exceeds 100%: ${total.toFixed(2)}%`);
+    }
+    
+    return {
+      insiders,
+      institutions,
+      total,
+      retail: Math.max(0, 100 - total) // Estimated retail ownership
+    };
+  };
+
+  const ownership = calculateOwnershipTotals();
 
   return (
     <div>
@@ -381,9 +446,16 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
           </div>
         </div>
 
-        {/* RIGHT SIDE: Ownership & Short Interest */}
+        {/* RIGHT SIDE: Enhanced Ownership & Short Interest */}
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4">Ownership & Short Interest</h3>
+          <h3 className="text-xl font-bold mb-4">
+            Ownership & Short Interest
+            {ownership.total > 100 && (
+              <span className="ml-2" title="Data may be overlapping or estimated">
+                <AlertCircle className="inline w-4 h-4 text-yellow-500" />
+              </span>
+            )}
+          </h3>
           <div className="grid grid-cols-1 gap-4">
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Institutional Ownership</span>
@@ -397,6 +469,15 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
                 {formatOwnershipPercent(company?.PercentInsiders)}
               </span>
             </div>
+            {/* Show estimated retail ownership if data is available */}
+            {ownership.total > 0 && ownership.total <= 100 && (
+              <div className="flex justify-between">
+                <span className="text-gray-400 text-sm">Est. Retail Ownership</span>
+                <span className="text-lg font-semibold text-gray-500">
+                  ~{ownership.retail.toFixed(2)}%
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Shares Outstanding</span>
               <span className="text-lg font-semibold">
@@ -412,13 +493,19 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Short Interest</span>
               <span className="text-lg font-semibold">
-                {formatLargeNumber(parseFloat(company?.SharesShort || '0'))}
+                {company?.SharesShort ? 
+                  formatShortInterest(company.SharesShort, false) : 
+                  'N/A'
+                }
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Short % of Float</span>
               <span className="text-lg font-semibold">
-                {formatPercent(company?.ShortPercentFloat)}
+                {company?.ShortPercentFloat ? 
+                  formatShortInterest(company.ShortPercentFloat, true) : 
+                  'N/A'
+                }
               </span>
             </div>
             <div className="flex justify-between">
@@ -426,6 +513,12 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
               <span className="text-lg font-semibold">{company?.ShortRatio || 'N/A'}</span>
             </div>
           </div>
+          {/* Data quality note */}
+          {(!company?.SharesShort || !company?.ShortPercentFloat) && (
+            <div className="mt-4 text-xs text-gray-500 italic">
+              * Some short interest data may be unavailable
+            </div>
+          )}
         </div>
       </div>
 
