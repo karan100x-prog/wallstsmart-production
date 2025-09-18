@@ -142,6 +142,14 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     return `${(num * 100).toFixed(2)}%`;
   };
 
+// ✅ Format ownership percentage function
+const formatOwnershipPercent = (value: any) => {
+  const num = parseFloat(value);
+  if (isNaN(num)) return 'N/A';
+  return `${num.toFixed(2)}%`; // no *100 here, since API already returns percent
+};
+
+  
   return (
     <div>
       {/* Header */}
@@ -376,47 +384,54 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         </div>
 
         {/* RIGHT SIDE: Ownership & Short Interest */}
-        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-          <h3 className="text-xl font-bold mb-4">Ownership & Short Interest</h3>
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Institutional Ownership</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.PercentInstitutions)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Insider Ownership</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.PercentInsiders)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Shares Outstanding</span>
-              <span className="text-lg font-semibold">
-                {formatLargeNumber(parseFloat(company?.SharesOutstanding || '0'))}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Float</span>
-              <span className="text-lg font-semibold">
-                {formatLargeNumber(parseFloat(company?.SharesFloat || '0'))}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Short Interest</span>
-              <span className="text-lg font-semibold">
-                {formatLargeNumber(parseFloat(company?.SharesShort || '0'))}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Short % of Float</span>
-              <span className="text-lg font-semibold">{formatPercent(company?.ShortPercentFloat)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-sm">Short Ratio</span>
-              <span className="text-lg font-semibold">{company?.ShortRatio || 'N/A'}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+<div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+  <h3 className="text-xl font-bold mb-4">Ownership & Short Interest</h3>
+  <div className="grid grid-cols-1 gap-4">
+    <div className="flex justify-between">
+      <span className="text-gray-400 text-sm">Institutional Ownership</span>
+      <span className="text-lg font-semibold">
+        {formatOwnershipPercent(company?.PercentInstitutions)}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-400 text-sm">Insider Ownership</span>
+      <span className="text-lg font-semibold">
+        {formatOwnershipPercent(company?.PercentInsiders)}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-400 text-sm">Shares Outstanding</span>
+      <span className="text-lg font-semibold">
+        {formatLargeNumber(parseFloat(company?.SharesOutstanding || '0'))}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-400 text-sm">Float</span>
+      <span className="text-lg font-semibold">
+        {formatLargeNumber(parseFloat(company?.SharesFloat || '0'))}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-400 text-sm">Short Interest</span>
+      <span className="text-lg font-semibold">
+        {formatLargeNumber(parseFloat(company?.SharesShort || '0'))}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-400 text-sm">Short % of Float</span>
+      <span className="text-lg font-semibold">
+        {formatPercent(company?.ShortPercentFloat)}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-400 text-sm">Short Ratio</span>
+      <span className="text-lg font-semibold">{company?.ShortRatio || 'N/A'}</span>
+    </div>
+  </div>
+</div>
 
+
+        
       {/* Latest News Section */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
         <div className="flex items-center justify-between mb-6">
