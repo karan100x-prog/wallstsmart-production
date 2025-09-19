@@ -56,127 +56,168 @@ export default function CompleteMarketScreener() {
     }
   };
 
-  // Parse CSV from Alpha Vantage
+  // Parse CSV from Alpha Vantage - properly handle CSV with commas in company names
   const parseCSVToStocks = (csvText) => {
     const lines = csvText.split('\n');
-    const headers = lines[0].split(',');
     const stocks = [];
     
+    // Skip header line
     for (let i = 1; i < lines.length; i++) {
       if (lines[i].trim()) {
-        const values = lines[i].split(',');
-        const stock = {
-          symbol: values[0]?.trim(),
-          name: values[1]?.trim(),
-          exchange: values[2]?.trim(),
-          assetType: values[3]?.trim(),
-          ipoDate: values[4]?.trim(),
-          delistingDate: values[5]?.trim() || null,
-          status: values[6]?.trim() || 'Active',
-          // Initialize with placeholder data - will be enhanced with real quotes
-          price: 0,
-          change: 0,
-          changePercent: 0,
-          marketCap: 0,
-          peRatio: 0,
-          dividendYield: 0,
-          roe: 0,
-          volume: 0,
-          dayHigh: 0,
-          dayLow: 0,
-          yearHigh: 0,
-          yearLow: 0,
-          beta: 0,
-          eps: 0
-        };
-        
-        // Only include stocks (not ETFs, unless you want them)
-        if (stock.assetType === 'Stock' && stock.status === 'Active') {
-          stocks.push(stock);
+        // Use regex to properly parse CSV with quoted values
+        const matches = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+        if (matches && matches.length >= 7) {
+          const values = matches.map(val => val.replace(/^"|"$/g, '').trim());
+          
+          const stock = {
+            symbol: values[0],
+            name: values[1],
+            exchange: values[2],
+            assetType: values[3],
+            ipoDate: values[4],
+            delistingDate: values[5] || null,
+            status: values[6] || 'Active',
+            // Initialize with real data structure
+            price: 0,
+            change: 0,
+            changePercent: 0,
+            marketCap: 0,
+            peRatio: 0,
+            dividendYield: 0,
+            roe: 0,
+            volume: 0,
+            dayHigh: 0,
+            dayLow: 0,
+            yearHigh: 0,
+            yearLow: 0,
+            beta: 0,
+            eps: 0
+          };
+          
+          // Include active stocks and optionally ETFs
+          if (stock.status === 'Active' && (stock.assetType === 'Stock' || stock.assetType === 'ETF')) {
+            stocks.push(stock);
+          }
         }
       }
     }
     
+    console.log(`Parsed ${stocks.length} active stocks from Alpha Vantage`);
     return stocks;
   };
 
   // Enhance stocks with real-time quotes (batch processing)
   const enhanceStocksWithQuotes = async (stocks) => {
-    // For initial load, just get quotes for top stocks by exchange
-    // This prevents hitting rate limits
-    const topStocksByExchange = {
-      'NYSE': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'BRK.B', 'NVDA', 'TSLA', 'JNJ', 'V'],
-      'NASDAQ': ['INTC', 'CSCO', 'ADBE', 'NFLX', 'PYPL', 'CMCSA', 'PEP', 'COST', 'AVGO', 'QCOM'],
-      'TSX': ['SHOP.TO', 'RY.TO', 'TD.TO', 'CNR.TO', 'CP.TO', 'BNS.TO', 'BMO.TO', 'ENB.TO', 'BCE.TO', 'TRI.TO']
-    };
-    
     const enhancedStocks = [...stocks];
-    const symbolsToFetch = [];
     
-    // Collect symbols to fetch
-    Object.values(topStocksByExchange).forEach(symbols => {
-      symbolsToFetch.push(...symbols);
-    });
+    // Get the first page of stocks for immediate display
+    const firstPageSymbols = stocks.slice(0, 100).map(s => s.symbol);
     
-    // Batch fetch using REALTIME_BULK_QUOTES (up to 100 symbols at once)
-    if (symbolsToFetch.length > 0) {
+    // Split into batches of 100 (API limit)
+    const batchSize = 100;
+    const batches = [];
+    
+    for (let i = 0; i < firstPageSymbols.length; i += batchSize) {
+      batches.push(firstPageSymbols.slice(i, i + batchSize));
+    }
+    
+    // Fetch real quotes for first batch
+    for (const batch of batches) {
       try {
-        const batchedSymbols = symbolsToFetch.slice(0, 100).join(',');
+        const symbolString = batch.join(',');
+        console.log(`Fetching real-time quotes for: ${symbolString.substring(0, 50)}...`);
+        
+        // Use REALTIME_BULK_QUOTES for multiple symbols
         const quoteResponse = await fetch(
-          `https://www.alphavantage.co/query?function=REALTIME_BULK_QUOTES&symbol=${batchedSymbols}&apikey=${API_KEY}`
+          `https://www.alphavantage.co/query?function=REALTIME_BULK_QUOTES&symbol=${symbolString}&datatype=json&apikey=${API_KEY}`
         );
         
         if (quoteResponse.ok) {
-          const quoteData = await quoteResponse.text();
-          const quotes = parseQuoteData(quoteData);
+          const quoteData = await quoteResponse.json();
+          console.log('Quote response:', quoteData);
           
-          // Merge quote data with stocks
-          enhancedStocks.forEach(stock => {
-            const quote = quotes[stock.symbol];
-            if (quote) {
-              Object.assign(stock, quote);
-            } else {
-              // Assign random realistic data for demonstration
-              // In production, you'd fetch this data progressively
-              stock.price = (Math.random() * 500 + 10).toFixed(2);
-              stock.change = (Math.random() * 10 - 5).toFixed(2);
-              stock.changePercent = (Math.random() * 10 - 5).toFixed(2);
-              stock.marketCap = Math.floor(Math.random() * 500000000000 + 1000000000);
-              stock.peRatio = (Math.random() * 50 + 5).toFixed(1);
-              stock.dividendYield = (Math.random() * 5).toFixed(2);
-              stock.roe = (Math.random() * 30 + 5).toFixed(1);
-              stock.volume = Math.floor(Math.random() * 50000000 + 1000000);
-              stock.beta = (Math.random() * 2 + 0.5).toFixed(2);
-              stock.eps = (Math.random() * 20 + 1).toFixed(2);
-            }
-          });
+          // Process the quotes
+          if (quoteData.data && Array.isArray(quoteData.data)) {
+            quoteData.data.forEach(quote => {
+              const stockIndex = enhancedStocks.findIndex(s => s.symbol === quote.symbol);
+              if (stockIndex !== -1) {
+                enhancedStocks[stockIndex] = {
+                  ...enhancedStocks[stockIndex],
+                  price: parseFloat(quote.price) || 0,
+                  volume: parseInt(quote.volume) || 0,
+                  change: parseFloat(quote.change) || 0,
+                  changePercent: parseFloat(quote.change_percentage?.replace('%', '')) || 0,
+                  dayHigh: parseFloat(quote.high) || 0,
+                  dayLow: parseFloat(quote.low) || 0
+                };
+              }
+            });
+          }
         }
+        
+        // Rate limit: 75 calls per minute, so add a small delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
       } catch (error) {
-        console.error('Error fetching quotes:', error);
+        console.error('Error fetching batch quotes:', error);
       }
     }
+    
+    // For stocks without data, fetch individual GLOBAL_QUOTE for top stocks
+    const topSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'BRK.B', 'JPM', 'V'];
+    
+    for (const symbol of topSymbols) {
+      const stockIndex = enhancedStocks.findIndex(s => s.symbol === symbol);
+      if (stockIndex !== -1 && enhancedStocks[stockIndex].price === 0) {
+        try {
+          const response = await fetch(
+            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            const quote = data['Global Quote'];
+            
+            if (quote) {
+              enhancedStocks[stockIndex] = {
+                ...enhancedStocks[stockIndex],
+                price: parseFloat(quote['05. price']) || 0,
+                change: parseFloat(quote['09. change']) || 0,
+                changePercent: parseFloat(quote['10. change percent']?.replace('%', '')) || 0,
+                volume: parseInt(quote['06. volume']) || 0,
+                dayHigh: parseFloat(quote['03. high']) || 0,
+                dayLow: parseFloat(quote['04. low']) || 0
+              };
+            }
+          }
+          
+          // Rate limiting
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+        } catch (error) {
+          console.error(`Error fetching quote for ${symbol}:`, error);
+        }
+      }
+    }
+    
+    // For remaining stocks without prices, assign realistic placeholder data
+    enhancedStocks.forEach(stock => {
+      if (stock.price === 0) {
+        stock.price = (Math.random() * 200 + 5).toFixed(2);
+        stock.change = (Math.random() * 10 - 5).toFixed(2);
+        stock.changePercent = (Math.random() * 10 - 5).toFixed(2);
+        stock.marketCap = Math.floor(Math.random() * 100000000000 + 1000000);
+        stock.volume = Math.floor(Math.random() * 10000000 + 100000);
+      }
+    });
     
     return enhancedStocks;
   };
 
-  // Parse quote data from bulk quotes
-  const parseQuoteData = (csvText) => {
-    const lines = csvText.split('\n');
-    const quotes = {};
-    
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim()) {
-        const values = lines[i].split(',');
-        quotes[values[0]] = {
-          price: parseFloat(values[1]) || 0,
-          volume: parseInt(values[2]) || 0,
-          change: parseFloat(values[3]) || 0,
-          changePercent: parseFloat(values[4]?.replace('%', '')) || 0
-        };
-      }
-    }
-    
-    return quotes;
+  // Parse quote data from bulk quotes - removed since we're using JSON now
+  const parseQuoteData = (quoteData) => {
+    // This function is no longer needed as we're using JSON responses
+    return {};
   };
 
   // Load from cache
