@@ -378,8 +378,8 @@ export default function CompleteMarketScreener() {
                 Complete Market Overview
               </h1>
               <p className="text-gray-400 text-sm mt-1">
-                <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> total stocks • 
-                <span className="text-blue-400 font-semibold ml-2">{marketStats.exchanges.length}</span> exchanges • 
+                <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> • 
+                <span className="text-blue-400 font-semibold ml-2">{marketStats.exchanges.length}</span>  • 
                 <span className="text-yellow-400 font-semibold ml-2">Real-time data</span>
               </p>
             </div>
