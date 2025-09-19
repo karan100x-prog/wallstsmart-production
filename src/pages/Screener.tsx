@@ -10,7 +10,7 @@ export default function CompleteMarketScreener() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'desc' });
   const [selectedExchange, setSelectedExchange] = useState('all');
   const [marketStats, setMarketStats] = useState({
     totalStocks: 0,
