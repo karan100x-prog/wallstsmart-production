@@ -375,13 +375,9 @@ export default function CompleteMarketScreener() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-                Complete Market Overview
+                Market Overview
               </h1>
-              <p className="text-gray-400 text-sm mt-1">
-                <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> 
-                <span className="text-blue-400 font-semibold ml-2">{marketStats.exchanges.length}</span> 
-                <span className="text-yellow-400 font-semibold ml-2"></span>Stocks
-              </p>
+              
             </div>
             <div className="flex items-center gap-3">
               <button
