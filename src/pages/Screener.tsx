@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2, ExternalLink } from 'lucide-react';
 
 // Complete Market Screener - ALL Stocks with Real Alpha Vantage Integration
+// Pre-sorted by Company Name with clickable navigation to stock details
 export default function CompleteMarketScreener() {
   const [allStocksData, setAllStocksData] = useState([]);
   const [displayStocks, setDisplayStocks] = useState([]);
@@ -9,7 +10,7 @@ export default function CompleteMarketScreener() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: 'marketCap', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [selectedExchange, setSelectedExchange] = useState('all');
   const [marketStats, setMarketStats] = useState({
     totalStocks: 0,
@@ -205,7 +206,12 @@ export default function CompleteMarketScreener() {
     });
   };
 
-  // Format large numbers
+  // Navigate to stock detail page
+  const navigateToStock = (symbol) => {
+    // In production, use React Router
+    // For now, using window.location for demonstration
+    window.location.href = `/stock/${symbol}`;
+  };
   const formatNumber = (num, format) => {
     if (format === 'currency' || format === 'marketCap') {
       if (num >= 1000000000000) return `$${(num / 1000000000000).toFixed(2)}T`;
@@ -375,9 +381,13 @@ export default function CompleteMarketScreener() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-                Market Overview
+                Complete Market Overview
               </h1>
-              
+              <p className="text-gray-400 text-sm mt-1">
+                <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> total stocks • 
+                <span className="text-blue-400 font-semibold ml-2">{marketStats.exchanges.length}</span> exchanges • 
+                <span className="text-yellow-400 font-semibold ml-2">Real-time data</span>
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -559,11 +569,22 @@ export default function CompleteMarketScreener() {
                           index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-925'
                         }`}
                       >
-                        <td className="sticky left-0 z-10 px-4 py-3 font-medium text-blue-400 bg-inherit">
-                          {stock.symbol}
+                        <td className="sticky left-0 z-10 px-4 py-3 bg-inherit">
+                          <button 
+                            onClick={() => navigateToStock(stock.symbol)}
+                            className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left"
+                          >
+                            {stock.symbol}
+                          </button>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-300 max-w-xs truncate" title={stock.name}>
-                          {stock.name}
+                        <td className="px-4 py-3">
+                          <button 
+                            onClick={() => navigateToStock(stock.symbol)}
+                            className="text-sm text-gray-300 hover:text-white hover:underline transition-colors max-w-xs truncate block text-left" 
+                            title={stock.name}
+                          >
+                            {stock.name}
+                          </button>
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <span className="px-2 py-1 bg-gray-800 rounded text-xs font-medium text-gray-300">
