@@ -28,35 +28,35 @@ function Navigation() {
   
   return (
     <>
-      <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl w-full">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+            <div className="flex items-center gap-2 cursor-pointer flex-shrink-0" onClick={() => navigate('/')}>
               <TrendingUp className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />
               <span className="text-lg sm:text-xl font-bold">WallStSmart</span>
             </div>
             
             <div className="hidden md:flex items-center gap-6">
-              <Link to="/macro" className="hover:text-green-500 transition">Macro</Link>
-              <Link to="/screener" className="hover:text-green-500 transition">Screener</Link>
-              <Link to="/portfolio" className="hover:text-green-500 transition">Portfolio</Link>
-              <Link to="/smart-flow" className="nav-link">Smart Flow</Link>
+              <Link to="/macro" className="hover:text-green-500 transition whitespace-nowrap">Macro</Link>
+              <Link to="/screener" className="hover:text-green-500 transition whitespace-nowrap">Screener</Link>
+              <Link to="/portfolio" className="hover:text-green-500 transition whitespace-nowrap">Portfolio</Link>
+              <Link to="/smart-flow" className="hover:text-green-500 transition whitespace-nowrap">Smart Flow</Link>
               
               {currentUser ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-400">{currentUser.email}</span>
+                  <span className="text-sm text-gray-400 hidden lg:block truncate max-w-[200px]">{currentUser.email}</span>
                   <button 
                     onClick={handleLogout}
-                    className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition flex items-center gap-2"
+                    className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition flex items-center gap-2 whitespace-nowrap"
                   >
                     <LogOut className="h-4 w-4" />
-                    Sign Out
+                    <span className="hidden sm:inline">Sign Out</span>
                   </button>
                 </div>
               ) : (
                 <button 
                   onClick={() => setShowLogin(true)}
-                  className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition"
+                  className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition whitespace-nowrap"
                 >
                   Sign In
                 </button>
@@ -83,9 +83,12 @@ function Navigation() {
                 <Link to="/portfolio" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
                   Portfolio
                 </Link>
+                <Link to="/smart-flow" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
+                  Smart Flow
+                </Link>
                 {currentUser ? (
                   <>
-                    <div className="px-2 py-1 text-sm text-gray-400">{currentUser.email}</div>
+                    <div className="px-2 py-1 text-sm text-gray-400 truncate">{currentUser.email}</div>
                     <button 
                       onClick={handleLogout}
                       className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition w-full"
@@ -120,29 +123,26 @@ function HomePage() {
   };
 
   return (
-    <>
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-10 sm:py-16 md:py-20">
+    <div className="w-full">
+      <div className="px-4 sm:px-6 lg:px-8 py-10 sm:py-16 md:py-20 max-w-7xl mx-auto">
         <div className="text-center mb-8 sm:mb-12">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
             Professional Stock Analysis
             <span className="text-green-500 block sm:inline"> Made Simple</span>
           </h1>
-          <p className="text-lg sm:text-xl text-gray-400 mb-6 sm:mb-8 px-4 sm:px-0">
+          <p className="text-lg sm:text-xl text-gray-400 mb-6 sm:mb-8">
             Smarter Decision. Smarter Returns.
           </p>
-
-         <p className="text-lg sm:text-xl text-gray-400 mb-6 sm:mb-8 px-4 sm:px-0">
+          <p className="text-lg sm:text-xl text-gray-400 mb-6 sm:mb-8">
             Under Construction - Official Launch on 20 Oct 2025.
           </p>
         </div>
-      </div>
-      
-      <div className="w-full px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16 md:pb-20">
-        <div className="w-full sm:max-w-[80%] md:max-w-[70%] lg:max-w-[60%] mx-auto">
+        
+        <div className="w-full max-w-3xl mx-auto">
           <StockSearch onSelectStock={handleSelectStock} />
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -157,7 +157,7 @@ function StockPage() {
   
   return (
     <div className="w-full">
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8 max-w-7xl mx-auto">
         <StockDetail symbol={symbol} />
       </div>
     </div>
@@ -171,7 +171,7 @@ function PortfolioPage() {
   if (!currentUser) {
     return (
       <>
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-10 text-center">
+        <div className="px-4 sm:px-6 lg:px-8 py-10 text-center max-w-7xl mx-auto">
           <h2 className="text-2xl font-bold mb-4">Sign in to access your portfolio</h2>
           <p className="text-gray-400 mb-6">Track your investments and create watchlists</p>
           <button 
@@ -187,7 +187,7 @@ function PortfolioPage() {
   }
   
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-10">
+    <div className="px-4 sm:px-6 lg:px-8 py-10 max-w-7xl mx-auto">
       <Portfolio />
     </div>
   );
@@ -197,26 +197,21 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="min-h-screen w-full overflow-x-hidden bg-gray-950 text-white">
-          <div className="flex flex-col min-h-screen">
-            <Navigation />
-            <main className="flex-1 w-full max-w-[100vw] overflow-x-hidden">
-              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/stock/:symbol" element={<StockPage />} />
-                  <Route path="/screener" element={<Screener />} />
-                  <Route path="/portfolio" element={<PortfolioPage />} />
-                  <Route path="/macro" element={<MacroDashboard />} />
-                  <Route path="/smart-flow" element={<SmartFlow />} />
-                </Routes>
-              </div>
-            </main>
-            <Analytics />
-          </div>
+        <div className="min-h-screen bg-gray-950 text-white overflow-x-hidden">
+          <Navigation />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/stock/:symbol" element={<StockPage />} />
+            <Route path="/screener" element={<Screener />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
+            <Route path="/macro" element={<MacroDashboard />} />
+            <Route path="/smart-flow" element={<SmartFlow />} />
+          </Routes>
+          <Analytics />
         </div>
       </Router>
     </AuthProvider>
   );
 }
+
 export default App;
