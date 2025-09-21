@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2, ExternalLink, Clock, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // Complete Market Screener with Real Alpha Vantage Integration
@@ -12,6 +12,8 @@ export default function CompleteMarketScreener() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'marketCap', direction: 'desc' });
   const [selectedExchange, setSelectedExchange] = useState('all');
+  const [cacheAge, setCacheAge] = useState(null);
+  const [forceRefresh, setForceRefresh] = useState(false);
   const [marketStats, setMarketStats] = useState({
     totalStocks: 0,
     activeStocks: 0,
@@ -21,11 +23,14 @@ export default function CompleteMarketScreener() {
   
   const stocksPerPage = 100;
   const API_KEY = 'NMSRS0ZDIOWF3CLL';
+  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
   // Fetch ALL stocks from Alpha Vantage LISTING_STATUS
-  const fetchAllStocksFromAPI = async () => {
+  const fetchAllStocksFromAPI = async (skipCache = false) => {
     setLoading(true);
     try {
+      console.log('Fetching fresh data from Alpha Vantage API...');
+      
       // Fetch complete listing of ALL stocks
       const listingResponse = await fetch(
         `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${API_KEY}`
@@ -46,10 +51,17 @@ export default function CompleteMarketScreener() {
       localStorage.setItem('wallstsmart_stocks', JSON.stringify(enhancedStocks));
       localStorage.setItem('wallstsmart_stocks_timestamp', Date.now().toString());
       
+      setCacheAge(null); // Reset cache age since we just fetched fresh data
+      
+      console.log('Fresh data fetched and cached successfully');
+      
     } catch (error) {
       console.error('Error fetching stocks:', error);
       // Try to load from localStorage as fallback
-      loadFromCache();
+      if (!skipCache) {
+        console.log('Falling back to cached data...');
+        loadFromCache();
+      }
     } finally {
       setLoading(false);
       setInitialLoad(false);
@@ -235,20 +247,26 @@ export default function CompleteMarketScreener() {
   };
 
   // Load from cache
- const loadFromCache = () => {
-  const cached = localStorage.getItem('wallstsmart_stocks');
-  const timestamp = localStorage.getItem('wallstsmart_stocks_timestamp');
-  
-  if (cached && timestamp) {
-    const age = Date.now() - parseInt(timestamp);
-    // Use cache if less than 24 hours old
-    if (age < 24 * 60 * 60 * 1000) {  // <-- CHANGE THIS LINE
+  const loadFromCache = () => {
+    const cached = localStorage.getItem('wallstsmart_stocks');
+    const timestamp = localStorage.getItem('wallstsmart_stocks_timestamp');
+    
+    if (cached && timestamp) {
+      const age = Date.now() - parseInt(timestamp);
       const stocks = JSON.parse(cached);
       setAllStocksData(stocks);
       updateMarketStats(stocks);
+      setCacheAge(age);
+      
+      // Calculate hours old
+      const hoursOld = Math.floor(age / (1000 * 60 * 60));
+      const minutesOld = Math.floor((age % (1000 * 60 * 60)) / (1000 * 60));
+      console.log(`Loaded cached data (${hoursOld}h ${minutesOld}m old)`);
+      
+      return true;
     }
-  }
-};
+    return false;
+  };
 
   // Update market statistics
   const updateMarketStats = (stocks) => {
@@ -281,6 +299,19 @@ export default function CompleteMarketScreener() {
       return num.toLocaleString();
     }
     return num.toLocaleString();
+  };
+
+  // Format cache age
+  const formatCacheAge = (ageInMs) => {
+    if (!ageInMs) return null;
+    
+    const hours = Math.floor(ageInMs / (1000 * 60 * 60));
+    const minutes = Math.floor((ageInMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ago`;
+    }
+    return `${minutes}m ago`;
   };
 
   // Filter and sort stocks
@@ -330,9 +361,12 @@ export default function CompleteMarketScreener() {
     setSortConfig({ key, direction });
   };
 
-  // Refresh data
+  // Refresh data - always fetches fresh data
   const handleRefresh = async () => {
-    await fetchAllStocksFromAPI();
+    console.log('Manual refresh requested');
+    setForceRefresh(true);
+    await fetchAllStocksFromAPI(true); // Skip cache
+    setForceRefresh(false);
   };
 
   // Export to CSV
@@ -414,11 +448,33 @@ export default function CompleteMarketScreener() {
     return pages;
   };
 
-  // Initial load
+  // Initial load - FIXED to properly check cache
   useEffect(() => {
-    loadFromCache();
+    // Don't run if we're forcing a refresh
+    if (forceRefresh) return;
+    
+    const cached = localStorage.getItem('wallstsmart_stocks');
+    const timestamp = localStorage.getItem('wallstsmart_stocks_timestamp');
+    
+    if (cached && timestamp) {
+      const age = Date.now() - parseInt(timestamp);
+      
+      // Check if cache is still valid (24 hours)
+      if (age < CACHE_DURATION) {
+        console.log(`Using cached data (${Math.round(age / 1000 / 60)} minutes old)`);
+        loadFromCache();
+        setInitialLoad(false); // Don't show loading spinner
+        return; // Don't fetch new data
+      } else {
+        console.log('Cache expired, fetching fresh data');
+      }
+    } else {
+      console.log('No cache found, fetching initial data');
+    }
+    
+    // Only fetch if cache is expired or doesn't exist
     fetchAllStocksFromAPI();
-  }, []);
+  }, []); // Empty dependency array - only run once
 
   // Reset page when filters change
   useEffect(() => {
@@ -440,7 +496,15 @@ export default function CompleteMarketScreener() {
               <p className="text-gray-400 text-sm mt-1">
                 <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> total stocks • 
                 <span className="text-blue-400 font-semibold ml-2">{marketStats.exchanges.length}</span> exchanges • 
-                <span className="text-yellow-400 font-semibold ml-2">Real-time data</span>
+                <span className="text-yellow-400 font-semibold ml-2">
+                  {cacheAge ? 'Cached data' : 'Real-time data'}
+                </span>
+                {cacheAge && (
+                  <span className="text-gray-500 ml-2">
+                    <Clock className="inline w-3 h-3 mr-1" />
+                    Updated {formatCacheAge(cacheAge)}
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -448,6 +512,7 @@ export default function CompleteMarketScreener() {
                 onClick={handleRefresh}
                 disabled={loading}
                 className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                title="Fetch fresh data from API"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -465,6 +530,25 @@ export default function CompleteMarketScreener() {
       </div>
 
       <div className="max-w-[1600px] mx-auto px-4 py-6">
+        {/* Cache Notice */}
+        {cacheAge && cacheAge > 12 * 60 * 60 * 1000 && (
+          <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3 mb-4 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-yellow-200">
+                Data is {formatCacheAge(cacheAge)} old. Click refresh to get the latest market data.
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="text-yellow-400 hover:text-yellow-300 text-sm font-medium"
+            >
+              Refresh Now
+            </button>
+          </div>
+        )}
+
         {/* Filters and Search Bar */}
         <div className="bg-gray-900 rounded-xl p-4 mb-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -526,7 +610,7 @@ export default function CompleteMarketScreener() {
             <p className="text-gray-500">Fetching all stocks from global exchanges</p>
             <p className="text-sm text-gray-600 mt-2">This may take a moment on first load</p>
           </div>
-        ) : displayedStocks.length === 0 ? (
+        ) : displayedStocks.length === 0 && !loading ? (
           <div className="bg-gray-900 rounded-xl p-12 text-center">
             <Search className="w-12 h-12 text-gray-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-300 mb-2">No stocks found</h3>
@@ -636,7 +720,7 @@ export default function CompleteMarketScreener() {
                         <td className="sticky left-0 z-10 px-4 py-3 bg-inherit">
                           <button 
                             onClick={() => navigateToStock(stock.symbol)}
-                            className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left flex items-center gap-1"
+                            className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left group flex items-center gap-1"
                           >
                             {stock.symbol}
                             <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
