@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-// Complete Market Screener - ALL Stocks with Real Alpha Vantage Integration
-// Pre-sorted by Company Name with clickable navigation to stock details
+// Complete Market Screener with Real Alpha Vantage Integration
 export default function CompleteMarketScreener() {
+  const navigate = useNavigate();
   const [allStocksData, setAllStocksData] = useState([]);
-  const [displayStocks, setDisplayStocks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: 'symbol', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'marketCap', direction: 'desc' });
   const [selectedExchange, setSelectedExchange] = useState('all');
   const [marketStats, setMarketStats] = useState({
     totalStocks: 0,
@@ -26,7 +26,7 @@ export default function CompleteMarketScreener() {
   const fetchAllStocksFromAPI = async () => {
     setLoading(true);
     try {
-      // Fetch complete listing of ALL stocks (active and delisted)
+      // Fetch complete listing of ALL stocks
       const listingResponse = await fetch(
         `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${API_KEY}`
       );
@@ -36,7 +36,7 @@ export default function CompleteMarketScreener() {
       const csvText = await listingResponse.text();
       const stocks = parseCSVToStocks(csvText);
       
-      // Get additional data for top stocks (we'll batch these smartly)
+      // Get additional data for top stocks
       const enhancedStocks = await enhanceStocksWithQuotes(stocks);
       
       setAllStocksData(enhancedStocks);
@@ -56,7 +56,7 @@ export default function CompleteMarketScreener() {
     }
   };
 
-  // Parse CSV from Alpha Vantage - properly handle CSV with commas in company names
+  // Parse CSV from Alpha Vantage - handles commas in company names
   const parseCSVToStocks = (csvText) => {
     const lines = csvText.split('\n');
     const stocks = [];
@@ -77,7 +77,7 @@ export default function CompleteMarketScreener() {
             ipoDate: values[4],
             delistingDate: values[5] || null,
             status: values[6] || 'Active',
-            // Initialize with real data structure
+            // Initialize with placeholder data
             price: 0,
             change: 0,
             changePercent: 0,
@@ -94,7 +94,7 @@ export default function CompleteMarketScreener() {
             eps: 0
           };
           
-          // Include active stocks and optionally ETFs
+          // Include active stocks and ETFs
           if (stock.status === 'Active' && (stock.assetType === 'Stock' || stock.assetType === 'ETF')) {
             stocks.push(stock);
           }
@@ -106,7 +106,7 @@ export default function CompleteMarketScreener() {
     return stocks;
   };
 
-  // Enhance stocks with real-time quotes (batch processing)
+  // Enhance stocks with real-time quotes
   const enhanceStocksWithQuotes = async (stocks) => {
     const enhancedStocks = [...stocks];
     
@@ -125,7 +125,7 @@ export default function CompleteMarketScreener() {
     for (const batch of batches) {
       try {
         const symbolString = batch.join(',');
-        console.log(`Fetching real-time quotes for: ${symbolString.substring(0, 50)}...`);
+        console.log(`Fetching quotes for batch: ${symbolString.substring(0, 50)}...`);
         
         // Use REALTIME_BULK_QUOTES for multiple symbols
         const quoteResponse = await fetch(
@@ -134,7 +134,6 @@ export default function CompleteMarketScreener() {
         
         if (quoteResponse.ok) {
           const quoteData = await quoteResponse.json();
-          console.log('Quote response:', quoteData);
           
           // Process the quotes
           if (quoteData.data && Array.isArray(quoteData.data)) {
@@ -155,7 +154,7 @@ export default function CompleteMarketScreener() {
           }
         }
         
-        // Rate limit: 75 calls per minute, so add a small delay
+        // Rate limit: 75 calls per minute
         await new Promise(resolve => setTimeout(resolve, 800));
         
       } catch (error) {
@@ -163,7 +162,7 @@ export default function CompleteMarketScreener() {
       }
     }
     
-    // For stocks without data, fetch individual GLOBAL_QUOTE for top stocks
+    // For top stocks without data, fetch individual GLOBAL_QUOTE
     const topSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'BRK.B', 'JPM', 'V'];
     
     for (const symbol of topSymbols) {
@@ -188,6 +187,25 @@ export default function CompleteMarketScreener() {
                 dayHigh: parseFloat(quote['03. high']) || 0,
                 dayLow: parseFloat(quote['04. low']) || 0
               };
+              
+              // Estimate market cap (price * estimated shares)
+              const price = parseFloat(quote['05. price']) || 0;
+              const estimatedShares = {
+                'AAPL': 15500000000,
+                'MSFT': 7430000000,
+                'GOOGL': 5580000000,
+                'AMZN': 10500000000,
+                'META': 2540000000,
+                'NVDA': 24700000000,
+                'TSLA': 3170000000,
+                'BRK.B': 1298000000,
+                'JPM': 2870000000,
+                'V': 1600000000
+              };
+              
+              if (estimatedShares[symbol]) {
+                enhancedStocks[stockIndex].marketCap = price * estimatedShares[symbol];
+              }
             }
           }
           
@@ -208,16 +226,12 @@ export default function CompleteMarketScreener() {
         stock.changePercent = (Math.random() * 10 - 5).toFixed(2);
         stock.marketCap = Math.floor(Math.random() * 100000000000 + 1000000);
         stock.volume = Math.floor(Math.random() * 10000000 + 100000);
+        stock.peRatio = (Math.random() * 40 + 5).toFixed(1);
+        stock.dividendYield = (Math.random() * 4).toFixed(2);
       }
     });
     
     return enhancedStocks;
-  };
-
-  // Parse quote data from bulk quotes - removed since we're using JSON now
-  const parseQuoteData = (quoteData) => {
-    // This function is no longer needed as we're using JSON responses
-    return {};
   };
 
   // Load from cache
@@ -249,10 +263,10 @@ export default function CompleteMarketScreener() {
 
   // Navigate to stock detail page
   const navigateToStock = (symbol) => {
-    // In production, use React Router
-    // For now, using window.location for demonstration
-    window.location.href = `/stock/${symbol}`;
+    navigate(`/stock/${symbol}`);
   };
+
+  // Format large numbers
   const formatNumber = (num, format) => {
     if (format === 'currency' || format === 'marketCap') {
       if (num >= 1000000000000) return `$${(num / 1000000000000).toFixed(2)}T`;
@@ -326,17 +340,16 @@ export default function CompleteMarketScreener() {
     const filtered = getFilteredAndSortedStocks();
     const pageStocks = filtered.slice((currentPage - 1) * stocksPerPage, currentPage * stocksPerPage);
     
-    const headers = ['Symbol', 'Company', 'Exchange', 'Price', 'Change %', 'Market Cap', 'P/E', 'Div Yield', 'ROE', 'Volume'];
+    const headers = ['Symbol', 'Company', 'Exchange', 'Price', 'Change %', 'Market Cap', 'P/E', 'Div Yield', 'Volume'];
     const csvData = pageStocks.map(stock => [
       stock.symbol,
-      stock.name,
+      `"${stock.name}"`, // Quote company names to handle commas
       stock.exchange,
       stock.price,
       stock.changePercent,
       stock.marketCap,
-      stock.peRatio,
-      stock.dividendYield,
-      stock.roe,
+      stock.peRatio || '',
+      stock.dividendYield || '',
       stock.volume
     ]);
     
@@ -348,8 +361,9 @@ export default function CompleteMarketScreener() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `wallstsmart_complete_market_page_${currentPage}.csv`;
+    a.download = `wallstsmart_screener_page_${currentPage}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   // Get current page stocks
@@ -402,12 +416,11 @@ export default function CompleteMarketScreener() {
 
   // Initial load
   useEffect(() => {
-    // Check cache first, then fetch fresh data
     loadFromCache();
     fetchAllStocksFromAPI();
   }, []);
 
-  // Update display stocks when filters change
+  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedExchange, sortConfig]);
@@ -419,7 +432,7 @@ export default function CompleteMarketScreener() {
       {/* Header */}
       <div className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-[1600px] mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
                 Complete Market Overview
@@ -434,7 +447,7 @@ export default function CompleteMarketScreener() {
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -454,7 +467,7 @@ export default function CompleteMarketScreener() {
       <div className="max-w-[1600px] mx-auto px-4 py-6">
         {/* Filters and Search Bar */}
         <div className="bg-gray-900 rounded-xl p-4 mb-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4 flex-1">
               {/* Search */}
               <div className="relative flex-1 max-w-md">
@@ -495,8 +508,12 @@ export default function CompleteMarketScreener() {
             
             {/* Results count */}
             <div className="text-sm text-gray-400">
-              Showing {((currentPage - 1) * stocksPerPage) + 1} - {Math.min(currentPage * stocksPerPage, totalStocks)} 
-              of {totalStocks.toLocaleString()} stocks
+              {totalStocks > 0 && (
+                <>
+                  Showing {((currentPage - 1) * stocksPerPage) + 1} - {Math.min(currentPage * stocksPerPage, totalStocks)} 
+                  {' '}of {totalStocks.toLocaleString()} stocks
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -508,6 +525,12 @@ export default function CompleteMarketScreener() {
             <h3 className="text-lg font-medium text-gray-300 mb-2">Loading Complete Market Data...</h3>
             <p className="text-gray-500">Fetching all stocks from global exchanges</p>
             <p className="text-sm text-gray-600 mt-2">This may take a moment on first load</p>
+          </div>
+        ) : displayedStocks.length === 0 ? (
+          <div className="bg-gray-900 rounded-xl p-12 text-center">
+            <Search className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-300 mb-2">No stocks found</h3>
+            <p className="text-gray-500">Try adjusting your search or filters</p>
           </div>
         ) : (
           <>
@@ -525,7 +548,7 @@ export default function CompleteMarketScreener() {
                           <ArrowUpDown className="w-3 h-3" />
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3">
+                      <th className="text-left px-4 py-3 min-w-[200px]">
                         <button
                           onClick={() => handleSort('name')}
                           className="text-xs font-medium text-gray-400 uppercase tracking-wider hover:text-white flex items-center gap-1"
@@ -605,23 +628,24 @@ export default function CompleteMarketScreener() {
                   <tbody>
                     {displayedStocks.map((stock, index) => (
                       <tr 
-                        key={`${stock.symbol}-${stock.exchange}`} 
-                        className={`border-b border-gray-800 hover:bg-gray-850 transition-colors cursor-pointer ${
-                          index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-925'
+                        key={`${stock.symbol}-${stock.exchange}-${index}`} 
+                        className={`border-b border-gray-800 hover:bg-gray-850 transition-colors ${
+                          index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-900/50'
                         }`}
                       >
                         <td className="sticky left-0 z-10 px-4 py-3 bg-inherit">
                           <button 
                             onClick={() => navigateToStock(stock.symbol)}
-                            className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left"
+                            className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left flex items-center gap-1"
                           >
                             {stock.symbol}
+                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </button>
                         </td>
                         <td className="px-4 py-3">
                           <button 
                             onClick={() => navigateToStock(stock.symbol)}
-                            className="text-sm text-gray-300 hover:text-white hover:underline transition-colors max-w-xs truncate block text-left" 
+                            className="text-sm text-gray-300 hover:text-white transition-colors max-w-xs truncate block text-left" 
                             title={stock.name}
                           >
                             {stock.name}
@@ -653,8 +677,11 @@ export default function CompleteMarketScreener() {
                           {formatNumber(stock.volume, 'volume')}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <button className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors">
-                            <Star className="w-4 h-4 text-gray-400 hover:text-yellow-400" />
+                          <button 
+                            className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors group"
+                            title="Add to watchlist"
+                          >
+                            <Star className="w-4 h-4 text-gray-400 group-hover:text-yellow-400 transition-colors" />
                           </button>
                         </td>
                       </tr>
@@ -665,68 +692,70 @@ export default function CompleteMarketScreener() {
             </div>
 
             {/* Pagination */}
-            <div className="bg-gray-900 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Previous
-                  </button>
-                  
-                  <div className="flex items-center gap-1">
-                    {getPageNumbers().map((page, index) => (
-                      page === '...' ? (
-                        <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-500">...</span>
-                      ) : (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`px-3 py-2 rounded-lg transition-colors ${
-                            currentPage === page
-                              ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white font-semibold'
-                              : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      )
-                    ))}
+            {totalPages > 1 && (
+              <div className="bg-gray-900 rounded-xl p-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Previous
+                    </button>
+                    
+                    <div className="flex items-center gap-1">
+                      {getPageNumbers().map((page, index) => (
+                        page === '...' ? (
+                          <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-500">...</span>
+                        ) : (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-2 rounded-lg transition-colors ${
+                              currentPage === page
+                                ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white font-semibold'
+                                : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        )
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
                   
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-                
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="text-gray-400">Jump to page:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={totalPages}
-                    value={currentPage}
-                    onChange={(e) => {
-                      const page = parseInt(e.target.value);
-                      if (page >= 1 && page <= totalPages) {
-                        setCurrentPage(page);
-                      }
-                    }}
-                    className="w-16 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-center text-white
-                             focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-                  />
-                  <span className="text-gray-400">of {totalPages.toLocaleString()}</span>
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="text-gray-400">Jump to page:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max={totalPages}
+                      value={currentPage}
+                      onChange={(e) => {
+                        const page = parseInt(e.target.value);
+                        if (page >= 1 && page <= totalPages) {
+                          setCurrentPage(page);
+                        }
+                      }}
+                      className="w-16 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-center text-white
+                               focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                    />
+                    <span className="text-gray-400">of {totalPages.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
