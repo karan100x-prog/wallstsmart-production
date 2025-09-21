@@ -235,20 +235,20 @@ export default function CompleteMarketScreener() {
   };
 
   // Load from cache
-  const loadFromCache = () => {
-    const cached = localStorage.getItem('wallstsmart_stocks');
-    const timestamp = localStorage.getItem('wallstsmart_stocks_timestamp');
-    
-    if (cached && timestamp) {
-      const age = Date.now() - parseInt(timestamp);
-      // Use cache if less than 5 minutes old
-      if (age < 5 * 60 * 1000) {
-        const stocks = JSON.parse(cached);
-        setAllStocksData(stocks);
-        updateMarketStats(stocks);
-      }
+ const loadFromCache = () => {
+  const cached = localStorage.getItem('wallstsmart_stocks');
+  const timestamp = localStorage.getItem('wallstsmart_stocks_timestamp');
+  
+  if (cached && timestamp) {
+    const age = Date.now() - parseInt(timestamp);
+    // Use cache if less than 24 hours old
+    if (age < 24 * 60 * 60 * 1000) {  // <-- CHANGE THIS LINE
+      const stocks = JSON.parse(cached);
+      setAllStocksData(stocks);
+      updateMarketStats(stocks);
     }
-  };
+  }
+};
 
   // Update market statistics
   const updateMarketStats = (stocks) => {
