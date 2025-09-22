@@ -118,17 +118,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showVolume, setShowVolume] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Detect mobile viewport
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth ="100%");
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     loadChartData(selectedRange);
@@ -232,30 +221,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const formatDateSmart = (dateStr: string, range: TimeRange, index: number, array: any[]) => {
     const date = new Date(dateStr);
     
-    // Simplified date formatting for mobile
-    if (isMobile) {
-      if (range === '5D' || range === '1M') {
-        // Show fewer labels on mobile
-        if (index % 2 === 0 || index === 0 || index === array.length - 1) {
-          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-        return '';
-      } else if (range === '6M' || range === '1Y') {
-        // Show only month for these ranges on mobile
-        if (index % 3 === 0 || index === 0 || index === array.length - 1) {
-          return date.toLocaleDateString('en-US', { month: 'short' });
-        }
-        return '';
-      } else {
-        // Show only year for longer ranges
-        if (index % 4 === 0 || index === 0 || index === array.length - 1) {
-          return date.getFullYear().toString();
-        }
-        return '';
-      }
-    }
-    
-    // Desktop formatting (unchanged)
     if (range === '5D') {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } 
@@ -312,23 +277,16 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
 
-  // Mobile-specific chart margins
-  const chartMargins = isMobile 
-    ? { top: 5, right: 45, bottom: 30, left: showVolume ? 40 : 5 }  // Space for axes on mobile
-    : { top: 5, right: 55, bottom: 30, left: 50 }; // Default margins for desktop
-
   return (
     <div>
       {/* Time Range Buttons at the top */}
       <div className="flex justify-end items-center mb-4">
-        <div className={`flex gap-1 ${isMobile ? 'w-full' : 'sm:gap-2'} overflow-x-auto`}>
+        <div className="flex gap-1 sm:gap-2 overflow-x-auto">
           {timeRanges.map((range) => (
             <button
               key={range}
               onClick={() => setSelectedRange(range)}
-              className={`${
-                isMobile ? 'flex-1 px-1' : 'px-2 sm:px-3'
-              } py-1 rounded text-xs sm:text-sm transition whitespace-nowrap ${
+              className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm transition whitespace-nowrap ${
                 selectedRange === range
                   ? 'bg-green-600 text-white'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
@@ -357,56 +315,39 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
         </div>
       ) : (
         <>
-          <div className={isMobile ? '' : '-ml-8'}>
+          <div className="-ml-8">
             <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart data={chartData} margin={chartMargins}>
-                {/* Conditional grid for mobile */}
-                {!isMobile && (
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                )}
-                
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis 
                   dataKey="date" 
                   stroke="#9CA3AF"
-                  tick={{ fill: '#9CA3AF', fontSize: isMobile ? 10 : 11 }}
-                  interval={isMobile ? 'preserveStartEnd' : (
-                    selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
-                    Math.floor(chartData.length / 8) : 'preserveStartEnd'
-                  )}
-                  minTickGap={isMobile ? 10 : 20}
-                  angle={isMobile && (selectedRange === '5D' || selectedRange === '1M') ? -45 : 0}
-                  textAnchor={isMobile && (selectedRange === '5D' || selectedRange === '1M') ? 'end' : 'middle'}
-                  height={isMobile ? 40 : 30}
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  interval={selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === 'MAX' ? 
+                    Math.floor(chartData.length / 8) : 'preserveStartEnd'}
+                  minTickGap={20}
                 />
                 
-                {/* Volume Y-Axis - Always rendered but conditionally styled */}
+                {/* Volume Y-Axis on the LEFT - Always rendered but conditionally styled */}
                 <YAxis 
                   yAxisId="volume"
                   orientation="left"
                   stroke={showVolume ? "#60A5FA" : "transparent"}
-                  tick={{ 
-                    fill: showVolume ? '#60A5FA' : 'transparent', 
-                    fontSize: isMobile ? 9 : 11 
-                  }}
+                  tick={{ fill: showVolume ? '#60A5FA' : 'transparent', fontSize: 11 }}
                   tickFormatter={formatVolume}
                   domain={[0, 'dataMax * 1.2']}
                   axisLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
                   tickLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
-                  width={isMobile ? (showVolume ? 35 : 0) : 45}
                 />
                 
-                {/* Price Y-Axis - Always visible but optimized for mobile */}
+                {/* Price Y-Axis on the RIGHT */}
                 <YAxis 
                   yAxisId="price"
                   orientation="right"
                   stroke="#9CA3AF"
-                  tick={{ 
-                    fill: '#9CA3AF', 
-                    fontSize: isMobile ? 9 : 11 
-                  }}
+                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
                   domain={['dataMin * 0.95', 'dataMax * 1.05']}
-                  tickFormatter={(value) => `${value.toFixed(0)}`}
-                  width={isMobile ? 40 : 50}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
                 />
                 
                 <Tooltip 
@@ -416,7 +357,6 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                     border: '1px solid #374151',
                     borderRadius: '0.5rem'
                   }}
-                  position={isMobile ? { y: 0 } : undefined}
                 />
                 
                 {/* Volume Bars - Only rendered when showVolume is true */}
@@ -437,7 +377,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   stroke="#10B981" 
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: isMobile ? 4 : 6 }}
+                  activeDot={{ r: 6 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
