@@ -862,7 +862,7 @@ export default function Portfolio() {
                     value={newHolding.quantity}
                     onChange={(e) => setNewHolding({...newHolding, quantity: e.target.value})}
                     className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="10"
+                    placeholder="QTY"
                     required
                   />
                 </div>
@@ -886,7 +886,7 @@ export default function Portfolio() {
                     value={newHolding.avgPrice}
                     onChange={(e) => setNewHolding({...newHolding, avgPrice: e.target.value})}
                     className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder={symbolValidation.currentPrice ? symbolValidation.currentPrice.toFixed(2) : "150.00"}
+                    placeholder={symbolValidation.currentPrice ? symbolValidation.currentPrice.toFixed(2) : "~PRICE"}
                     required
                   />
                 </div>
