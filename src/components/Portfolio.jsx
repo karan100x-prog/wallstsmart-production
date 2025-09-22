@@ -70,7 +70,8 @@ export default function Portfolio() {
     symbol: '',
     quantity: '',
     avgPrice: '',
-    sector: ''
+    sector: '',
+    industry: ''
   });
   const [loading, setLoading] = useState(true);
   const [pricesLoading, setPricesLoading] = useState(false);
@@ -211,6 +212,9 @@ export default function Portfolio() {
         const currentPrice = parseFloat(quote['05. price']);
 
         let companyName = symbol.toUpperCase();
+        let detectedSector = 'Other';
+        let detectedIndustry = '';
+        
         try {
           await new Promise(resolve => setTimeout(resolve, 800));
           const overviewResponse = await axios.get(
@@ -219,16 +223,21 @@ export default function Portfolio() {
           
           if (overviewResponse.data.Name) {
             companyName = overviewResponse.data.Name;
+            // Get sector and industry from API
+            detectedSector = overviewResponse.data.Sector || 'Other';
+            detectedIndustry = overviewResponse.data.Industry || '';
           }
         } catch (error) {
-          console.log('Could not fetch company name, using symbol');
+          console.log('Could not fetch company details, using fallback');
+          // Fall back to hard-coded sectors if API fails
+          detectedSector = getSector(symbol);
         }
 
-        // Auto-detect sector
-        const detectedSector = getSector(symbol);
+        // Update holding with API-fetched sector
         setNewHolding(prev => ({
           ...prev,
-          sector: detectedSector
+          sector: detectedSector,
+          industry: detectedIndustry
         }));
 
         setSymbolValidation({
@@ -236,7 +245,9 @@ export default function Portfolio() {
           isValid: true,
           error: '',
           companyName: companyName,
-          currentPrice: currentPrice
+          currentPrice: currentPrice,
+          sector: detectedSector,
+          industry: detectedIndustry
         });
 
         if (!newHolding.avgPrice) {
@@ -344,11 +355,12 @@ export default function Portfolio() {
         quantity: parseFloat(newHolding.quantity),
         avgPrice: parseFloat(newHolding.avgPrice),
         sector: newHolding.sector || 'Other',
+        industry: newHolding.industry || '',
         createdAt: new Date().toISOString()
       });
       
       setShowAddModal(false);
-      setNewHolding({ symbol: '', quantity: '', avgPrice: '', sector: '' });
+      setNewHolding({ symbol: '', quantity: '', avgPrice: '', sector: '', industry: '' });
       setSymbolValidation({
         isValidating: false,
         isValid: false,
