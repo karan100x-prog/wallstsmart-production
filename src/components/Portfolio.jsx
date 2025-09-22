@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { Plus, Trash2, TrendingUp, TrendingDown, RefreshCw, Star } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, RefreshCw, Star, Search, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 
 export default function Portfolio() {
@@ -18,9 +18,21 @@ export default function Portfolio() {
   const [loading, setLoading] = useState(true);
   const [pricesLoading, setPricesLoading] = useState(false);
   const [liveQuotes, setLiveQuotes] = useState({});
-  const [activeTab, setActiveTab] = useState('portfolio'); // 'portfolio' or 'watchlist'
+  const [activeTab, setActiveTab] = useState('portfolio');
+  
+  // New states for validation
+  const [symbolValidation, setSymbolValidation] = useState({
+    isValidating: false,
+    isValid: false,
+    error: '',
+    companyName: '',
+    currentPrice: null
+  });
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const ALPHA_VANTAGE_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
+  // Your Premium API Key with 75 calls/minute
+  const ALPHA_VANTAGE_KEY = 'NMSRS0ZDIOWF3CLL';
 
   useEffect(() => {
     if (currentUser) {
@@ -32,10 +44,143 @@ export default function Portfolio() {
   useEffect(() => {
     if (holdings.length > 0 && activeTab === 'portfolio') {
       fetchLivePrices();
-      const interval = setInterval(fetchLivePrices, 60000); // Update every minute
+      const interval = setInterval(fetchLivePrices, 60000);
       return () => clearInterval(interval);
     }
   }, [holdings, activeTab]);
+
+  // Debounced symbol search for autocomplete
+  useEffect(() => {
+    const delaySearch = setTimeout(() => {
+      if (newHolding.symbol.length >= 2) {
+        searchSymbol(newHolding.symbol);
+      } else {
+        setSearchResults([]);
+      }
+    }, 500);
+
+    return () => clearTimeout(delaySearch);
+  }, [newHolding.symbol]);
+
+  // Search for symbols using SYMBOL_SEARCH endpoint
+  const searchSymbol = async (keywords) => {
+    setIsSearching(true);
+    try {
+      const response = await axios.get(
+        `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${keywords}&apikey=${ALPHA_VANTAGE_KEY}`
+      );
+      
+      if (response.data.bestMatches) {
+        const matches = response.data.bestMatches
+          .filter(match => {
+            // Filter for stocks only (exclude mutual funds, ETFs with specific patterns)
+            const symbol = match['1. symbol'];
+            const type = match['3. type'];
+            const region = match['4. region'];
+            
+            // Prioritize US stocks
+            return type === 'Equity' && 
+                   region === 'United States' &&
+                   !symbol.includes('.') && // Exclude foreign exchanges
+                   symbol.length <= 5; // Most US stocks have short symbols
+          })
+          .slice(0, 5) // Limit to top 5 results
+          .map(match => ({
+            symbol: match['1. symbol'],
+            name: match['2. name'],
+            type: match['3. type'],
+            region: match['4. region']
+          }));
+        
+        setSearchResults(matches);
+      }
+    } catch (error) {
+      console.error('Symbol search error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Validate symbol and get current price
+  const validateSymbol = async (symbol) => {
+    if (!symbol) {
+      setSymbolValidation({
+        isValidating: false,
+        isValid: false,
+        error: 'Please enter a symbol',
+        companyName: '',
+        currentPrice: null
+      });
+      return;
+    }
+
+    setSymbolValidation({
+      ...symbolValidation,
+      isValidating: true,
+      error: ''
+    });
+
+    try {
+      // First, get the quote to verify the symbol exists
+      const quoteResponse = await axios.get(
+        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol.toUpperCase()}&apikey=${ALPHA_VANTAGE_KEY}`
+      );
+
+      if (quoteResponse.data['Global Quote'] && quoteResponse.data['Global Quote']['05. price']) {
+        const quote = quoteResponse.data['Global Quote'];
+        const currentPrice = parseFloat(quote['05. price']);
+
+        // Get company overview for name (optional, can be skipped for speed)
+        let companyName = symbol.toUpperCase();
+        try {
+          await new Promise(resolve => setTimeout(resolve, 800)); // Rate limit delay
+          const overviewResponse = await axios.get(
+            `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol.toUpperCase()}&apikey=${ALPHA_VANTAGE_KEY}`
+          );
+          
+          if (overviewResponse.data.Name) {
+            companyName = overviewResponse.data.Name;
+          }
+        } catch (error) {
+          // If overview fails, continue with just the symbol
+          console.log('Could not fetch company name, using symbol');
+        }
+
+        setSymbolValidation({
+          isValidating: false,
+          isValid: true,
+          error: '',
+          companyName: companyName,
+          currentPrice: currentPrice
+        });
+
+        // Auto-fill the current price as suggestion
+        if (!newHolding.avgPrice) {
+          setNewHolding(prev => ({
+            ...prev,
+            avgPrice: currentPrice.toFixed(2)
+          }));
+        }
+      } else {
+        setSymbolValidation({
+          isValidating: false,
+          isValid: false,
+          error: 'Invalid symbol or symbol not found',
+          companyName: '',
+          currentPrice: null
+        });
+      }
+    } catch (error) {
+      console.error('Symbol validation error:', error);
+      setSymbolValidation({
+        isValidating: false,
+        isValid: false,
+        error: 'Error validating symbol. Please try again.',
+        companyName: '',
+        currentPrice: null
+      });
+    }
+  };
 
   const fetchHoldings = async () => {
     try {
@@ -89,7 +234,6 @@ export default function Portfolio() {
           };
         }
         
-        // Add delay to respect API rate limits
         await new Promise(resolve => setTimeout(resolve, 800));
       } catch (error) {
         console.error(`Error fetching price for ${holding.symbol}:`, error);
@@ -102,10 +246,18 @@ export default function Portfolio() {
 
   const addHolding = async (e) => {
     e.preventDefault();
+    
+    // Validate before adding
+    if (!symbolValidation.isValid) {
+      alert('Please enter a valid stock symbol');
+      return;
+    }
+
     try {
       await addDoc(collection(db, 'portfolios'), {
         userId: currentUser.uid,
         symbol: newHolding.symbol.toUpperCase(),
+        companyName: symbolValidation.companyName,
         quantity: parseFloat(newHolding.quantity),
         avgPrice: parseFloat(newHolding.avgPrice),
         createdAt: new Date().toISOString()
@@ -113,15 +265,31 @@ export default function Portfolio() {
       
       setShowAddModal(false);
       setNewHolding({ symbol: '', quantity: '', avgPrice: '' });
+      setSymbolValidation({
+        isValidating: false,
+        isValid: false,
+        error: '',
+        companyName: '',
+        currentPrice: null
+      });
+      setSearchResults([]);
       fetchHoldings();
     } catch (error) {
       console.error('Error adding holding:', error);
     }
   };
 
+  const selectSymbolFromSearch = (result) => {
+    setNewHolding(prev => ({
+      ...prev,
+      symbol: result.symbol
+    }));
+    setSearchResults([]);
+    validateSymbol(result.symbol);
+  };
+
   const addToWatchlist = async (symbol) => {
     try {
-      // Check if already in watchlist
       const exists = watchlist.some(item => item.symbol === symbol);
       if (exists) {
         alert('Already in watchlist!');
@@ -171,7 +339,7 @@ export default function Portfolio() {
       if (liveQuotes[holding.symbol]) {
         totalCurrentValue += holding.quantity * liveQuotes[holding.symbol].price;
       } else {
-        totalCurrentValue += invested; // Use cost basis if no live price
+        totalCurrentValue += invested;
       }
     });
     
@@ -294,7 +462,12 @@ export default function Portfolio() {
                       <tr key={holding.id} className="border-t border-gray-800">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold">{holding.symbol}</span>
+                            <div>
+                              <span className="font-semibold">{holding.symbol}</span>
+                              {holding.companyName && (
+                                <p className="text-xs text-gray-400">{holding.companyName}</p>
+                              )}
+                            </div>
                             <button
                               onClick={() => addToWatchlist(holding.symbol)}
                               className="text-gray-400 hover:text-yellow-500"
@@ -380,28 +553,106 @@ export default function Portfolio() {
         </div>
       )}
 
-      {/* Add Holding Modal */}
+      {/* Enhanced Add Holding Modal with Validation */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold mb-6">Add New Holding</h2>
             <form onSubmit={addHolding} className="space-y-4">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium mb-1">Stock Symbol</label>
-                <input
-                  type="text"
-                  value={newHolding.symbol}
-                  onChange={(e) => setNewHolding({...newHolding, symbol: e.target.value})}
-                  className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="AAPL"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={newHolding.symbol}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      setNewHolding({...newHolding, symbol: value});
+                      if (value.length === 0) {
+                        setSymbolValidation({
+                          isValidating: false,
+                          isValid: false,
+                          error: '',
+                          companyName: '',
+                          currentPrice: null
+                        });
+                      }
+                    }}
+                    onBlur={() => {
+                      if (newHolding.symbol && !symbolValidation.isValid) {
+                        validateSymbol(newHolding.symbol);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 ${
+                      symbolValidation.error ? 'focus:ring-red-500 border border-red-500' : 
+                      symbolValidation.isValid ? 'focus:ring-green-500 border border-green-500' :
+                      'focus:ring-green-500'
+                    }`}
+                    placeholder="AAPL"
+                    required
+                  />
+                  {symbolValidation.isValidating && (
+                    <div className="absolute right-3 top-2">
+                      <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />
+                    </div>
+                  )}
+                  {symbolValidation.isValid && (
+                    <div className="absolute right-3 top-2">
+                      <svg className="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                {/* Autocomplete dropdown */}
+                {searchResults.length > 0 && (
+                  <div className="absolute z-10 w-full bg-gray-800 border border-gray-700 rounded-lg mt-1 max-h-60 overflow-auto">
+                    {searchResults.map((result, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => selectSymbolFromSearch(result)}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors"
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="font-semibold">{result.symbol}</span>
+                            <p className="text-xs text-gray-400">{result.name}</p>
+                          </div>
+                          <span className="text-xs text-gray-500">{result.region}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Validation feedback */}
+                {symbolValidation.error && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {symbolValidation.error}
+                  </p>
+                )}
+                {symbolValidation.isValid && (
+                  <div className="text-green-500 text-xs mt-1">
+                    <p className="flex items-center gap-1">
+                      ✓ Valid: {symbolValidation.companyName}
+                    </p>
+                    {symbolValidation.currentPrice && (
+                      <p className="text-gray-400">
+                        Current price: ${symbolValidation.currentPrice.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Number of Shares</label>
                 <input
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   value={newHolding.quantity}
                   onChange={(e) => setNewHolding({...newHolding, quantity: e.target.value})}
                   className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -409,28 +660,53 @@ export default function Portfolio() {
                   required
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">Purchase Price (per share)</label>
+                <label className="block text-sm font-medium mb-1">
+                  Purchase Price (per share)
+                  {symbolValidation.currentPrice && (
+                    <button
+                      type="button"
+                      onClick={() => setNewHolding({...newHolding, avgPrice: symbolValidation.currentPrice.toFixed(2)})}
+                      className="ml-2 text-xs text-green-500 hover:text-green-400"
+                    >
+                      Use current price
+                    </button>
+                  )}
+                </label>
                 <input
                   type="number"
                   step="0.01"
                   value={newHolding.avgPrice}
                   onChange={(e) => setNewHolding({...newHolding, avgPrice: e.target.value})}
                   className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="150.00"
+                  placeholder={symbolValidation.currentPrice ? symbolValidation.currentPrice.toFixed(2) : "150.00"}
                   required
                 />
               </div>
+
               <div className="flex gap-4">
                 <button
                   type="submit"
-                  className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold"
+                  disabled={!symbolValidation.isValid || symbolValidation.isValidating}
+                  className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add Holding
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setNewHolding({ symbol: '', quantity: '', avgPrice: '' });
+                    setSymbolValidation({
+                      isValidating: false,
+                      isValid: false,
+                      error: '',
+                      companyName: '',
+                      currentPrice: null
+                    });
+                    setSearchResults([]);
+                  }}
                   className="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg font-semibold"
                 >
                   Cancel
