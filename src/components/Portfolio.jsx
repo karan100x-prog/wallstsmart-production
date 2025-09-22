@@ -796,7 +796,7 @@ export default function Portfolio() {
                         symbolValidation.isValid ? 'focus:ring-green-500 border border-green-500' :
                         'focus:ring-green-500'
                       }`}
-                      placeholder="AAPL"
+                      placeholder="SYMBOL"
                       required
                     />
                     {symbolValidation.isValidating && (
