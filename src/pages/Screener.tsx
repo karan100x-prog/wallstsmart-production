@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2, ExternalLink, Clock, AlertCircle, Loader } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2, ExternalLink, Clock, AlertCircle, Loader, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// Enhanced Market Screener with Smart Real-Time Data Loading
+// Enhanced Market Screener with Controlled Updates
 export default function EnhancedMarketScreener() {
   const navigate = useNavigate();
   
@@ -10,7 +10,13 @@ export default function EnhancedMarketScreener() {
   const [stocksMetadata, setStocksMetadata] = useState([]);
   
   // State for real-time data (actual prices and metrics)
-  const [realTimeData, setRealTimeData] = useState(new Map());
+  const [realTimeDataCache, setRealTimeDataCache] = useState(new Map());
+  
+  // State for displayed data (frozen snapshot)
+  const [displayedData, setDisplayedData] = useState(new Map());
+  
+  // Track pending updates
+  const [pendingUpdates, setPendingUpdates] = useState(new Map());
   
   // Track which symbols are currently loading
   const [loadingSymbols, setLoadingSymbols] = useState(new Set());
@@ -21,6 +27,7 @@ export default function EnhancedMarketScreener() {
   // General loading states
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [autoUpdate, setAutoUpdate] = useState(false); // Control auto-updates
   
   // UI states
   const [currentPage, setCurrentPage] = useState(1);
@@ -163,36 +170,6 @@ export default function EnhancedMarketScreener() {
     }
   };
 
-  // Fetch company overview for fundamental data
-  const fetchCompanyOverview = async (symbol) => {
-    try {
-      const response = await fetch(
-        `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`
-      );
-      
-      if (response.ok) {
-        const overview = await response.json();
-        
-        if (overview && overview.Symbol) {
-          return {
-            marketCap: parseFloat(overview.MarketCapitalization) || 0,
-            peRatio: parseFloat(overview.PERatio) || 0,
-            dividendYield: parseFloat(overview.DividendYield) * 100 || 0,
-            eps: parseFloat(overview.EPS) || 0,
-            beta: parseFloat(overview.Beta) || 0,
-            yearHigh: parseFloat(overview['52WeekHigh']) || 0,
-            yearLow: parseFloat(overview['52WeekLow']) || 0,
-            roe: parseFloat(overview.ReturnOnEquityTTM) * 100 || 0,
-            profitMargin: parseFloat(overview.ProfitMargin) * 100 || 0
-          };
-        }
-      }
-    } catch (error) {
-      console.error(`Error fetching overview for ${symbol}:`, error);
-    }
-    return null;
-  };
-
   // Process fetch queue
   const processFetchQueue = async () => {
     if (isFetchingRef.current || fetchQueueRef.current.length === 0) {
@@ -204,15 +181,23 @@ export default function EnhancedMarketScreener() {
     while (fetchQueueRef.current.length > 0) {
       const symbol = fetchQueueRef.current.shift();
       
-      if (!realTimeData.has(symbol) && !loadingSymbols.has(symbol) && !failedSymbols.has(symbol)) {
+      if (!realTimeDataCache.has(symbol) && !loadingSymbols.has(symbol) && !failedSymbols.has(symbol)) {
         const quoteData = await fetchRealTimeQuote(symbol);
         
         if (quoteData) {
-          setRealTimeData(prev => {
+          // Add to pending updates instead of directly to cache
+          setPendingUpdates(prev => {
+            const next = new Map(prev);
+            next.set(symbol, quoteData);
+            return next;
+          });
+          
+          // Update cache in background
+          setRealTimeDataCache(prev => {
             const next = new Map(prev);
             next.set(symbol, quoteData);
             
-            // Save to cache
+            // Save to localStorage
             const cacheData = Array.from(next.entries());
             localStorage.setItem(REALTIME_CACHE_KEY, JSON.stringify(cacheData));
             localStorage.setItem(REALTIME_CACHE_KEY + '_timestamp', Date.now().toString());
@@ -221,7 +206,7 @@ export default function EnhancedMarketScreener() {
           });
         }
         
-        // Rate limiting - respect 75 calls/minute (be conservative)
+        // Rate limiting - respect 75 calls/minute
         await new Promise(resolve => setTimeout(resolve, 850));
       }
     }
@@ -229,12 +214,27 @@ export default function EnhancedMarketScreener() {
     isFetchingRef.current = false;
   };
 
+  // Apply pending updates to displayed data
+  const applyPendingUpdates = () => {
+    if (pendingUpdates.size === 0) return;
+    
+    setDisplayedData(prev => {
+      const next = new Map(prev);
+      pendingUpdates.forEach((data, symbol) => {
+        next.set(symbol, data);
+      });
+      return next;
+    });
+    
+    setPendingUpdates(new Map());
+  };
+
   // Add symbols to fetch queue
   const queueSymbolsForFetch = (symbols) => {
     const uniqueSymbols = [...new Set(symbols)];
     const newSymbols = uniqueSymbols.filter(s => 
       !fetchQueueRef.current.includes(s) &&
-      !realTimeData.has(s) &&
+      !realTimeDataCache.has(s) &&
       !loadingSymbols.has(s) &&
       !failedSymbols.has(s)
     );
@@ -301,7 +301,9 @@ export default function EnhancedMarketScreener() {
       
       if (age < CACHE_DURATION) {
         const data = JSON.parse(cached);
-        setRealTimeData(new Map(data));
+        const dataMap = new Map(data);
+        setRealTimeDataCache(dataMap);
+        setDisplayedData(dataMap); // Set displayed data initially
         setCacheAge(age);
         return true;
       }
@@ -357,15 +359,15 @@ export default function EnhancedMarketScreener() {
     return `${minutes}m ago`;
   };
 
-  // Combine metadata with real-time data
+  // Combine metadata with displayed data
   const getCombinedStockData = () => {
     return stocksMetadata.map(stock => {
-      const realData = realTimeData.get(stock.symbol);
+      const displayData = displayedData.get(stock.symbol);
       
-      if (realData) {
+      if (displayData) {
         return {
           ...stock,
-          ...realData,
+          ...displayData,
           hasRealData: true
         };
       }
@@ -383,6 +385,11 @@ export default function EnhancedMarketScreener() {
         hasRealData: false
       };
     });
+  };
+
+  // Check if stock has pending update
+  const hasPendingUpdate = (symbol) => {
+    return pendingUpdates.has(symbol) && !displayedData.has(symbol);
   };
 
   // Filter and sort stocks
@@ -441,14 +448,49 @@ export default function EnhancedMarketScreener() {
   // Refresh all data
   const handleRefresh = async () => {
     console.log('Manual refresh requested');
-    setFailedSymbols(new Set()); // Clear failed symbols to retry
-    fetchQueueRef.current = []; // Clear queue
+    
+    // Apply any pending updates first
+    applyPendingUpdates();
+    
+    // Clear failed symbols to retry
+    setFailedSymbols(new Set());
+    fetchQueueRef.current = [];
+    
+    // Refetch metadata if needed
     await fetchStockMetadata();
     
     // Queue visible stocks for immediate refresh
     const visible = getCurrentPageStocks();
     const symbols = visible.map(s => s.symbol);
     queueSymbolsForFetch(symbols);
+  };
+
+  // Refresh specific symbol
+  const refreshSymbol = async (symbol) => {
+    // Remove from failed list
+    setFailedSymbols(prev => {
+      const next = new Set(prev);
+      next.delete(symbol);
+      return next;
+    });
+    
+    // Fetch immediately
+    const data = await fetchRealTimeQuote(symbol);
+    if (data) {
+      // Update displayed data immediately for this symbol
+      setDisplayedData(prev => {
+        const next = new Map(prev);
+        next.set(symbol, data);
+        return next;
+      });
+      
+      // Also update cache
+      setRealTimeDataCache(prev => {
+        const next = new Map(prev);
+        next.set(symbol, data);
+        return next;
+      });
+    }
   };
 
   // Export to CSV
@@ -552,6 +594,9 @@ export default function EnhancedMarketScreener() {
   useEffect(() => {
     if (stocksMetadata.length === 0) return;
     
+    // Apply pending updates when changing pages
+    applyPendingUpdates();
+    
     const visible = getCurrentPageStocks();
     const symbols = visible
       .filter(s => !s.hasRealData)
@@ -562,6 +607,17 @@ export default function EnhancedMarketScreener() {
       queueSymbolsForFetch(symbols);
     }
   }, [currentPage, searchTerm, selectedExchange, sortConfig, stocksMetadata]);
+
+  // Auto-update displayed data if enabled
+  useEffect(() => {
+    if (autoUpdate && pendingUpdates.size > 0) {
+      const interval = setInterval(() => {
+        applyPendingUpdates();
+      }, 5000); // Update every 5 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [autoUpdate, pendingUpdates]);
 
   // Fetch watchlist stocks on mount
   useEffect(() => {
@@ -577,6 +633,9 @@ export default function EnhancedMarketScreener() {
 
   const displayedStocks = getCurrentPageStocks();
   const stocksWithRealData = displayedStocks.filter(s => s.hasRealData).length;
+  const pendingUpdateCount = Array.from(pendingUpdates.keys()).filter(symbol => 
+    displayedStocks.some(s => s.symbol === symbol)
+  ).length;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -592,8 +651,13 @@ export default function EnhancedMarketScreener() {
                 <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> stocks • 
                 <span className="text-blue-400 font-semibold ml-2">{marketStats.exchanges.length}</span> exchanges • 
                 <span className="text-yellow-400 font-semibold ml-2">
-                  {stocksWithRealData}/{displayedStocks.length} with real-time data
+                  {stocksWithRealData}/{displayedStocks.length} loaded
                 </span>
+                {pendingUpdateCount > 0 && (
+                  <span className="text-orange-400 ml-2">
+                    • {pendingUpdateCount} updates pending
+                  </span>
+                )}
                 {watchlist.length > 0 && (
                   <span className="text-purple-400 ml-2">
                     • <Star className="inline w-3 h-3 mr-1 fill-current" />
@@ -603,6 +667,26 @@ export default function EnhancedMarketScreener() {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              {pendingUpdateCount > 0 && (
+                <button
+                  onClick={applyPendingUpdates}
+                  className="px-4 py-2 bg-orange-600 rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
+                  title="Apply pending updates"
+                >
+                  <Eye className="w-4 h-4" />
+                  Show Updates ({pendingUpdateCount})
+                </button>
+              )}
+              <button
+                onClick={() => setAutoUpdate(!autoUpdate)}
+                className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                  autoUpdate ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-800 hover:bg-gray-700'
+                }`}
+                title={autoUpdate ? "Disable auto-update" : "Enable auto-update"}
+              >
+                <RefreshCw className={`w-4 h-4 ${autoUpdate ? 'animate-spin' : ''}`} />
+                {autoUpdate ? 'Auto' : 'Manual'}
+              </button>
               <button
                 onClick={handleRefresh}
                 disabled={loading}
@@ -617,7 +701,7 @@ export default function EnhancedMarketScreener() {
                 className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                Export CSV
+                Export
               </button>
             </div>
           </div>
@@ -625,12 +709,30 @@ export default function EnhancedMarketScreener() {
       </div>
 
       <div className="max-w-[1600px] mx-auto px-4 py-6">
-        {/* Real-time data loading indicator */}
+        {/* Update notification */}
+        {pendingUpdateCount > 0 && !autoUpdate && (
+          <div className="bg-orange-900/20 border border-orange-600/30 rounded-lg p-3 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+              <p className="text-sm text-orange-200">
+                {pendingUpdateCount} stock{pendingUpdateCount > 1 ? 's have' : ' has'} new data available. Click "Show Updates" to see the latest prices.
+              </p>
+            </div>
+            <button
+              onClick={applyPendingUpdates}
+              className="text-orange-400 hover:text-orange-300 text-sm font-medium"
+            >
+              Show Updates
+            </button>
+          </div>
+        )}
+
+        {/* Loading indicator */}
         {loadingSymbols.size > 0 && (
           <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3 mb-4 flex items-center gap-3">
             <Loader className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
             <p className="text-sm text-blue-200">
-              Loading real-time data for {loadingSymbols.size} symbol{loadingSymbols.size > 1 ? 's' : ''}...
+              Loading data for {loadingSymbols.size} symbol{loadingSymbols.size > 1 ? 's' : ''}...
             </p>
           </div>
         )}
@@ -767,99 +869,110 @@ export default function EnhancedMarketScreener() {
                     </tr>
                   </thead>
                   <tbody>
-                    {displayedStocks.map((stock, index) => (
-                      <tr 
-                        key={`${stock.symbol}-${index}`} 
-                        className={`border-b border-gray-800 hover:bg-gray-850 transition-colors ${
-                          index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-900/50'
-                        } ${!stock.hasRealData ? 'opacity-60' : ''}`}
-                      >
-                        <td className="sticky left-0 z-10 px-4 py-3 bg-inherit">
-                          <div className="flex items-center gap-2">
+                    {displayedStocks.map((stock, index) => {
+                      const isPending = hasPendingUpdate(stock.symbol);
+                      
+                      return (
+                        <tr 
+                          key={`${stock.symbol}-${index}`} 
+                          className={`border-b border-gray-800 hover:bg-gray-850 transition-colors ${
+                            index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-900/50'
+                          } ${!stock.hasRealData ? 'opacity-60' : ''} ${
+                            isPending ? 'ring-1 ring-orange-500/30' : ''
+                          }`}
+                        >
+                          <td className="sticky left-0 z-10 px-4 py-3 bg-inherit">
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => navigateToStock(stock.symbol)}
+                                className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left group flex items-center gap-1"
+                              >
+                                {stock.symbol}
+                                <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </button>
+                              {loadingSymbols.has(stock.symbol) && (
+                                <Loader className="w-3 h-3 text-gray-400 animate-spin" />
+                              )}
+                              {isPending && (
+                                <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
+                                  new
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
                             <button 
                               onClick={() => navigateToStock(stock.symbol)}
-                              className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left group flex items-center gap-1"
+                              className="text-sm text-gray-300 hover:text-white transition-colors max-w-xs truncate block text-left" 
+                              title={stock.name}
                             >
-                              {stock.symbol}
-                              <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              {stock.name}
                             </button>
-                            {loadingSymbols.has(stock.symbol) && (
-                              <Loader className="w-3 h-3 text-gray-400 animate-spin" />
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className="px-2 py-1 bg-gray-800 rounded text-xs font-medium text-gray-300">
+                              {stock.exchange}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium">
+                            {stock.hasRealData ? (
+                              `$${stock.price.toFixed(2)}`
+                            ) : (
+                              <span className="text-gray-500">--</span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button 
-                            onClick={() => navigateToStock(stock.symbol)}
-                            className="text-sm text-gray-300 hover:text-white transition-colors max-w-xs truncate block text-left" 
-                            title={stock.name}
-                          >
-                            {stock.name}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className="px-2 py-1 bg-gray-800 rounded text-xs font-medium text-gray-300">
-                            {stock.exchange}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium">
-                          {stock.hasRealData ? (
-                            `$${stock.price.toFixed(2)}`
-                          ) : (
-                            <span className="text-gray-500">--</span>
-                          )}
-                        </td>
-                        <td className={`px-4 py-3 text-right font-medium ${
-                          stock.hasRealData ? (
-                            stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'
-                          ) : 'text-gray-500'
-                        }`}>
-                          {stock.hasRealData ? (
-                            `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%`
-                          ) : (
-                            '--'
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm">
-                          {stock.hasRealData && stock.marketCap ? 
-                            formatNumber(stock.marketCap, 'marketCap') : 
-                            <span className="text-gray-500">--</span>
-                          }
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm">
-                          {stock.hasRealData && stock.volume ? 
-                            formatNumber(stock.volume, 'volume') : 
-                            <span className="text-gray-500">--</span>
-                          }
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1">
-                            <button 
-                              onClick={() => toggleWatchlist(stock.symbol)}
-                              className="p-1.5 hover:bg-gray-800 rounded-lg transition-all group"
-                              title={isInWatchlist(stock.symbol) ? "Remove from watchlist" : "Add to watchlist"}
-                            >
-                              <Star 
-                                className={`w-4 h-4 transition-all ${
-                                  isInWatchlist(stock.symbol)
-                                    ? 'text-yellow-400 fill-yellow-400'
-                                    : 'text-gray-400 group-hover:text-yellow-400'
-                                }`}
-                              />
-                            </button>
-                            {!stock.hasRealData && !loadingSymbols.has(stock.symbol) && (
-                              <button
-                                onClick={() => queueSymbolsForFetch([stock.symbol])}
+                          </td>
+                          <td className={`px-4 py-3 text-right font-medium ${
+                            stock.hasRealData ? (
+                              stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'
+                            ) : 'text-gray-500'
+                          }`}>
+                            {stock.hasRealData ? (
+                              `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%`
+                            ) : (
+                              '--'
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm">
+                            {stock.hasRealData && stock.marketCap ? 
+                              formatNumber(stock.marketCap, 'marketCap') : 
+                              <span className="text-gray-500">--</span>
+                            }
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm">
+                            {stock.hasRealData && stock.volume ? 
+                              formatNumber(stock.volume, 'volume') : 
+                              <span className="text-gray-500">--</span>
+                            }
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center gap-1">
+                              <button 
+                                onClick={() => toggleWatchlist(stock.symbol)}
                                 className="p-1.5 hover:bg-gray-800 rounded-lg transition-all group"
-                                title="Load real-time data"
+                                title={isInWatchlist(stock.symbol) ? "Remove from watchlist" : "Add to watchlist"}
                               >
-                                <RefreshCw className="w-4 h-4 text-gray-400 group-hover:text-green-400" />
+                                <Star 
+                                  className={`w-4 h-4 transition-all ${
+                                    isInWatchlist(stock.symbol)
+                                      ? 'text-yellow-400 fill-yellow-400'
+                                      : 'text-gray-400 group-hover:text-yellow-400'
+                                  }`}
+                                />
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {!stock.hasRealData && !loadingSymbols.has(stock.symbol) && (
+                                <button
+                                  onClick={() => refreshSymbol(stock.symbol)}
+                                  className="p-1.5 hover:bg-gray-800 rounded-lg transition-all group"
+                                  title="Load data"
+                                >
+                                  <RefreshCw className="w-4 h-4 text-gray-400 group-hover:text-green-400" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
