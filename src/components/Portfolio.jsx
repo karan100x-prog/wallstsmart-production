@@ -11,7 +11,7 @@ import axios from 'axios';
 // Sector definitions for categorization
 const SECTORS = {
   'Technology': ['AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA', 'AVGO', 'ORCL', 'ADBE', 'CRM', 'INTC'],
-  'Healthcare': ['JNJ', 'UNH', 'PFE', 'ABBV', 'TMO', 'MRK', 'ABT', 'CVS', 'DHR', 'AMGN'],
+  'Healthcare': ['JNJ', 'UNH', 'PFE', 'ABBV', 'TMO', 'MRK', 'ABT', 'CVS', 'DHR', 'AMGN', 'HIMS'],
   'Finance': ['BRK.B', 'JPM', 'V', 'MA', 'BAC', 'WFC', 'GS', 'MS', 'AXP', 'SCHW'],
   'Consumer Discretionary': ['AMZN', 'TSLA', 'HD', 'MCD', 'NKE', 'SBUX', 'TGT', 'LOW', 'BKNG'],
   'Consumer Staples': ['WMT', 'PG', 'KO', 'PEP', 'COST', 'MDLZ', 'MO', 'CL', 'GIS'],
