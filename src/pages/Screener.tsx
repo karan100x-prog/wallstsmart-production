@@ -1,112 +1,83 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2, ExternalLink, Clock, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ChevronLeft, ChevronRight, RefreshCw, Download, TrendingUp, Star, Search, ArrowUpDown, Filter, Globe, Building2, ExternalLink, Clock, AlertCircle, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// Complete Market Screener with Real Alpha Vantage Integration
-export default function CompleteMarketScreener() {
+// Enhanced Market Screener with Smart Real-Time Data Loading
+export default function EnhancedMarketScreener() {
   const navigate = useNavigate();
-  const [allStocksData, setAllStocksData] = useState([]);
+  
+  // State for stock metadata (basic info from LISTING_STATUS)
+  const [stocksMetadata, setStocksMetadata] = useState([]);
+  
+  // State for real-time data (actual prices and metrics)
+  const [realTimeData, setRealTimeData] = useState(new Map());
+  
+  // Track which symbols are currently loading
+  const [loadingSymbols, setLoadingSymbols] = useState(new Set());
+  
+  // Track failed symbol fetches to avoid retrying
+  const [failedSymbols, setFailedSymbols] = useState(new Set());
+  
+  // General loading states
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  
+  // UI states
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'marketCap', direction: 'desc' });
   const [selectedExchange, setSelectedExchange] = useState('all');
   const [cacheAge, setCacheAge] = useState(null);
-  const [forceRefresh, setForceRefresh] = useState(false);
+  
+  // Watchlist
   const [watchlist, setWatchlist] = useState(() => {
-    // Initialize watchlist from localStorage
     const saved = localStorage.getItem('wallstsmart_watchlist');
     return saved ? JSON.parse(saved) : [];
   });
+  
+  // Market statistics
   const [marketStats, setMarketStats] = useState({
     totalStocks: 0,
     activeStocks: 0,
-    delistedStocks: 0,
     exchanges: []
   });
   
+  // Ref to track current fetch queue
+  const fetchQueueRef = useRef([]);
+  const isFetchingRef = useRef(false);
+  
   const stocksPerPage = 100;
   const API_KEY = 'NMSRS0ZDIOWF3CLL';
-  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  const METADATA_CACHE_KEY = 'wallstsmart_stocks_metadata';
+  const REALTIME_CACHE_KEY = 'wallstsmart_realtime_data';
+  const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes for real-time data
+  
+  // Priority stocks to always fetch first
+  const PRIORITY_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'BRK.B', 'JPM', 'V'];
 
   // Toggle watchlist
   const toggleWatchlist = (symbol) => {
     setWatchlist(prev => {
       const isInWatchlist = prev.includes(symbol);
-      let newWatchlist;
+      const newWatchlist = isInWatchlist 
+        ? prev.filter(s => s !== symbol)
+        : [...prev, symbol];
       
-      if (isInWatchlist) {
-        // Remove from watchlist
-        newWatchlist = prev.filter(s => s !== symbol);
-      } else {
-        // Add to watchlist
-        newWatchlist = [...prev, symbol];
-      }
-      
-      // Save to localStorage
       localStorage.setItem('wallstsmart_watchlist', JSON.stringify(newWatchlist));
       return newWatchlist;
     });
   };
 
   // Check if stock is in watchlist
-  const isInWatchlist = (symbol) => {
-    return watchlist.includes(symbol);
-  };
+  const isInWatchlist = (symbol) => watchlist.includes(symbol);
 
-  // Fetch ALL stocks from Alpha Vantage LISTING_STATUS
-  const fetchAllStocksFromAPI = async (skipCache = false) => {
-    setLoading(true);
-    try {
-      console.log('Fetching fresh data from Alpha Vantage API...');
-      
-      // Fetch complete listing of ALL stocks
-      const listingResponse = await fetch(
-        `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${API_KEY}`
-      );
-      
-      if (!listingResponse.ok) throw new Error('Failed to fetch listing data');
-      
-      const csvText = await listingResponse.text();
-      const stocks = parseCSVToStocks(csvText);
-      
-      // Get additional data for top stocks
-      const enhancedStocks = await enhanceStocksWithQuotes(stocks);
-      
-      setAllStocksData(enhancedStocks);
-      updateMarketStats(enhancedStocks);
-      
-      // Save to localStorage for faster subsequent loads
-      localStorage.setItem('wallstsmart_stocks', JSON.stringify(enhancedStocks));
-      localStorage.setItem('wallstsmart_stocks_timestamp', Date.now().toString());
-      
-      setCacheAge(null); // Reset cache age since we just fetched fresh data
-      
-      console.log('Fresh data fetched and cached successfully');
-      
-    } catch (error) {
-      console.error('Error fetching stocks:', error);
-      // Try to load from localStorage as fallback
-      if (!skipCache) {
-        console.log('Falling back to cached data...');
-        loadFromCache();
-      }
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-    }
-  };
-
-  // Parse CSV from Alpha Vantage - handles commas in company names
+  // Parse CSV from Alpha Vantage
   const parseCSVToStocks = (csvText) => {
     const lines = csvText.split('\n');
     const stocks = [];
     
-    // Skip header line
     for (let i = 1; i < lines.length; i++) {
       if (lines[i].trim()) {
-        // Use regex to properly parse CSV with quoted values
         const matches = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
         if (matches && matches.length >= 7) {
           const values = matches.map(val => val.replace(/^"|"$/g, '').trim());
@@ -118,22 +89,7 @@ export default function CompleteMarketScreener() {
             assetType: values[3],
             ipoDate: values[4],
             delistingDate: values[5] || null,
-            status: values[6] || 'Active',
-            // Initialize with placeholder data
-            price: 0,
-            change: 0,
-            changePercent: 0,
-            marketCap: 0,
-            peRatio: 0,
-            dividendYield: 0,
-            roe: 0,
-            volume: 0,
-            dayHigh: 0,
-            dayLow: 0,
-            yearHigh: 0,
-            yearLow: 0,
-            beta: 0,
-            eps: 0
+            status: values[6] || 'Active'
           };
           
           // Include active stocks and ETFs
@@ -144,176 +100,211 @@ export default function CompleteMarketScreener() {
       }
     }
     
-    console.log(`Parsed ${stocks.length} active stocks from Alpha Vantage`);
     return stocks;
   };
 
-  // Enhance stocks with real-time quotes - IMPROVED VERSION
-  const enhanceStocksWithQuotes = async (stocks) => {
-    const enhancedStocks = [...stocks];
-    
-    // Priority stocks to fetch with real data
-    const prioritySymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'BRK.B', 'JPM', 'V', 
-                             'WMT', 'XOM', 'UNH', 'MA', 'PG', 'HD', 'CVX', 'LLY', 'ABBV', 'MRK',
-                             'PFE', 'KO', 'PEP', 'AVGO', 'COST', 'TMO', 'CSCO', 'ACN', 'ABT', 'NKE'];
-    
-    // Fetch overview data for top stocks to get accurate metrics
-    for (const symbol of prioritySymbols) {
-      const stockIndex = enhancedStocks.findIndex(s => s.symbol === symbol);
-      if (stockIndex !== -1) {
-        try {
-          // Fetch OVERVIEW for fundamental metrics
-          const overviewResponse = await fetch(
-            `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`
-          );
+  // Fetch real-time quote for a single symbol
+  const fetchRealTimeQuote = async (symbol) => {
+    try {
+      // Check if already loading or failed
+      if (loadingSymbols.has(symbol) || failedSymbols.has(symbol)) {
+        return null;
+      }
+      
+      setLoadingSymbols(prev => new Set([...prev, symbol]));
+      
+      const response = await fetch(
+        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const quote = data['Global Quote'];
+        
+        if (quote && quote['05. price']) {
+          const realData = {
+            symbol: symbol,
+            price: parseFloat(quote['05. price']) || 0,
+            change: parseFloat(quote['09. change']) || 0,
+            changePercent: parseFloat(quote['10. change percent']?.replace('%', '')) || 0,
+            volume: parseInt(quote['06. volume']) || 0,
+            dayHigh: parseFloat(quote['03. high']) || 0,
+            dayLow: parseFloat(quote['04. low']) || 0,
+            previousClose: parseFloat(quote['08. previous close']) || 0,
+            timestamp: Date.now(),
+            hasRealData: true
+          };
           
-          if (overviewResponse.ok) {
-            const overview = await overviewResponse.json();
-            
-            // Fetch GLOBAL_QUOTE for real-time price data
-            const quoteResponse = await fetch(
-              `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
-            );
-            
-            let priceData = {};
-            if (quoteResponse.ok) {
-              const quoteJson = await quoteResponse.json();
-              const quote = quoteJson['Global Quote'];
-              if (quote) {
-                priceData = {
-                  price: parseFloat(quote['05. price']) || 0,
-                  change: parseFloat(quote['09. change']) || 0,
-                  changePercent: parseFloat(quote['10. change percent']?.replace('%', '')) || 0,
-                  volume: parseInt(quote['06. volume']) || 0,
-                  dayHigh: parseFloat(quote['03. high']) || 0,
-                  dayLow: parseFloat(quote['04. low']) || 0,
-                  previousClose: parseFloat(quote['08. previous close']) || 0
-                };
-              }
-            }
-            
-            // Combine overview and quote data
-            enhancedStocks[stockIndex] = {
-              ...enhancedStocks[stockIndex],
-              ...priceData,
-              marketCap: parseFloat(overview.MarketCapitalization) || 0,
-              peRatio: parseFloat(overview.PERatio) || 0,
-              dividendYield: parseFloat(overview.DividendYield) * 100 || 0, // Convert to percentage
-              eps: parseFloat(overview.EPS) || 0,
-              beta: parseFloat(overview.Beta) || 0,
-              yearHigh: parseFloat(overview['52WeekHigh']) || priceData.dayHigh || 0,
-              yearLow: parseFloat(overview['52WeekLow']) || priceData.dayLow || 0,
-              roe: parseFloat(overview.ReturnOnEquityTTM) * 100 || 0, // Convert to percentage
-              profitMargin: parseFloat(overview.ProfitMargin) * 100 || 0,
-              revenuePerShareTTM: parseFloat(overview.RevenuePerShareTTM) || 0,
-              quarterlyEarningsGrowthYOY: parseFloat(overview.QuarterlyEarningsGrowthYOY) * 100 || 0
-            };
+          // Calculate market cap estimate if we have price
+          if (realData.price > 0) {
+            // Rough market cap estimate based on typical shares outstanding
+            const estimatedShares = symbol.includes('.') ? 5000000000 : 1000000000;
+            realData.marketCap = Math.floor(realData.price * estimatedShares);
           }
           
-          // Rate limiting - respect 75 calls/minute
-          await new Promise(resolve => setTimeout(resolve, 850)); // ~70 calls per minute to be safe
-          
-        } catch (error) {
-          console.error(`Error fetching data for ${symbol}:`, error);
+          return realData;
         }
       }
+      
+      // Mark as failed to avoid retrying
+      setFailedSymbols(prev => new Set([...prev, symbol]));
+      return null;
+      
+    } catch (error) {
+      console.error(`Error fetching quote for ${symbol}:`, error);
+      setFailedSymbols(prev => new Set([...prev, symbol]));
+      return null;
+    } finally {
+      setLoadingSymbols(prev => {
+        const next = new Set(prev);
+        next.delete(symbol);
+        return next;
+      });
     }
-    
-    // Try bulk quotes for additional stocks (first 100)
-    const firstPageSymbols = stocks.slice(0, 100).filter(s => !prioritySymbols.includes(s.symbol)).map(s => s.symbol);
-    
-    if (firstPageSymbols.length > 0) {
-      const batchSize = 100;
-      for (let i = 0; i < Math.min(firstPageSymbols.length, 100); i += batchSize) {
-        const batch = firstPageSymbols.slice(i, i + batchSize);
-        try {
-          const symbolString = batch.join(',');
-          console.log(`Fetching bulk quotes for batch...`);
-          
-          const quoteResponse = await fetch(
-            `https://www.alphavantage.co/query?function=REALTIME_BULK_QUOTES&symbol=${symbolString}&datatype=json&apikey=${API_KEY}`
-          );
-          
-          if (quoteResponse.ok) {
-            const quoteData = await quoteResponse.json();
-            
-            if (quoteData.data && Array.isArray(quoteData.data)) {
-              quoteData.data.forEach(quote => {
-                const stockIndex = enhancedStocks.findIndex(s => s.symbol === quote.symbol);
-                if (stockIndex !== -1 && enhancedStocks[stockIndex].price === 0) {
-                  enhancedStocks[stockIndex] = {
-                    ...enhancedStocks[stockIndex],
-                    price: parseFloat(quote.price) || 0,
-                    volume: parseInt(quote.volume) || 0,
-                    change: parseFloat(quote.change) || 0,
-                    changePercent: parseFloat(quote.change_percentage?.replace('%', '')) || 0,
-                    dayHigh: parseFloat(quote.high) || 0,
-                    dayLow: parseFloat(quote.low) || 0
-                  };
-                }
-              });
-            }
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 850));
-          
-        } catch (error) {
-          console.error('Error fetching batch quotes:', error);
-        }
-      }
-    }
-    
-    // For remaining stocks without data, generate realistic placeholder values
-    enhancedStocks.forEach(stock => {
-      if (stock.price === 0) {
-        // Generate more realistic data based on exchange
-        const isLargeCap = Math.random() > 0.7;
-        const basePrice = isLargeCap ? Math.random() * 300 + 50 : Math.random() * 100 + 5;
-        const volatility = isLargeCap ? 0.02 : 0.05;
-        
-        stock.price = parseFloat(basePrice.toFixed(2));
-        stock.change = parseFloat((basePrice * (Math.random() * volatility * 2 - volatility)).toFixed(2));
-        stock.changePercent = parseFloat(((stock.change / basePrice) * 100).toFixed(2));
-        
-        // Generate realistic market cap
-        const sharesOutstanding = isLargeCap ? 
-          Math.random() * 5000000000 + 1000000000 : 
-          Math.random() * 500000000 + 10000000;
-        stock.marketCap = Math.floor(stock.price * sharesOutstanding);
-        
-        // Generate realistic metrics
-        stock.volume = Math.floor(Math.random() * (isLargeCap ? 50000000 : 5000000) + 100000);
-        stock.peRatio = parseFloat((Math.random() * 30 + 10).toFixed(1));
-        stock.dividendYield = parseFloat((Math.random() * 3).toFixed(2));
-        stock.eps = parseFloat((stock.price / stock.peRatio).toFixed(2));
-        stock.beta = parseFloat((Math.random() * 1.5 + 0.5).toFixed(2));
-        stock.dayHigh = parseFloat((stock.price * 1.02).toFixed(2));
-        stock.dayLow = parseFloat((stock.price * 0.98).toFixed(2));
-        stock.yearHigh = parseFloat((stock.price * (1 + Math.random() * 0.3)).toFixed(2));
-        stock.yearLow = parseFloat((stock.price * (1 - Math.random() * 0.3)).toFixed(2));
-      }
-    });
-    
-    return enhancedStocks;
   };
 
-  // Load from cache
-  const loadFromCache = () => {
-    const cached = localStorage.getItem('wallstsmart_stocks');
-    const timestamp = localStorage.getItem('wallstsmart_stocks_timestamp');
+  // Fetch company overview for fundamental data
+  const fetchCompanyOverview = async (symbol) => {
+    try {
+      const response = await fetch(
+        `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`
+      );
+      
+      if (response.ok) {
+        const overview = await response.json();
+        
+        if (overview && overview.Symbol) {
+          return {
+            marketCap: parseFloat(overview.MarketCapitalization) || 0,
+            peRatio: parseFloat(overview.PERatio) || 0,
+            dividendYield: parseFloat(overview.DividendYield) * 100 || 0,
+            eps: parseFloat(overview.EPS) || 0,
+            beta: parseFloat(overview.Beta) || 0,
+            yearHigh: parseFloat(overview['52WeekHigh']) || 0,
+            yearLow: parseFloat(overview['52WeekLow']) || 0,
+            roe: parseFloat(overview.ReturnOnEquityTTM) * 100 || 0,
+            profitMargin: parseFloat(overview.ProfitMargin) * 100 || 0
+          };
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching overview for ${symbol}:`, error);
+    }
+    return null;
+  };
+
+  // Process fetch queue
+  const processFetchQueue = async () => {
+    if (isFetchingRef.current || fetchQueueRef.current.length === 0) {
+      return;
+    }
+    
+    isFetchingRef.current = true;
+    
+    while (fetchQueueRef.current.length > 0) {
+      const symbol = fetchQueueRef.current.shift();
+      
+      if (!realTimeData.has(symbol) && !loadingSymbols.has(symbol) && !failedSymbols.has(symbol)) {
+        const quoteData = await fetchRealTimeQuote(symbol);
+        
+        if (quoteData) {
+          setRealTimeData(prev => {
+            const next = new Map(prev);
+            next.set(symbol, quoteData);
+            
+            // Save to cache
+            const cacheData = Array.from(next.entries());
+            localStorage.setItem(REALTIME_CACHE_KEY, JSON.stringify(cacheData));
+            localStorage.setItem(REALTIME_CACHE_KEY + '_timestamp', Date.now().toString());
+            
+            return next;
+          });
+        }
+        
+        // Rate limiting - respect 75 calls/minute (be conservative)
+        await new Promise(resolve => setTimeout(resolve, 850));
+      }
+    }
+    
+    isFetchingRef.current = false;
+  };
+
+  // Add symbols to fetch queue
+  const queueSymbolsForFetch = (symbols) => {
+    const uniqueSymbols = [...new Set(symbols)];
+    const newSymbols = uniqueSymbols.filter(s => 
+      !fetchQueueRef.current.includes(s) &&
+      !realTimeData.has(s) &&
+      !loadingSymbols.has(s) &&
+      !failedSymbols.has(s)
+    );
+    
+    fetchQueueRef.current.push(...newSymbols);
+    processFetchQueue();
+  };
+
+  // Fetch stock metadata (listing)
+  const fetchStockMetadata = async () => {
+    setLoading(true);
+    try {
+      console.log('Fetching stock metadata from Alpha Vantage...');
+      
+      const response = await fetch(
+        `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${API_KEY}`
+      );
+      
+      if (!response.ok) throw new Error('Failed to fetch listing data');
+      
+      const csvText = await response.text();
+      const stocks = parseCSVToStocks(csvText);
+      
+      setStocksMetadata(stocks);
+      updateMarketStats(stocks);
+      
+      // Cache metadata
+      localStorage.setItem(METADATA_CACHE_KEY, JSON.stringify(stocks));
+      localStorage.setItem(METADATA_CACHE_KEY + '_timestamp', Date.now().toString());
+      
+      console.log(`Loaded ${stocks.length} stocks metadata`);
+      
+      // Queue priority symbols for immediate fetch
+      queueSymbolsForFetch(PRIORITY_SYMBOLS);
+      
+    } catch (error) {
+      console.error('Error fetching metadata:', error);
+      loadMetadataFromCache();
+    } finally {
+      setLoading(false);
+      setInitialLoad(false);
+    }
+  };
+
+  // Load metadata from cache
+  const loadMetadataFromCache = () => {
+    const cached = localStorage.getItem(METADATA_CACHE_KEY);
+    if (cached) {
+      const stocks = JSON.parse(cached);
+      setStocksMetadata(stocks);
+      updateMarketStats(stocks);
+      return true;
+    }
+    return false;
+  };
+
+  // Load real-time data from cache
+  const loadRealTimeDataFromCache = () => {
+    const cached = localStorage.getItem(REALTIME_CACHE_KEY);
+    const timestamp = localStorage.getItem(REALTIME_CACHE_KEY + '_timestamp');
     
     if (cached && timestamp) {
       const age = Date.now() - parseInt(timestamp);
-      const stocks = JSON.parse(cached);
-      setAllStocksData(stocks);
-      updateMarketStats(stocks);
-      setCacheAge(age);
       
-      const hoursOld = Math.floor(age / (1000 * 60 * 60));
-      const minutesOld = Math.floor((age % (1000 * 60 * 60)) / (1000 * 60));
-      console.log(`Loaded cached data (${hoursOld}h ${minutesOld}m old)`);
-      
-      return true;
+      if (age < CACHE_DURATION) {
+        const data = JSON.parse(cached);
+        setRealTimeData(new Map(data));
+        setCacheAge(age);
+        return true;
+      }
     }
     return false;
   };
@@ -324,12 +315,11 @@ export default function CompleteMarketScreener() {
     setMarketStats({
       totalStocks: stocks.length,
       activeStocks: stocks.filter(s => s.status === 'Active').length,
-      delistedStocks: stocks.filter(s => s.status === 'Delisted').length,
       exchanges: exchanges
     });
   };
 
-  // Navigate to stock detail page
+  // Navigate to stock detail
   const navigateToStock = (symbol) => {
     navigate(`/stock/${symbol}`);
   };
@@ -357,24 +347,54 @@ export default function CompleteMarketScreener() {
   const formatCacheAge = (ageInMs) => {
     if (!ageInMs) return null;
     
-    const hours = Math.floor(ageInMs / (1000 * 60 * 60));
-    const minutes = Math.floor((ageInMs % (1000 * 60 * 60)) / (1000 * 60));
+    const minutes = Math.floor(ageInMs / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
     
     if (hours > 0) {
-      return `${hours}h ${minutes}m ago`;
+      return `${hours}h ${remainingMinutes}m ago`;
     }
     return `${minutes}m ago`;
   };
 
+  // Combine metadata with real-time data
+  const getCombinedStockData = () => {
+    return stocksMetadata.map(stock => {
+      const realData = realTimeData.get(stock.symbol);
+      
+      if (realData) {
+        return {
+          ...stock,
+          ...realData,
+          hasRealData: true
+        };
+      }
+      
+      // Return metadata with placeholder indicators
+      return {
+        ...stock,
+        price: 0,
+        change: 0,
+        changePercent: 0,
+        marketCap: 0,
+        peRatio: 0,
+        dividendYield: 0,
+        volume: 0,
+        hasRealData: false
+      };
+    });
+  };
+
   // Filter and sort stocks
   const getFilteredAndSortedStocks = () => {
-    let filtered = [...allStocksData];
+    let filtered = getCombinedStockData();
     
     // Filter by search term
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter(stock => 
-        stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        stock.name.toLowerCase().includes(searchTerm.toLowerCase())
+        stock.symbol.toLowerCase().includes(term) ||
+        stock.name.toLowerCase().includes(term)
       );
     }
     
@@ -383,15 +403,20 @@ export default function CompleteMarketScreener() {
       filtered = filtered.filter(stock => stock.exchange === selectedExchange);
     }
     
-    // Sort
+    // Sort - prioritize stocks with real data
     filtered.sort((a, b) => {
+      // First, sort by whether they have real data
+      if (a.hasRealData && !b.hasRealData) return -1;
+      if (!a.hasRealData && b.hasRealData) return 1;
+      
+      // Then sort by the selected field
       let aVal = a[sortConfig.key];
       let bVal = b[sortConfig.key];
       
       // Handle numeric values
       if (!isNaN(aVal) && !isNaN(bVal)) {
-        aVal = parseFloat(aVal);
-        bVal = parseFloat(bVal);
+        aVal = parseFloat(aVal) || 0;
+        bVal = parseFloat(bVal) || 0;
       }
       
       if (sortConfig.direction === 'asc') {
@@ -413,12 +438,17 @@ export default function CompleteMarketScreener() {
     setSortConfig({ key, direction });
   };
 
-  // Refresh data - always fetches fresh data
+  // Refresh all data
   const handleRefresh = async () => {
     console.log('Manual refresh requested');
-    setForceRefresh(true);
-    await fetchAllStocksFromAPI(true); // Skip cache
-    setForceRefresh(false);
+    setFailedSymbols(new Set()); // Clear failed symbols to retry
+    fetchQueueRef.current = []; // Clear queue
+    await fetchStockMetadata();
+    
+    // Queue visible stocks for immediate refresh
+    const visible = getCurrentPageStocks();
+    const symbols = visible.map(s => s.symbol);
+    queueSymbolsForFetch(symbols);
   };
 
   // Export to CSV
@@ -426,17 +456,16 @@ export default function CompleteMarketScreener() {
     const filtered = getFilteredAndSortedStocks();
     const pageStocks = filtered.slice((currentPage - 1) * stocksPerPage, currentPage * stocksPerPage);
     
-    const headers = ['Symbol', 'Company', 'Exchange', 'Price', 'Change %', 'Market Cap', 'P/E', 'Div Yield', 'Volume', 'In Watchlist'];
+    const headers = ['Symbol', 'Company', 'Exchange', 'Price', 'Change %', 'Market Cap', 'Volume', 'Data Status', 'In Watchlist'];
     const csvData = pageStocks.map(stock => [
       stock.symbol,
       `"${stock.name}"`,
       stock.exchange,
-      stock.price,
-      stock.changePercent,
-      stock.marketCap,
-      stock.peRatio || '',
-      stock.dividendYield || '',
-      stock.volume,
+      stock.hasRealData ? stock.price : 'N/A',
+      stock.hasRealData ? stock.changePercent : 'N/A',
+      stock.hasRealData && stock.marketCap ? stock.marketCap : 'N/A',
+      stock.hasRealData ? stock.volume : 'N/A',
+      stock.hasRealData ? 'Real-Time' : 'Pending',
       isInWatchlist(stock.symbol) ? 'Yes' : 'No'
     ]);
     
@@ -448,7 +477,7 @@ export default function CompleteMarketScreener() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `wallstsmart_screener_page_${currentPage}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `wallstsmart_screener_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -503,28 +532,43 @@ export default function CompleteMarketScreener() {
 
   // Initial load
   useEffect(() => {
-    if (forceRefresh) return;
+    // Load cached metadata
+    const hasMetadata = loadMetadataFromCache();
     
-    const cached = localStorage.getItem('wallstsmart_stocks');
-    const timestamp = localStorage.getItem('wallstsmart_stocks_timestamp');
+    // Load cached real-time data
+    loadRealTimeDataFromCache();
     
-    if (cached && timestamp) {
-      const age = Date.now() - parseInt(timestamp);
-      
-      if (age < CACHE_DURATION) {
-        console.log(`Using cached data (${Math.round(age / 1000 / 60)} minutes old)`);
-        loadFromCache();
-        setInitialLoad(false);
-        return;
-      } else {
-        console.log('Cache expired, fetching fresh data');
-      }
+    // Fetch fresh metadata if not cached
+    if (!hasMetadata) {
+      fetchStockMetadata();
     } else {
-      console.log('No cache found, fetching initial data');
+      setInitialLoad(false);
+      // Queue priority symbols
+      queueSymbolsForFetch(PRIORITY_SYMBOLS);
     }
-    
-    fetchAllStocksFromAPI();
   }, []);
+
+  // Fetch data for visible stocks when page changes
+  useEffect(() => {
+    if (stocksMetadata.length === 0) return;
+    
+    const visible = getCurrentPageStocks();
+    const symbols = visible
+      .filter(s => !s.hasRealData)
+      .map(s => s.symbol)
+      .slice(0, 10); // Fetch up to 10 at a time
+    
+    if (symbols.length > 0) {
+      queueSymbolsForFetch(symbols);
+    }
+  }, [currentPage, searchTerm, selectedExchange, sortConfig, stocksMetadata]);
+
+  // Fetch watchlist stocks on mount
+  useEffect(() => {
+    if (watchlist.length > 0 && stocksMetadata.length > 0) {
+      queueSymbolsForFetch(watchlist);
+    }
+  }, [watchlist, stocksMetadata]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -532,6 +576,7 @@ export default function CompleteMarketScreener() {
   }, [searchTerm, selectedExchange, sortConfig]);
 
   const displayedStocks = getCurrentPageStocks();
+  const stocksWithRealData = displayedStocks.filter(s => s.hasRealData).length;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -541,24 +586,18 @@ export default function CompleteMarketScreener() {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-                Screener
+                Smart Screener
               </h1>
               <p className="text-gray-400 text-sm mt-1">
-                <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> total stocks • 
+                <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> stocks • 
                 <span className="text-blue-400 font-semibold ml-2">{marketStats.exchanges.length}</span> exchanges • 
                 <span className="text-yellow-400 font-semibold ml-2">
-                  {cacheAge ? 'Cached data' : 'Real-time data'}
+                  {stocksWithRealData}/{displayedStocks.length} with real-time data
                 </span>
-                {cacheAge && (
-                  <span className="text-gray-500 ml-2">
-                    <Clock className="inline w-3 h-3 mr-1" />
-                    Updated {formatCacheAge(cacheAge)}
-                  </span>
-                )}
                 {watchlist.length > 0 && (
                   <span className="text-purple-400 ml-2">
                     • <Star className="inline w-3 h-3 mr-1 fill-current" />
-                    {watchlist.length} in watchlist
+                    {watchlist.length} watchlist
                   </span>
                 )}
               </p>
@@ -568,7 +607,7 @@ export default function CompleteMarketScreener() {
                 onClick={handleRefresh}
                 disabled={loading}
                 className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                title="Fetch fresh data from API"
+                title="Refresh data"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -586,26 +625,17 @@ export default function CompleteMarketScreener() {
       </div>
 
       <div className="max-w-[1600px] mx-auto px-4 py-6">
-        {/* Cache Notice */}
-        {cacheAge && cacheAge > 12 * 60 * 60 * 1000 && (
-          <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3 mb-4 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm text-yellow-200">
-                Data is {formatCacheAge(cacheAge)} old. Click refresh to get the latest market data.
-              </p>
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="text-yellow-400 hover:text-yellow-300 text-sm font-medium"
-            >
-              Refresh Now
-            </button>
+        {/* Real-time data loading indicator */}
+        {loadingSymbols.size > 0 && (
+          <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3 mb-4 flex items-center gap-3">
+            <Loader className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
+            <p className="text-sm text-blue-200">
+              Loading real-time data for {loadingSymbols.size} symbol{loadingSymbols.size > 1 ? 's' : ''}...
+            </p>
           </div>
         )}
 
-        {/* Filters and Search Bar */}
+        {/* Filters and Search */}
         <div className="bg-gray-900 rounded-xl p-4 mb-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4 flex-1">
@@ -614,7 +644,7 @@ export default function CompleteMarketScreener() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by symbol or company name..."
+                  placeholder="Search by symbol or company..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm 
@@ -636,24 +666,16 @@ export default function CompleteMarketScreener() {
                   <option value="NYSE">NYSE</option>
                   <option value="NASDAQ">NASDAQ</option>
                   <option value="AMEX">AMEX</option>
-                  <option value="TSX">TSX (Toronto)</option>
-                  <option value="LSE">LSE (London)</option>
-                  <option value="XETRA">XETRA (Germany)</option>
-                  <option value="EURONEXT">Euronext</option>
-                  <option value="TSE">TSE (Tokyo)</option>
-                  <option value="HKEX">HKEX (Hong Kong)</option>
+                  <option value="TSX">TSX</option>
+                  <option value="LSE">LSE</option>
+                  <option value="XETRA">XETRA</option>
                 </select>
               </div>
             </div>
             
             {/* Results count */}
             <div className="text-sm text-gray-400">
-              {totalStocks > 0 && (
-                <>
-                  Showing {((currentPage - 1) * stocksPerPage) + 1} - {Math.min(currentPage * stocksPerPage, totalStocks)} 
-                  {' '}of {totalStocks.toLocaleString()} stocks
-                </>
-              )}
+              Showing {((currentPage - 1) * stocksPerPage) + 1} - {Math.min(currentPage * stocksPerPage, totalStocks)} of {totalStocks.toLocaleString()}
             </div>
           </div>
         </div>
@@ -662,11 +684,10 @@ export default function CompleteMarketScreener() {
         {initialLoad && loading ? (
           <div className="bg-gray-900 rounded-xl p-12 text-center">
             <RefreshCw className="w-12 h-12 text-green-500 mx-auto mb-4 animate-spin" />
-            <h3 className="text-lg font-medium text-gray-300 mb-2">Loading Complete Market Data...</h3>
-            <p className="text-gray-500">Fetching all stocks from global exchanges</p>
-            <p className="text-sm text-gray-600 mt-2">This may take a moment on first load</p>
+            <h3 className="text-lg font-medium text-gray-300 mb-2">Loading Market Data...</h3>
+            <p className="text-gray-500">Fetching stocks from global exchanges</p>
           </div>
-        ) : displayedStocks.length === 0 && !loading ? (
+        ) : displayedStocks.length === 0 ? (
           <div className="bg-gray-900 rounded-xl p-12 text-center">
             <Search className="w-12 h-12 text-gray-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-300 mb-2">No stocks found</h3>
@@ -698,13 +719,9 @@ export default function CompleteMarketScreener() {
                         </button>
                       </th>
                       <th className="text-left px-4 py-3">
-                        <button
-                          onClick={() => handleSort('exchange')}
-                          className="text-xs font-medium text-gray-400 uppercase tracking-wider hover:text-white flex items-center gap-1"
-                        >
+                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                           Exchange
-                          <ArrowUpDown className="w-3 h-3" />
-                        </button>
+                        </span>
                       </th>
                       <th className="text-right px-4 py-3">
                         <button
@@ -735,24 +752,6 @@ export default function CompleteMarketScreener() {
                       </th>
                       <th className="text-right px-4 py-3">
                         <button
-                          onClick={() => handleSort('peRatio')}
-                          className="text-xs font-medium text-gray-400 uppercase tracking-wider hover:text-white flex items-center gap-1 ml-auto"
-                        >
-                          P/E
-                          <ArrowUpDown className="w-3 h-3" />
-                        </button>
-                      </th>
-                      <th className="text-right px-4 py-3">
-                        <button
-                          onClick={() => handleSort('dividendYield')}
-                          className="text-xs font-medium text-gray-400 uppercase tracking-wider hover:text-white flex items-center gap-1 ml-auto"
-                        >
-                          Div Yield
-                          <ArrowUpDown className="w-3 h-3" />
-                        </button>
-                      </th>
-                      <th className="text-right px-4 py-3">
-                        <button
                           onClick={() => handleSort('volume')}
                           className="text-xs font-medium text-gray-400 uppercase tracking-wider hover:text-white flex items-center gap-1 ml-auto"
                         >
@@ -760,27 +759,34 @@ export default function CompleteMarketScreener() {
                           <ArrowUpDown className="w-3 h-3" />
                         </button>
                       </th>
-                      <th className="text-center px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Watch
+                      <th className="text-center px-4 py-3">
+                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Actions
+                        </span>
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {displayedStocks.map((stock, index) => (
                       <tr 
-                        key={`${stock.symbol}-${stock.exchange}-${index}`} 
+                        key={`${stock.symbol}-${index}`} 
                         className={`border-b border-gray-800 hover:bg-gray-850 transition-colors ${
                           index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-900/50'
-                        }`}
+                        } ${!stock.hasRealData ? 'opacity-60' : ''}`}
                       >
                         <td className="sticky left-0 z-10 px-4 py-3 bg-inherit">
-                          <button 
-                            onClick={() => navigateToStock(stock.symbol)}
-                            className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left group flex items-center gap-1"
-                          >
-                            {stock.symbol}
-                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => navigateToStock(stock.symbol)}
+                              className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors text-left group flex items-center gap-1"
+                            >
+                              {stock.symbol}
+                              <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                            {loadingSymbols.has(stock.symbol) && (
+                              <Loader className="w-3 h-3 text-gray-400 animate-spin" />
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <button 
@@ -797,39 +803,60 @@ export default function CompleteMarketScreener() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
-                          ${parseFloat(stock.price).toFixed(2)}
+                          {stock.hasRealData ? (
+                            `$${stock.price.toFixed(2)}`
+                          ) : (
+                            <span className="text-gray-500">--</span>
+                          )}
                         </td>
                         <td className={`px-4 py-3 text-right font-medium ${
-                          parseFloat(stock.changePercent) >= 0 ? 'text-green-400' : 'text-red-400'
+                          stock.hasRealData ? (
+                            stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'
+                          ) : 'text-gray-500'
                         }`}>
-                          {parseFloat(stock.changePercent) >= 0 ? '+' : ''}{parseFloat(stock.changePercent).toFixed(2)}%
+                          {stock.hasRealData ? (
+                            `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%`
+                          ) : (
+                            '--'
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right text-sm">
-                          {formatNumber(stock.marketCap, 'marketCap')}
+                          {stock.hasRealData && stock.marketCap ? 
+                            formatNumber(stock.marketCap, 'marketCap') : 
+                            <span className="text-gray-500">--</span>
+                          }
                         </td>
                         <td className="px-4 py-3 text-right text-sm">
-                          {stock.peRatio ? parseFloat(stock.peRatio).toFixed(1) : '-'}
+                          {stock.hasRealData && stock.volume ? 
+                            formatNumber(stock.volume, 'volume') : 
+                            <span className="text-gray-500">--</span>
+                          }
                         </td>
-                        <td className="px-4 py-3 text-right text-sm">
-                          {stock.dividendYield ? `${parseFloat(stock.dividendYield).toFixed(2)}%` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm">
-                          {formatNumber(stock.volume, 'volume')}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button 
-                            onClick={() => toggleWatchlist(stock.symbol)}
-                            className="p-1.5 hover:bg-gray-800 rounded-lg transition-all group"
-                            title={isInWatchlist(stock.symbol) ? "Remove from watchlist" : "Add to watchlist"}
-                          >
-                            <Star 
-                              className={`w-4 h-4 transition-all ${
-                                isInWatchlist(stock.symbol)
-                                  ? 'text-yellow-400 fill-yellow-400'
-                                  : 'text-gray-400 group-hover:text-yellow-400'
-                              }`}
-                            />
-                          </button>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button 
+                              onClick={() => toggleWatchlist(stock.symbol)}
+                              className="p-1.5 hover:bg-gray-800 rounded-lg transition-all group"
+                              title={isInWatchlist(stock.symbol) ? "Remove from watchlist" : "Add to watchlist"}
+                            >
+                              <Star 
+                                className={`w-4 h-4 transition-all ${
+                                  isInWatchlist(stock.symbol)
+                                    ? 'text-yellow-400 fill-yellow-400'
+                                    : 'text-gray-400 group-hover:text-yellow-400'
+                                }`}
+                              />
+                            </button>
+                            {!stock.hasRealData && !loadingSymbols.has(stock.symbol) && (
+                              <button
+                                onClick={() => queueSymbolsForFetch([stock.symbol])}
+                                className="p-1.5 hover:bg-gray-800 rounded-lg transition-all group"
+                                title="Load real-time data"
+                              >
+                                <RefreshCw className="w-4 h-4 text-gray-400 group-hover:text-green-400" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
