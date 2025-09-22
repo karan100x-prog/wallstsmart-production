@@ -4,7 +4,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, getDocs, deleteDoc, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { 
   Plus, Trash2, TrendingUp, TrendingDown, RefreshCw, Star, Search, AlertCircle,
-  Target, PieChart, BarChart3, Calendar, DollarSign, Award, Info, X
+  PieChart, BarChart3, X
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -59,13 +59,7 @@ export default function Portfolio() {
   const { currentUser } = useAuth();
   const [holdings, setHoldings] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
-  const [goals, setGoals] = useState({
-    oneYear: 0,
-    threeYear: 0,
-    fiveYear: 0
-  });
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [newHolding, setNewHolding] = useState({
     symbol: '',
     quantity: '',
@@ -77,7 +71,7 @@ export default function Portfolio() {
   const [pricesLoading, setPricesLoading] = useState(false);
   const [liveQuotes, setLiveQuotes] = useState({});
   const [activeTab, setActiveTab] = useState('portfolio');
-  const [activeView, setActiveView] = useState('holdings'); // 'holdings', 'goals', 'sectors'
+  const [activeView, setActiveView] = useState('holdings'); // 'holdings', 'sectors'
   
   // Validation states
   const [symbolValidation, setSymbolValidation] = useState({
@@ -96,7 +90,6 @@ export default function Portfolio() {
     if (currentUser) {
       fetchHoldings();
       fetchWatchlist();
-      fetchGoals();
     }
   }, [currentUser]);
 
@@ -119,34 +112,6 @@ export default function Portfolio() {
 
     return () => clearTimeout(delaySearch);
   }, [newHolding.symbol]);
-
-  // Fetch user's financial goals
-  const fetchGoals = async () => {
-    try {
-      const docRef = doc(db, 'goals', currentUser.uid);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        setGoals(docSnap.data());
-      }
-    } catch (error) {
-      console.error('Error fetching goals:', error);
-    }
-  };
-
-  // Save/Update goals
-  const saveGoals = async (newGoals) => {
-    try {
-      await setDoc(doc(db, 'goals', currentUser.uid), {
-        ...newGoals,
-        updatedAt: new Date().toISOString()
-      });
-      setGoals(newGoals);
-      setShowGoalsModal(false);
-    } catch (error) {
-      console.error('Error saving goals:', error);
-    }
-  };
 
   const searchSymbol = async (keywords) => {
     setIsSearching(true);
@@ -480,37 +445,8 @@ export default function Portfolio() {
     return { sectorData, totalValue };
   };
 
-  const calculateGoalProgress = () => {
-    const currentValue = parseFloat(calculateMetrics().totalCurrentValue);
-    
-    return {
-      oneYear: {
-        target: goals.oneYear,
-        current: currentValue,
-        remaining: Math.max(0, goals.oneYear - currentValue),
-        progress: goals.oneYear > 0 ? Math.min(100, (currentValue / goals.oneYear) * 100) : 0,
-        monthlyRequired: goals.oneYear > currentValue ? ((goals.oneYear - currentValue) / 12).toFixed(2) : 0
-      },
-      threeYear: {
-        target: goals.threeYear,
-        current: currentValue,
-        remaining: Math.max(0, goals.threeYear - currentValue),
-        progress: goals.threeYear > 0 ? Math.min(100, (currentValue / goals.threeYear) * 100) : 0,
-        monthlyRequired: goals.threeYear > currentValue ? ((goals.threeYear - currentValue) / 36).toFixed(2) : 0
-      },
-      fiveYear: {
-        target: goals.fiveYear,
-        current: currentValue,
-        remaining: Math.max(0, goals.fiveYear - currentValue),
-        progress: goals.fiveYear > 0 ? Math.min(100, (currentValue / goals.fiveYear) * 100) : 0,
-        monthlyRequired: goals.fiveYear > currentValue ? ((goals.fiveYear - currentValue) / 60).toFixed(2) : 0
-      }
-    };
-  };
-
   const metrics = calculateMetrics();
   const { sectorData } = calculateSectorAllocation();
-  const goalProgress = calculateGoalProgress();
 
   if (loading) {
     return <div className="text-center py-10">Loading portfolio...</div>;
@@ -557,14 +493,6 @@ export default function Portfolio() {
                     }`}
                   >
                     Holdings
-                  </button>
-                  <button
-                    onClick={() => setActiveView('goals')}
-                    className={`px-4 py-2 rounded transition-colors ${
-                      activeView === 'goals' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    Goals
                   </button>
                   <button
                     onClick={() => setActiveView('sectors')}
@@ -710,142 +638,6 @@ export default function Portfolio() {
               )
             )}
 
-            {activeView === 'goals' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">Financial Goals</h2>
-                  <button
-                    onClick={() => setShowGoalsModal(true)}
-                    className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg flex items-center gap-2"
-                  >
-                    <Target className="h-5 w-5" />
-                    Set Goals
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* 1 Year Goal */}
-                  <div className="bg-gray-900 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">1 Year Goal</h3>
-                      <Calendar className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-gray-400 text-sm">Target</p>
-                        <p className="text-2xl font-bold">${goals.oneYear.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 text-sm">Progress</p>
-                        <div className="w-full bg-gray-700 rounded-full h-3 mt-2">
-                          <div 
-                            className="bg-green-500 h-3 rounded-full transition-all duration-500"
-                            style={{ width: `${goalProgress.oneYear.progress}%` }}
-                          />
-                        </div>
-                        <p className="text-sm text-gray-300 mt-1">{goalProgress.oneYear.progress.toFixed(1)}% Complete</p>
-                      </div>
-                      <div className="pt-2 border-t border-gray-800">
-                        <p className="text-gray-400 text-sm">Remaining</p>
-                        <p className="text-lg font-semibold">${goalProgress.oneYear.remaining.toLocaleString()}</p>
-                        {goalProgress.oneYear.monthlyRequired > 0 && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            Save ${goalProgress.oneYear.monthlyRequired}/month
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3 Year Goal */}
-                  <div className="bg-gray-900 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">3 Year Goal</h3>
-                      <Award className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-gray-400 text-sm">Target</p>
-                        <p className="text-2xl font-bold">${goals.threeYear.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 text-sm">Progress</p>
-                        <div className="w-full bg-gray-700 rounded-full h-3 mt-2">
-                          <div 
-                            className="bg-blue-500 h-3 rounded-full transition-all duration-500"
-                            style={{ width: `${goalProgress.threeYear.progress}%` }}
-                          />
-                        </div>
-                        <p className="text-sm text-gray-300 mt-1">{goalProgress.threeYear.progress.toFixed(1)}% Complete</p>
-                      </div>
-                      <div className="pt-2 border-t border-gray-800">
-                        <p className="text-gray-400 text-sm">Remaining</p>
-                        <p className="text-lg font-semibold">${goalProgress.threeYear.remaining.toLocaleString()}</p>
-                        {goalProgress.threeYear.monthlyRequired > 0 && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            Save ${goalProgress.threeYear.monthlyRequired}/month
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 5 Year Goal */}
-                  <div className="bg-gray-900 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">5 Year Goal</h3>
-                      <Target className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-gray-400 text-sm">Target</p>
-                        <p className="text-2xl font-bold">${goals.fiveYear.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 text-sm">Progress</p>
-                        <div className="w-full bg-gray-700 rounded-full h-3 mt-2">
-                          <div 
-                            className="bg-purple-500 h-3 rounded-full transition-all duration-500"
-                            style={{ width: `${goalProgress.fiveYear.progress}%` }}
-                          />
-                        </div>
-                        <p className="text-sm text-gray-300 mt-1">{goalProgress.fiveYear.progress.toFixed(1)}% Complete</p>
-                      </div>
-                      <div className="pt-2 border-t border-gray-800">
-                        <p className="text-gray-400 text-sm">Remaining</p>
-                        <p className="text-lg font-semibold">${goalProgress.fiveYear.remaining.toLocaleString()}</p>
-                        {goalProgress.fiveYear.monthlyRequired > 0 && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            Save ${goalProgress.fiveYear.monthlyRequired}/month
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Goal Achievement Tips */}
-                <div className="bg-gray-900 rounded-lg p-6 mt-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Info className="h-5 w-5 text-blue-500" />
-                    <h3 className="text-lg font-semibold">Tips to Achieve Your Goals</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-300">• Diversify across sectors to reduce risk</p>
-                      <p className="text-sm text-gray-300">• Set up automatic monthly investments</p>
-                      <p className="text-sm text-gray-300">• Reinvest dividends for compound growth</p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-300">• Review and rebalance quarterly</p>
-                      <p className="text-sm text-gray-300">• Consider index funds for stability</p>
-                      <p className="text-sm text-gray-300">• Keep 3-6 months emergency fund</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {activeView === 'sectors' && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold mb-4">Sector Allocation</h2>
@@ -969,78 +761,6 @@ export default function Portfolio() {
           </div>
         )}
 
-        {/* Goals Modal */}
-        {showGoalsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Set Financial Goals</h2>
-                <button
-                  onClick={() => setShowGoalsModal(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-                saveGoals({
-                  oneYear: parseFloat(formData.get('oneYear')) || 0,
-                  threeYear: parseFloat(formData.get('threeYear')) || 0,
-                  fiveYear: parseFloat(formData.get('fiveYear')) || 0
-                });
-              }} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">1 Year Goal ($)</label>
-                  <input
-                    type="number"
-                    name="oneYear"
-                    defaultValue={goals.oneYear}
-                    className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="25000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">3 Year Goal ($)</label>
-                  <input
-                    type="number"
-                    name="threeYear"
-                    defaultValue={goals.threeYear}
-                    className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="100000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">5 Year Goal ($)</label>
-                  <input
-                    type="number"
-                    name="fiveYear"
-                    defaultValue={goals.fiveYear}
-                    className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="250000"
-                  />
-                </div>
-                <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold"
-                  >
-                    Save Goals
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowGoalsModal(false)}
-                    className="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg font-semibold"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
         {/* Enhanced Add Holding Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1132,29 +852,6 @@ export default function Portfolio() {
                       )}
                     </div>
                   )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Sector</label>
-                  <select
-                    value={newHolding.sector}
-                    onChange={(e) => setNewHolding({...newHolding, sector: e.target.value})}
-                    className="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">Auto-detect</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Healthcare">Healthcare</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Energy">Energy</option>
-                    <option value="Consumer Discretionary">Consumer Discretionary</option>
-                    <option value="Consumer Staples">Consumer Staples</option>
-                    <option value="Industrials">Industrials</option>
-                    <option value="Materials">Materials</option>
-                    <option value="Real Estate">Real Estate</option>
-                    <option value="Utilities">Utilities</option>
-                    <option value="Communication">Communication</option>
-                    <option value="Other">Other</option>
-                  </select>
                 </div>
 
                 <div>
