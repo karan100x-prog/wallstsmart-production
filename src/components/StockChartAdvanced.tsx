@@ -314,8 +314,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
 
   // Mobile-specific chart margins
   const chartMargins = isMobile 
-    ? { top: 5, right: 5, bottom: 30, left: 0 }  // Minimal margins for mobile
-    : { top: 5, right: 10, bottom: 30, left: 10 }; // Default margins for desktop
+    ? { top: 5, right: 45, bottom: 30, left: showVolume ? 40 : 5 }  // Space for axes on mobile
+    : { top: 5, right: 55, bottom: 30, left: 50 }; // Default margins for desktop
 
   return (
     <div>
@@ -379,43 +379,35 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   height={isMobile ? 40 : 30}
                 />
                 
-                {/* Volume Y-Axis - Hidden on mobile when showVolume is false */}
-                {(!isMobile || showVolume) && (
-                  <YAxis 
-                    yAxisId="volume"
-                    orientation="left"
-                    stroke={showVolume ? "#60A5FA" : "transparent"}
-                    tick={{ fill: showVolume ? '#60A5FA' : 'transparent', fontSize: isMobile ? 10 : 11 }}
-                    tickFormatter={formatVolume}
-                    domain={[0, 'dataMax * 1.2']}
-                    axisLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
-                    tickLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
-                    width={isMobile ? 0 : undefined}
-                    hide={isMobile && !showVolume}
-                  />
-                )}
+                {/* Volume Y-Axis - Always rendered but conditionally styled */}
+                <YAxis 
+                  yAxisId="volume"
+                  orientation="left"
+                  stroke={showVolume ? "#60A5FA" : "transparent"}
+                  tick={{ 
+                    fill: showVolume ? '#60A5FA' : 'transparent', 
+                    fontSize: isMobile ? 9 : 11 
+                  }}
+                  tickFormatter={formatVolume}
+                  domain={[0, 'dataMax * 1.2']}
+                  axisLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
+                  tickLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
+                  width={isMobile ? (showVolume ? 35 : 0) : 45}
+                />
                 
-                {/* Price Y-Axis - Hide on mobile to save space */}
-                {!isMobile && (
-                  <YAxis 
-                    yAxisId="price"
-                    orientation="right"
-                    stroke="#9CA3AF"
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    domain={['dataMin * 0.95', 'dataMax * 1.05']}
-                    tickFormatter={(value) => `$${value.toFixed(0)}`}
-                  />
-                )}
-                
-                {/* Mobile-only hidden price axis for proper scaling */}
-                {isMobile && (
-                  <YAxis 
-                    yAxisId="price"
-                    orientation="right"
-                    domain={['dataMin * 0.95', 'dataMax * 1.05']}
-                    hide={true}
-                  />
-                )}
+                {/* Price Y-Axis - Always visible but optimized for mobile */}
+                <YAxis 
+                  yAxisId="price"
+                  orientation="right"
+                  stroke="#9CA3AF"
+                  tick={{ 
+                    fill: '#9CA3AF', 
+                    fontSize: isMobile ? 9 : 11 
+                  }}
+                  domain={['dataMin * 0.95', 'dataMax * 1.05']}
+                  tickFormatter={(value) => `${value.toFixed(0)}`}
+                  width={isMobile ? 40 : 50}
+                />
                 
                 <Tooltip 
                   content={<CustomTooltip />}
