@@ -49,7 +49,7 @@ const Footer = () => (
       </div>
       <div className="text-center mt-6">
         <p className="text-gray-400">© 2025 WallStSmart. Professional financial analysis.</p>
-        <p className="text-gray-500 text-sm mt-2">Real-time market data • Professional-grade analytics</p>
+        
       </div>
     </div>
   </footer>
