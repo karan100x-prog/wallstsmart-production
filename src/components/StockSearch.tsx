@@ -182,7 +182,7 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
         
         <div className="text-center text-gray-400 text-sm">
           <p className="mb-2">© 2025 WallStSmart. Professional financial analysis.</p>
-          <p>Real-time market data •Professional-grade analytics</p>
+          <p></p>
         </div>
            
         
