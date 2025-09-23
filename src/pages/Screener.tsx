@@ -19,7 +19,7 @@ export default function CompleteMarketScreener() {
     exchanges: []
   });
   
-  const stocksPerPage = 100;
+  const stocksPerPage = 20;
   const API_KEY = 'NMSRS0ZDIOWF3CLL';
 
   // Fetch ALL stocks from Alpha Vantage LISTING_STATUS
