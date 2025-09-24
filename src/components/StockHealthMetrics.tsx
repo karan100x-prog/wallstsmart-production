@@ -225,18 +225,19 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
           </div>
         </div>
 
-        {/* Piotroski F-Score Section */}
-        <div className="bg-gray-800 rounded-lg p-6 mb-6">
-          <div className="text-center">
-            <div className="text-6xl font-bold text-white mb-2">
+        {/* All Metrics Grid - 8 cards including Piotroski */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {/* Piotroski F-Score Card */}
+          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-all hover:shadow-lg">
+            <div className="text-gray-400 text-sm mb-2">Piotroski F-Score</div>
+            <div className="text-2xl font-bold text-white mb-2">
               {metrics?.piotroskiScore?.score || 0}/9
             </div>
-            <div className="text-sm text-gray-400 mb-3">Piotroski F-Score</div>
-            <div className="flex justify-center gap-1 mb-3">
+            <div className="flex gap-1 mb-2">
               {[...Array(9)].map((_, i) => (
                 <div
                   key={i}
-                  className={`w-10 h-3 rounded ${
+                  className={`flex-1 h-2 rounded ${
                     i < (metrics?.piotroskiScore?.score || 0)
                       ? 'bg-green-500'
                       : 'bg-gray-600'
@@ -244,14 +245,14 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
                 />
               ))}
             </div>
-            <div className="text-sm text-gray-400">
-              Fundamental Strength Assessment
+            <div className={`text-sm ${
+              (metrics?.piotroskiScore?.score || 0) >= 7 ? 'text-green-400' :
+              (metrics?.piotroskiScore?.score || 0) >= 5 ? 'text-yellow-400' : 'text-red-400'
+            }`}>
+              {metrics?.piotroskiScore?.interpretation || 'N/A'}
             </div>
           </div>
-        </div>
-
-        {/* Detailed Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          
           <MetricCard
             title="Altman Z-Score"
             value={metrics?.altmanZ?.score || 'N/A'}
