@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Activity, Calendar, DollarSign, User, Building, AlertCircle } from 'lucide-react';
+import { apiDebugger } from '../services/apiDebugger';
 
 interface Transaction {
   name: string;
