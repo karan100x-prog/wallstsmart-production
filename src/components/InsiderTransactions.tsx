@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Activity, Calendar, DollarSign, User, Building, AlertCircle } from 'lucide-react';
-import { apiDebugger } from '../services/apiDebugger';
+import { TrendingUp, TrendingDown, Activity, Calendar, DollarSign, User, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface Transaction {
   name: string;
@@ -21,7 +20,10 @@ interface InsiderTransactionsProps {
   symbol: string;
 }
 
-
+// Simple cache implementation
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const pendingRequests = new Map<string, Promise<any>>();
 
 const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -38,63 +40,55 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     setLoading(true);
     setError(null);
     
+    const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
+    const cacheKey = `insider_${symbol}`;
+    
     try {
-      console.log(`[InsiderTransactions] Loading data for symbol: ${symbol}`);
-      
-      const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
-      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
-      
-      console.log(`[InsiderTransactions] Fetching URL:`, url);
-      
-      const response = await fetch(url);
-      console.log(`[InsiderTransactions] Response status: ${response.status}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Check cache first
+      const cached = cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log(`📦 [InsiderTransactions] Using cached data for ${symbol}`);
+        processData(cached.data);
+        setLoading(false);
+        return;
       }
 
-      const data = await response.json();
-      console.log('📦 [InsiderTransactions] Raw API Response:', { data: Array.isArray(data?.data) ? `Array(${data.data.length})` : data });
-      console.log('🔑 [InsiderTransactions] Response keys:', data ? Object.keys(data) : 'No data');
-      
-      if (data['Information'] || data['Note']) {
-        throw new Error('API limit reached. Please try again later.');
+      // Check if request is already pending for this symbol
+      if (pendingRequests.has(cacheKey)) {
+        console.log(`⏳ [InsiderTransactions] Waiting for pending request for ${symbol}`);
+        const data = await pendingRequests.get(cacheKey);
+        processData(data);
+        setLoading(false);
+        return;
       }
+
+      // Make new request
+      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
       
-      if (data['Error Message']) {
-        throw new Error('Invalid symbol or API error');
-      }
+      console.log(`📡 [InsiderTransactions] Fetching fresh data for ${symbol}`);
       
-      // The API returns data in the "data" field
-      if (data && data.data && Array.isArray(data.data)) {
-        console.log(`✅ [InsiderTransactions] Found data in "data" field`);
-        console.log(`✅ [InsiderTransactions] Found ${data.data.length} transactions`);
-        
-        // Process and set the transactions
-        const processedTransactions = data.data.slice(0, 20); // Show latest 20 transactions
-        setTransactions(processedTransactions);
-        
-        // Count buys and sells
-        let buyCount = 0;
-        let sellCount = 0;
-        
-        processedTransactions.forEach(t => {
-          if (t.acquisition_or_disposal?.toUpperCase() === 'A') {
-            buyCount++;
-          } else if (t.acquisition_or_disposal?.toUpperCase() === 'D') {
-            sellCount++;
-          }
+      // Create promise and store it
+      const requestPromise = fetch(url)
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          return response.json();
+        })
+        .then(data => {
+          // Cache the successful response
+          cache.set(cacheKey, { data, timestamp: Date.now() });
+          pendingRequests.delete(cacheKey);
+          return data;
+        })
+        .catch(err => {
+          pendingRequests.delete(cacheKey);
+          throw err;
         });
-        
-        setBuys(buyCount);
-        setSells(sellCount);
-        
-        console.log(`📊 [InsiderTransactions] Processed ${processedTransactions.length} transactions`);
-        console.log(`📈 [InsiderTransactions] Buys: ${buyCount}, Sells: ${sellCount}`);
-      } else {
-        console.log('❌ [InsiderTransactions] No valid data found in response');
-        setTransactions([]);
-      }
+
+      pendingRequests.set(cacheKey, requestPromise);
+      const data = await requestPromise;
+      
+      // Process the data
+      processData(data);
       
     } catch (err) {
       console.error('❌ [InsiderTransactions] Error:', err);
@@ -103,6 +97,64 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     } finally {
       setLoading(false);
     }
+  };
+
+  const processData = (data: any) => {
+    // Check for API errors
+    if (data['Information']) {
+      console.warn('⚠️ [InsiderTransactions] API Information:', data['Information']);
+      setError('API limit reached. Data will refresh in a few minutes.');
+      setTransactions([]);
+      return;
+    }
+    
+    if (data['Note']) {
+      console.warn('⚠️ [InsiderTransactions] API Note:', data['Note']);
+      setError('API call frequency limit. Please wait a moment.');
+      setTransactions([]);
+      return;
+    }
+    
+    if (data['Error Message']) {
+      console.error('❌ [InsiderTransactions] API Error:', data['Error Message']);
+      setError('Invalid symbol or API error');
+      setTransactions([]);
+      return;
+    }
+    
+    // Process successful data
+    if (data && data.data && Array.isArray(data.data)) {
+      console.log(`✅ [InsiderTransactions] Processing ${data.data.length} transactions for ${symbol}`);
+      
+      const processedTransactions = data.data.slice(0, 20);
+      setTransactions(processedTransactions);
+      
+      // Count buys and sells
+      let buyCount = 0;
+      let sellCount = 0;
+      
+      processedTransactions.forEach(t => {
+        if (t.acquisition_or_disposal?.toUpperCase() === 'A') {
+          buyCount++;
+        } else if (t.acquisition_or_disposal?.toUpperCase() === 'D') {
+          sellCount++;
+        }
+      });
+      
+      setBuys(buyCount);
+      setSells(sellCount);
+    } else {
+      console.log('❌ [InsiderTransactions] No valid data found');
+      setTransactions([]);
+    }
+  };
+
+  const handleRefresh = () => {
+    // Clear cache for this symbol and refetch
+    const cacheKey = `insider_${symbol}`;
+    cache.delete(cacheKey);
+    console.log(`🔄 [InsiderTransactions] Cache cleared for ${symbol}, refreshing...`);
+    fetchInsiderTransactions();
   };
 
   const formatDate = (dateStr: string) => {
@@ -119,18 +171,18 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
   };
 
   const formatNumber = (num: number | undefined) => {
-    if (!num) return 'N/A';
-    return new Intl.NumberFormat('en-US').format(num);
+    if (num === undefined || num === null) return 'N/A';
+    return new Intl.NumberFormat('en-US').format(Math.abs(num));
   };
 
   const formatCurrency = (num: number | undefined) => {
-    if (!num) return 'N/A';
+    if (num === undefined || num === null || num === 0) return 'N/A';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(num);
+    }).format(Math.abs(num));
   };
 
   if (loading) {
@@ -150,36 +202,73 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
   if (error) {
     return (
       <div className="bg-gray-900 rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-blue-400" />
-          Insider Transactions
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Activity className="w-5 h-5 text-blue-400" />
+            Insider Transactions
+          </h2>
+          <button 
+            onClick={handleRefresh}
+            className="text-blue-400 hover:text-blue-300 p-1"
+            title="Refresh data"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
         <div className="text-red-400 flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
           {error}
         </div>
+        <button 
+          onClick={handleRefresh}
+          className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Try Again
+        </button>
       </div>
     );
   }
 
-  if (transactions.length === 0) {
+  if (!transactions || transactions.length === 0) {
     return (
       <div className="bg-gray-900 rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-blue-400" />
-          Insider Transactions
-        </h2>
-        <p className="text-gray-400">No insider transactions available</p>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Activity className="w-5 h-5 text-blue-400" />
+            Insider Transactions
+          </h2>
+          <button 
+            onClick={handleRefresh}
+            className="text-blue-400 hover:text-blue-300 p-1"
+            title="Refresh data"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-gray-400">No insider transactions available for {symbol}</p>
       </div>
     );
   }
 
   return (
     <div className="bg-gray-900 rounded-lg p-6">
-      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-        <Activity className="w-5 h-5 text-blue-400" />
-        Insider Transactions
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <Activity className="w-5 h-5 text-blue-400" />
+          Insider Transactions
+          {transactions.length > 0 && (
+            <span className="text-sm text-gray-500">({transactions.length} recent)</span>
+          )}
+        </h2>
+        <button 
+          onClick={handleRefresh}
+          className="text-blue-400 hover:text-blue-300 p-1"
+          title="Refresh data"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -215,11 +304,11 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
             {transactions.map((transaction, index) => {
               const isAcquisition = transaction.acquisition_or_disposal?.toUpperCase() === 'A';
               const value = transaction.shares && transaction.price 
-                ? transaction.shares * transaction.price 
+                ? Math.abs(transaction.shares * transaction.price)
                 : transaction.value || 0;
               
               return (
-                <tr key={index} className="border-b border-gray-800 hover:bg-gray-800/50">
+                <tr key={`${transaction.transaction_date}-${transaction.name}-${index}`} className="border-b border-gray-800 hover:bg-gray-800/50">
                   <td className="py-3 pr-4">
                     <div className="flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-gray-500" />
@@ -280,14 +369,12 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
         </table>
       </div>
 
-      {/* Show More Button */}
-      {transactions.length === 20 && (
-        <div className="mt-4 text-center">
-          <button className="text-blue-400 hover:text-blue-300 text-sm">
-            Showing latest 20 transactions
-          </button>
-        </div>
-      )}
+      {/* Cache Info */}
+      <div className="mt-4 text-center">
+        <p className="text-gray-500 text-xs">
+          Data cached for 5 minutes • Click refresh to update
+        </p>
+      </div>
     </div>
   );
 };
