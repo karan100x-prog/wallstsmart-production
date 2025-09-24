@@ -38,7 +38,7 @@ function Navigation() {
             
             <div className="hidden md:flex items-center gap-6">
               <Link to="/macro" className="hover:text-green-500 transition whitespace-nowrap">Macro</Link>
-              <Link to="/screener" className="hover:text-green-500 transition whitespace-nowrap">Screener</Link>
+              <Link to="/screener" className="hover:text-green-500 transition whitespace-nowrap"> </Link>
               <Link to="/portfolio" className="hover:text-green-500 transition whitespace-nowrap">Portfolio</Link>
               <Link to="/smart-flow" className="hover:text-green-500 transition whitespace-nowrap">Smart Flow</Link>
               
