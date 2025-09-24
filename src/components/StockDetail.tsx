@@ -4,6 +4,7 @@ import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 import { StockHealthMetrics } from './StockHealthMetrics';
 import RevenueAnalysis from './RevenueAnalysis';
+import InsiderTransactions from './InsiderTransactions';
 
 interface StockDetailProps {
   symbol: string;
