@@ -50,6 +50,19 @@ class MetricsCalculator {
         return { score: 'N/A', interpretation: 'Missing liabilities data' };
       }
 
+      // Check for negative equity scenario
+      const totalEquity = totalAssets - totalLiabilities;
+      if (totalEquity < 0) {
+        console.warn(`${overview.Symbol}: Negative shareholders' equity detected`);
+        return { 
+          score: 'N/A', 
+          interpretation: 'Negative equity - Severe financial distress',
+          components: {
+            warning: 'Company has negative shareholders\' equity'
+          }
+        };
+      }
+
       // Calculate the five components (X1 to X5)
       const workingCapital = currentAssets - currentLiabilities;
       
@@ -117,6 +130,17 @@ class MetricsCalculator {
 
   // Helper function to interpret Z-Score
   interpretZScore(score: number, isPrivateCompany: boolean = false) {
+    // VALIDATION: Check for extreme/unrealistic values
+    if (score < -10 || score > 20 || isNaN(score)) {
+      return {
+        score: 'N/A',
+        interpretation: 'Data quality issue - unable to calculate',
+        components: {
+          warning: 'Extreme values detected - check financial data'
+        }
+      };
+    }
+    
     let interpretation = '';
     
     if (isPrivateCompany) {
@@ -328,8 +352,23 @@ class MetricsCalculator {
       const latestBalance = balance?.annualReports?.[0] || {};
       const totalLiabilities = parseFloat(latestBalance.totalLiabilities || 0);
       const totalEquity = parseFloat(latestBalance.totalShareholderEquity || 0);
+      
+      // Handle edge cases
       if (totalEquity === 0) return 'N/A';
-      return (totalLiabilities / totalEquity).toFixed(2);
+      
+      // Handle negative equity (company is technically insolvent)
+      if (totalEquity < 0) {
+        return 'Negative Equity';
+      }
+      
+      const debtToEquity = totalLiabilities / totalEquity;
+      
+      // Sanity check for extreme values
+      if (Math.abs(debtToEquity) > 100) {
+        return 'N/A'; // Likely data quality issue
+      }
+      
+      return debtToEquity.toFixed(2);
     } catch (error) {
       console.error('Error calculating Debt to Equity:', error);
       return 'N/A';
@@ -343,8 +382,15 @@ class MetricsCalculator {
       const latestBalance = balance?.annualReports?.[0] || {};
       
       const ebit = parseFloat(latestIncome.ebit || latestIncome.operatingIncome || 0);
-      const taxRate = parseFloat(latestIncome.incomeTaxExpense || 0) / 
-                      parseFloat(latestIncome.incomeBeforeTax || 1);
+      const incomeBeforeTax = parseFloat(latestIncome.incomeBeforeTax || 0);
+      const incomeTaxExpense = parseFloat(latestIncome.incomeTaxExpense || 0);
+      
+      // Calculate tax rate more safely
+      let taxRate = 0;
+      if (incomeBeforeTax !== 0 && incomeBeforeTax > 0) {
+        taxRate = Math.max(0, Math.min(1, incomeTaxExpense / incomeBeforeTax));
+      }
+      
       const nopat = ebit * (1 - taxRate); // Net Operating Profit After Tax
       
       const totalEquity = parseFloat(latestBalance.totalShareholderEquity || 0);
@@ -354,8 +400,21 @@ class MetricsCalculator {
       
       const investedCapital = totalEquity + longTermDebt + shortTermDebt - cash;
       
-      if (investedCapital <= 0) return 'N/A';
-      return ((nopat / investedCapital) * 100).toFixed(2);
+      // Handle edge cases
+      if (investedCapital <= 0) {
+        console.log('Invested capital is negative or zero');
+        return 'N/A';
+      }
+      
+      const roic = (nopat / investedCapital) * 100;
+      
+      // Sanity check - ROIC above 200% or below -200% is likely a data issue
+      if (Math.abs(roic) > 200) {
+        console.warn(`ROIC calculation resulted in extreme value: ${roic}%`);
+        return 'N/A';
+      }
+      
+      return roic.toFixed(2);
     } catch (error) {
       console.error('Error calculating ROIC:', error);
       return 'N/A';
