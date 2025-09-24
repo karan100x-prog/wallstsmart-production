@@ -1,4 +1,4 @@
-// InsiderTransactions.tsx
+// InsiderTransactions.tsx - Updated with debugging
 import React, { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, User, AlertCircle } from 'lucide-react';
 
@@ -20,6 +20,7 @@ interface Transaction {
 const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState({
     totalBuys: 0,
     totalSells: 0,
@@ -30,64 +31,154 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
   });
 
   useEffect(() => {
-    loadInsiderData();
+    if (symbol) {
+      loadInsiderData();
+    }
   }, [symbol]);
 
   const loadInsiderData = async () => {
     setLoading(true);
+    setError(null);
+    console.log('🔍 [InsiderTransactions] Loading data for symbol:', symbol);
+    
     try {
-      const response = await fetch(
-        `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=NMSRS0ZDIOWF3CLL`
-      );
-      const data = await response.json();
-
-      if (data.data && Array.isArray(data.data)) {
-        const processedTransactions = data.data
-          .slice(0, 20)
-          .map((tx: any) => ({
-            name: tx.name || 'Unknown',
-            title: tx.title || 'N/A',
-            transaction_type: tx.transaction_type || 'Unknown',
-            shares: parseInt(tx.shares || 0),
-            price: parseFloat(tx.price || 0),
-            value: parseFloat(tx.value || 0),
-            date: tx.date || '',
-            ownership: tx.ownership || 'N/A'
-          }));
-
-        setTransactions(processedTransactions);
-
-        const buys = processedTransactions.filter((tx: Transaction) => 
-          tx.transaction_type.toLowerCase().includes('buy') || 
-          tx.transaction_type.toLowerCase().includes('purchase') ||
-          tx.transaction_type.toLowerCase().includes('acquisition')
-        );
-        
-        const sells = processedTransactions.filter((tx: Transaction) => 
-          tx.transaction_type.toLowerCase().includes('sell') || 
-          tx.transaction_type.toLowerCase().includes('sale') ||
-          tx.transaction_type.toLowerCase().includes('disposition')
-        );
-
-        const totalBuyValue = buys.reduce((sum: number, tx: Transaction) => sum + tx.value, 0);
-        const totalSellValue = sells.reduce((sum: number, tx: Transaction) => sum + tx.value, 0);
-        const netActivity = totalBuyValue - totalSellValue;
-
-        let sentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
-        if (netActivity > 1000000) sentiment = 'bullish';
-        else if (netActivity < -1000000) sentiment = 'bearish';
-
-        setSummary({
-          totalBuys: buys.length,
-          totalSells: sells.length,
-          buyValue: totalBuyValue,
-          sellValue: totalSellValue,
-          netActivity,
-          sentiment
-        });
+      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=NMSRS0ZDIOWF3CLL`;
+      console.log('📡 [InsiderTransactions] Fetching URL:', url);
+      
+      const response = await fetch(url);
+      console.log('✅ [InsiderTransactions] Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const data = await response.json();
+      console.log('📦 [InsiderTransactions] Raw API Response:', data);
+      
+      // Check for API errors or rate limits
+      if (data.Note) {
+        console.warn('⚠️ [InsiderTransactions] API Rate Limit:', data.Note);
+        setError('API rate limit reached. Please try again later.');
+        return;
+      }
+      
+      if (data['Error Message']) {
+        console.error('❌ [InsiderTransactions] API Error:', data['Error Message']);
+        setError('Invalid symbol or API error.');
+        return;
+      }
+      
+      if (data.Information) {
+        console.warn('⚠️ [InsiderTransactions] API Info:', data.Information);
+        setError('API request limit reached.');
+        return;
+      }
+      
+      // Log the structure to understand what we're working with
+      console.log('🔑 [InsiderTransactions] Response keys:', Object.keys(data));
+      
+      // Try different possible data structures
+      let rawTransactions = null;
+      
+      // Check for different possible field names
+      if (data.data && Array.isArray(data.data)) {
+        rawTransactions = data.data;
+        console.log('✅ [InsiderTransactions] Found data in "data" field');
+      } else if (data.feed && Array.isArray(data.feed)) {
+        rawTransactions = data.feed;
+        console.log('✅ [InsiderTransactions] Found data in "feed" field');
+      } else if (data.transactions && Array.isArray(data.transactions)) {
+        rawTransactions = data.transactions;
+        console.log('✅ [InsiderTransactions] Found data in "transactions" field');
+      } else if (Array.isArray(data)) {
+        rawTransactions = data;
+        console.log('✅ [InsiderTransactions] Data is direct array');
+      }
+      
+      if (!rawTransactions) {
+        console.log('⚠️ [InsiderTransactions] No transaction data found');
+        console.log('📊 [InsiderTransactions] Full response structure:', JSON.stringify(data, null, 2));
+        setTransactions([]);
+        return;
+      }
+      
+      console.log(`📈 [InsiderTransactions] Found ${rawTransactions.length} transactions`);
+      
+      // Log first transaction to see its structure
+      if (rawTransactions.length > 0) {
+        console.log('🔍 [InsiderTransactions] First transaction structure:', rawTransactions[0]);
+        console.log('🔑 [InsiderTransactions] First transaction keys:', Object.keys(rawTransactions[0]));
+      }
+      
+      // Process transactions with flexible field mapping
+      const processedTransactions = rawTransactions
+        .slice(0, 20)
+        .map((tx: any, index: number) => {
+          // Try different field names for each property
+          const processed = {
+            name: tx.name || tx.insider_name || tx.insider || tx.reportingOwner || 'Unknown',
+            title: tx.title || tx.position || tx.relationship || tx.insider_title || 'N/A',
+            transaction_type: tx.transaction_type || tx.transactionType || tx.transaction || tx.acquisitionDisposition || 'Unknown',
+            shares: parseInt(tx.shares || tx.shareCount || tx.quantity || tx.securitiesTransacted || '0'),
+            price: parseFloat(tx.price || tx.pricePerShare || tx.transactionPrice || '0'),
+            value: parseFloat(tx.value || tx.transactionValue || tx.totalValue || '0'),
+            date: tx.date || tx.transactionDate || tx.filingDate || '',
+            ownership: tx.ownership || tx.sharesOwned || tx.postTransactionShares || 'N/A'
+          };
+          
+          // Log mapping for first item to debug
+          if (index === 0) {
+            console.log('🔄 [InsiderTransactions] Mapped transaction:', processed);
+          }
+          
+          return processed;
+        });
+      
+      console.log(`✅ [InsiderTransactions] Processed ${processedTransactions.length} transactions`);
+      setTransactions(processedTransactions);
+      
+      // Calculate summary statistics
+      const buys = processedTransactions.filter((tx: Transaction) => {
+        const type = tx.transaction_type.toLowerCase();
+        return type.includes('buy') || 
+               type.includes('purchase') || 
+               type.includes('acquisition') ||
+               type.includes('grant') ||
+               type === 'p' || 
+               type === 'a';
+      });
+      
+      const sells = processedTransactions.filter((tx: Transaction) => {
+        const type = tx.transaction_type.toLowerCase();
+        return type.includes('sell') || 
+               type.includes('sale') || 
+               type.includes('disposition') ||
+               type === 's' || 
+               type === 'd';
+      });
+      
+      console.log(`📊 [InsiderTransactions] Buys: ${buys.length}, Sells: ${sells.length}`);
+      
+      const totalBuyValue = buys.reduce((sum: number, tx: Transaction) => sum + tx.value, 0);
+      const totalSellValue = sells.reduce((sum: number, tx: Transaction) => sum + tx.value, 0);
+      const netActivity = totalBuyValue - totalSellValue;
+      
+      let sentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (netActivity > 1000000) sentiment = 'bullish';
+      else if (netActivity < -1000000) sentiment = 'bearish';
+      
+      setSummary({
+        totalBuys: buys.length,
+        totalSells: sells.length,
+        buyValue: totalBuyValue,
+        sellValue: totalSellValue,
+        netActivity,
+        sentiment
+      });
+      
     } catch (error) {
-      console.error('Error loading insider transactions:', error);
+      console.error('❌ [InsiderTransactions] Error loading data:', error);
+      setError('Failed to load insider transactions');
     } finally {
       setLoading(false);
     }
@@ -102,20 +193,27 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'N/A';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr; // Return original if invalid
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    } catch {
+      return dateStr;
+    }
   };
 
   const getTransactionIcon = (type: string) => {
     const lowerType = type.toLowerCase();
-    if (lowerType.includes('buy') || lowerType.includes('purchase') || lowerType.includes('acquisition')) {
+    if (lowerType.includes('buy') || lowerType.includes('purchase') || 
+        lowerType.includes('acquisition') || lowerType === 'p' || lowerType === 'a') {
       return <TrendingUp className="h-4 w-4 text-green-500" />;
     }
-    if (lowerType.includes('sell') || lowerType.includes('sale') || lowerType.includes('disposition')) {
+    if (lowerType.includes('sell') || lowerType.includes('sale') || 
+        lowerType.includes('disposition') || lowerType === 's' || lowerType === 'd') {
       return <TrendingDown className="h-4 w-4 text-red-500" />;
     }
     return <AlertCircle className="h-4 w-4 text-gray-400" />;
@@ -123,10 +221,12 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
 
   const getTransactionColor = (type: string) => {
     const lowerType = type.toLowerCase();
-    if (lowerType.includes('buy') || lowerType.includes('purchase') || lowerType.includes('acquisition')) {
+    if (lowerType.includes('buy') || lowerType.includes('purchase') || 
+        lowerType.includes('acquisition') || lowerType === 'p' || lowerType === 'a') {
       return 'text-green-500';
     }
-    if (lowerType.includes('sell') || lowerType.includes('sale') || lowerType.includes('disposition')) {
+    if (lowerType.includes('sell') || lowerType.includes('sale') || 
+        lowerType.includes('disposition') || lowerType === 's' || lowerType === 'd') {
       return 'text-red-500';
     }
     return 'text-gray-400';
@@ -147,6 +247,19 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
+        <h3 className="text-xl font-bold mb-4">Insider Transactions</h3>
+        <div className="text-center py-8">
+          <AlertCircle className="h-12 w-12 mx-auto mb-3 text-yellow-500" />
+          <p className="text-gray-400">{error}</p>
+          <p className="text-sm text-gray-500 mt-2">Please try again later</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!transactions.length) {
     return (
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
@@ -154,6 +267,7 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
         <div className="text-center py-8 text-gray-400">
           <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
           <p>No recent insider transactions available</p>
+          <p className="text-sm text-gray-500 mt-2">This stock may not have recent insider activity</p>
         </div>
       </div>
     );
@@ -186,12 +300,12 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
         <div className="bg-gray-800 rounded-lg p-3">
           <div className="text-xs text-gray-400 mb-1">Net Activity</div>
           <div className={`text-xl font-bold ${
-            summary.netActivity > 0 ? 'text-green-500' : 'text-red-500'
+            summary.netActivity > 0 ? 'text-green-500' : summary.netActivity < 0 ? 'text-red-500' : 'text-gray-400'
           }`}>
             {formatMoney(Math.abs(summary.netActivity))}
           </div>
           <div className="text-xs text-gray-400">
-            {summary.netActivity > 0 ? 'Net Buying' : 'Net Selling'}
+            {summary.netActivity > 0 ? 'Net Buying' : summary.netActivity < 0 ? 'Net Selling' : 'Neutral'}
           </div>
         </div>
         <div className="bg-gray-800 rounded-lg p-3">
@@ -200,7 +314,8 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
             {summary.totalSells > 0 ? (summary.totalBuys / summary.totalSells).toFixed(2) : summary.totalBuys}:1
           </div>
           <div className="text-xs text-gray-400">
-            {summary.totalBuys > summary.totalSells ? 'More Buying' : 'More Selling'}
+            {summary.totalBuys > summary.totalSells ? 'More Buying' : 
+             summary.totalBuys < summary.totalSells ? 'More Selling' : 'Balanced'}
           </div>
         </div>
       </div>
@@ -239,7 +354,7 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
                   {tx.shares.toLocaleString()}
                 </td>
                 <td className="py-3 text-right text-white">
-                  ${tx.price.toFixed(2)}
+                  ${tx.price > 0 ? tx.price.toFixed(2) : '0.00'}
                 </td>
                 <td className={`py-3 text-right font-semibold ${getTransactionColor(tx.transaction_type)}`}>
                   {formatMoney(tx.value)}
