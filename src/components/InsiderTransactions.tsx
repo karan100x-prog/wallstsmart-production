@@ -21,6 +21,19 @@ interface InsiderTransactionsProps {
   symbol: string;
 }
 
+
+import { apiDebugger } from '../services/apiDebugger';
+
+const fetchInsiderTransactions = async () => {
+  // ADD THIS LINE
+  apiDebugger.logCall(url, 'InsiderTransactions');
+  
+  // rest of your existing code...
+  const response = await fetch(url);
+  // ...
+};
+
+
 const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
