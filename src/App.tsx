@@ -75,16 +75,16 @@ function Navigation() {
             <div className="md:hidden border-t border-gray-800 py-4">
               <div className="flex flex-col gap-4">
                 <Link to="/macro" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
-                  Macro
+                  
                 </Link>
                 <Link to="/screener" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
-                  Screener
+                  
                 </Link>
                 <Link to="/portfolio" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
                   Portfolio
                 </Link>
                 <Link to="/smart-flow" className="px-2 py-1 hover:text-green-500 transition" onClick={() => setMobileMenuOpen(false)}>
-                  Smart Flow
+                  
                 </Link>
                 {currentUser ? (
                   <>
