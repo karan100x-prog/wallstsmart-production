@@ -1,491 +1,425 @@
-// StockHealthMetrics.tsx - Updated with Improved Gauge
-import React, { useEffect, useState } from 'react';
-import metricsCalculator from '../services/metricsCalculator';
+// metricsCalculator.ts - Fixed Altman Z-Score Calculation
 import { 
-  getCompanyOverview,
   fetchIncomeStatement, 
   fetchBalanceSheet,
   fetchCashFlow 
-} from '../services/alphaVantage';
+} from './alphaVantage';
 
-interface HealthMetricsProps {
-  symbol: string;
-}
-
-// Improved Gauge Component with better N/A handling and extended scale
-const ImprovedGaugeChart: React.FC<{ value: number | string; title: string }> = ({ value, title }) => {
-  // Handle N/A or invalid values
-  const isValidValue = typeof value === 'number' && !isNaN(value);
-  const numericValue = isValidValue ? value : 0;
+class MetricsCalculator {
   
-  // Extended scale: -4 to 8 to accommodate most real-world scores
-  const minValue = -4;
-  const maxValue = 8;
-  const range = maxValue - minValue;
-  
-  // Calculate needle rotation (0-180 degrees)
-  const clampedValue = Math.max(minValue, Math.min(maxValue, numericValue));
-  const rotation = ((clampedValue - minValue) / range) * 180;
-  
-  // Determine color zones (as percentages of the 180-degree arc)
-  const distressEnd = ((1.8 - minValue) / range) * 180;
-  const greyEnd = ((3.0 - minValue) / range) * 180;
-  
-  // Format display value
-  const displayValue = isValidValue ? numericValue.toFixed(2) : 'N/A';
-  
-  // Get interpretation based on score
-  const getInterpretation = () => {
-    if (!isValidValue) return 'Data Unavailable';
-    if (numericValue < 0) return 'Severe Distress';
-    if (numericValue < 1.8) return 'Distress Zone';
-    if (numericValue < 3.0) return 'Grey Zone';
-    return 'Safe Zone';
-  };
-  
-  const interpretation = getInterpretation();
-  
-  // Color for the score text based on zone
-  const getScoreColor = () => {
-    if (!isValidValue) return '#6b7280'; // gray
-    if (numericValue < 1.8) return '#ef4444'; // red
-    if (numericValue < 3.0) return '#eab308'; // yellow
-    return '#22c55e'; // green
-  };
-
-  return (
-    <div className="relative w-full h-40">
-      <svg viewBox="0 0 200 120" className="w-full h-full">
-        {/* Background arc */}
-        <path
-          d="M 20 100 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="#374151"
-          strokeWidth="12"
-        />
-        
-        {/* Red zone (Distress: -4 to 1.8) */}
-        <path
-          d="M 20 100 A 80 80 0 0 1 73 35"
-          fill="none"
-          stroke="#ef4444"
-          strokeWidth="12"
-          opacity={isValidValue ? 1 : 0.3}
-        />
-        
-        {/* Yellow zone (Grey: 1.8 to 3.0) */}
-        <path
-          d="M 73 35 A 80 80 0 0 1 127 35"
-          fill="none"
-          stroke="#eab308"
-          strokeWidth="12"
-          opacity={isValidValue ? 1 : 0.3}
-        />
-        
-        {/* Green zone (Safe: 3.0 to 8) */}
-        <path
-          d="M 127 35 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="#22c55e"
-          strokeWidth="12"
-          opacity={isValidValue ? 1 : 0.3}
-        />
-        
-        {/* Scale labels */}
-        <text x="20" y="115" fill="#9ca3af" fontSize="10" textAnchor="middle">
-          {minValue}
-        </text>
-        <text x="73" y="30" fill="#9ca3af" fontSize="10" textAnchor="middle">
-          1.8
-        </text>
-        <text x="127" y="30" fill="#9ca3af" fontSize="10" textAnchor="middle">
-          3.0
-        </text>
-        <text x="180" y="115" fill="#9ca3af" fontSize="10" textAnchor="middle">
-          {maxValue}
-        </text>
-        
-        {/* Needle - only show if value is valid */}
-        {isValidValue && (
-          <g transform={`rotate(${rotation} 100 100)`}>
-            <line
-              x1="100"
-              y1="100"
-              x2="100"
-              y2="35"
-              stroke="white"
-              strokeWidth="3"
-            />
-            <circle cx="100" cy="100" r="6" fill="white" />
-          </g>
-        )}
-        
-        {/* "No Data" indicator for N/A values */}
-        {!isValidValue && (
-          <text x="100" y="70" fill="#6b7280" fontSize="14" textAnchor="middle" fontWeight="bold">
-            No Data Available
-          </text>
-        )}
-      </svg>
-      
-      {/* Score display */}
-      <div className="absolute bottom-0 left-0 right-0 text-center">
-        <div className={`text-3xl font-bold`} style={{ color: getScoreColor() }}>
-          {displayValue}
-        </div>
-        <div className="text-xs text-gray-400">{title}</div>
-        <div className={`text-sm mt-1`} style={{ color: getScoreColor() }}>
-          {interpretation}
-        </div>
-      </div>
-      
-      {/* Out of range indicator */}
-      {isValidValue && (numericValue < minValue || numericValue > maxValue) && (
-        <div className="absolute top-0 right-0 bg-yellow-600 text-xs text-white px-2 py-1 rounded">
-          {numericValue < minValue ? '↓ Below Range' : '↑ Above Range'}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Improved Metric Card Component
-const ImprovedMetricCard: React.FC<{
-  title: string;
-  value: string | number;
-  maxValue?: number;
-  interpretation?: string;
-  showProgress?: boolean;
-  benchmark?: string;
-}> = ({ 
-  title, 
-  value, 
-  maxValue = 10, 
-  interpretation, 
-  showProgress = false,
-  benchmark
-}) => {
-  // Check if value is valid
-  const isValidValue = value !== 'N/A' && value !== 'Negative Equity' && 
-                      value !== null && value !== undefined && 
-                      (typeof value === 'number' || !isNaN(parseFloat(String(value))));
-  
-  const numValue = isValidValue ? (typeof value === 'string' ? parseFloat(value) : value) : 0;
-  const progressPercent = isValidValue && maxValue ? (Math.abs(numValue) / maxValue) * 100 : 0;
-  
-  const getProgressColor = () => {
-    if (!isValidValue) return 'bg-gray-600';
-    
-    if (title === 'ROIC' || title === 'FCF Yield') {
-      if (numValue > 15) return 'bg-green-500';
-      if (numValue > 5) return 'bg-yellow-500';
-      if (numValue > 0) return 'bg-orange-500';
-      return 'bg-red-500';
-    }
-    
-    if (title === 'Current Ratio' || title === 'Quick Ratio') {
-      if (numValue > 1.5) return 'bg-green-500';
-      if (numValue > 1.0) return 'bg-yellow-500';
-      return 'bg-red-500';
-    }
-    
-    if (title === 'Debt/Equity') {
-      if (numValue < 0.5) return 'bg-green-500';
-      if (numValue < 1.0) return 'bg-yellow-500';
-      if (numValue < 2.0) return 'bg-orange-500';
-      return 'bg-red-500';
-    }
-    
-    return 'bg-blue-500';
-  };
-  
-  const getInterpretationColor = () => {
-    if (!isValidValue || value === 'Negative Equity') return 'text-red-500';
-    if (!interpretation) return 'text-gray-400';
-    
-    if (interpretation.includes('Strong') || interpretation.includes('Positive') || 
-        interpretation.includes('Low Leverage') || interpretation.includes('Safe')) {
-      return 'text-green-400';
-    }
-    if (interpretation.includes('Moderate') || interpretation.includes('Grey')) {
-      return 'text-yellow-400';
-    }
-    if (interpretation.includes('Negative') || interpretation.includes('Weak') || 
-        interpretation.includes('High Leverage') || interpretation.includes('Distress')) {
-      return 'text-red-400';
-    }
-    return 'text-gray-400';
-  };
-
-  return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-all hover:shadow-lg">
-      <div className="flex justify-between items-start mb-2">
-        <div className="text-gray-400 text-sm">{title}</div>
-        {benchmark && isValidValue && (
-          <div className="text-xs text-gray-500">Target: {benchmark}</div>
-        )}
-      </div>
-      
-      <div className={`text-2xl font-bold mb-2 ${!isValidValue ? 'text-gray-500' : 'text-white'}`}>
-        {value || 'N/A'}
-      </div>
-      
-      {showProgress && isValidValue && !isNaN(numValue) && (
-        <div className="mb-2">
-          <div className="w-full bg-gray-700 rounded-full h-2">
-            <div 
-              className={`h-2 rounded-full transition-all duration-500 ${getProgressColor()}`}
-              style={{ width: `${Math.min(progressPercent, 100)}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>0</span>
-            <span>{maxValue}</span>
-          </div>
-        </div>
-      )}
-      
-      {(interpretation || !isValidValue || value === 'Negative Equity') && (
-        <div className={`text-sm mt-2 ${getInterpretationColor()}`}>
-          {!isValidValue ? 'Data unavailable' : interpretation}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => {
-  const [metrics, setMetrics] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [industryAvg, setIndustryAvg] = useState<any>(null);
-
-  useEffect(() => {
-    const loadMetrics = async () => {
-      try {
-        setLoading(true);
-        
-        const [overview, income, balance, cashFlow] = await Promise.all([
-          getCompanyOverview(symbol),
-          fetchIncomeStatement(symbol),
-          fetchBalanceSheet(symbol),
-          fetchCashFlow(symbol)
-        ]);
-
-        // Calculate current metrics
-        const altmanZ = metricsCalculator.calculateAltmanZScore(overview, income, balance);
-        const fcf = metricsCalculator.calculateFreeCashFlow(cashFlow);
-        const fcfYield = metricsCalculator.calculateFCFYield(overview, cashFlow);
-        const currentRatio = metricsCalculator.calculateCurrentRatio(balance);
-        const quickRatio = metricsCalculator.calculateQuickRatio(balance);
-        const debtToEquity = metricsCalculator.calculateDebtToEquity(balance);
-        const piotroskiScore = metricsCalculator.calculatePiotroskiScore(income, balance, cashFlow);
-        const roic = metricsCalculator.calculateROIC(income, balance);
-
-        setMetrics({
-          altmanZ,
-          freeCashFlow: fcf,
-          fcfYield,
-          currentRatio,
-          quickRatio,
-          debtToEquity,
-          piotroskiScore,
-          roic,
-          industry: overview.Industry,
-          sector: overview.Sector
-        });
-
-        // Mock industry averages (in production, fetch from a database or API)
-        setIndustryAvg({
-          altmanZ: 3.2,
-          piotroskiScore: 6,
-          currentRatio: 1.8,
-          debtToEquity: 0.8,
-          roic: 12
-        });
-
-      } catch (error) {
-        console.error('Error loading metrics:', error);
-      } finally {
-        setLoading(false);
+  // FIXED ALTMAN Z-SCORE CALCULATION
+  calculateAltmanZScore(overview: any, income: any, balance: any) {
+    try {
+      if (!overview || !income || !balance) {
+        console.error('Missing data for Altman Z-Score calculation');
+        return { score: 'N/A', interpretation: 'Insufficient data' };
       }
-    };
 
-    if (symbol) {
-      loadMetrics();
+      // Get the latest balance sheet data
+      const latestBalance = balance.annualReports?.[0] || {};
+      const latestIncome = income.annualReports?.[0] || {};
+      
+      // Parse values with proper validation
+      const currentAssets = parseFloat(latestBalance.totalCurrentAssets || 0);
+      const currentLiabilities = parseFloat(latestBalance.totalCurrentLiabilities || 0);
+      const totalAssets = parseFloat(latestBalance.totalAssets || 0);
+      const retainedEarnings = parseFloat(latestBalance.retainedEarnings || 0);
+      const ebit = parseFloat(latestIncome.ebit || latestIncome.operatingIncome || 0);
+      const revenue = parseFloat(latestIncome.totalRevenue || 0);
+      const totalLiabilities = parseFloat(latestBalance.totalLiabilities || 0);
+      
+      // CRITICAL FIX: Market Cap should be in the same units as book values
+      // Alpha Vantage provides MarketCapitalization already calculated
+      let marketValueEquity = parseFloat(overview.MarketCapitalization || 0);
+      
+      // If market cap is missing, estimate from share price * shares outstanding
+      if (!marketValueEquity || marketValueEquity === 0) {
+        const sharePrice = parseFloat(overview['50DayMovingAverage'] || 0);
+        const sharesOutstanding = parseFloat(overview.SharesOutstanding || 0);
+        marketValueEquity = sharePrice * sharesOutstanding;
+      }
+
+      // Validate that we have the minimum required data
+      if (totalAssets === 0) {
+        console.error('Total assets is 0 - cannot calculate Altman Z-Score');
+        return { score: 'N/A', interpretation: 'Missing total assets data' };
+      }
+
+      if (totalLiabilities === 0) {
+        console.error('Total liabilities is 0 - cannot calculate Altman Z-Score');
+        return { score: 'N/A', interpretation: 'Missing liabilities data' };
+      }
+
+      // Check for negative equity scenario
+      const totalEquity = totalAssets - totalLiabilities;
+      if (totalEquity < 0) {
+        console.warn(`${overview.Symbol}: Negative shareholders' equity detected`);
+        return { 
+          score: 'N/A', 
+          interpretation: 'Negative equity - Severe financial distress',
+          components: {
+            warning: 'Company has negative shareholders\' equity'
+          }
+        };
+      }
+
+      // Calculate the five components (X1 to X5)
+      const workingCapital = currentAssets - currentLiabilities;
+      
+      // X1: Working Capital / Total Assets
+      const X1 = workingCapital / totalAssets;
+      
+      // X2: Retained Earnings / Total Assets
+      const X2 = retainedEarnings / totalAssets;
+      
+      // X3: EBIT / Total Assets
+      const X3 = ebit / totalAssets;
+      
+      // X4: Market Value of Equity / Book Value of Total Liabilities
+      // CRITICAL: This ratio often causes inflated scores if market cap is in different units
+      const X4 = marketValueEquity / totalLiabilities;
+      
+      // X5: Sales / Total Assets
+      const X5 = revenue / totalAssets;
+
+      // Log the components for debugging
+      console.log(`${overview.Symbol} Altman Z-Score Components:`, {
+        X1: X1.toFixed(4),
+        X2: X2.toFixed(4),
+        X3: X3.toFixed(4),
+        X4: X4.toFixed(4),
+        X5: X5.toFixed(4),
+        workingCapital,
+        retainedEarnings,
+        ebit,
+        marketValueEquity,
+        totalLiabilities,
+        revenue,
+        totalAssets
+      });
+
+      // Apply the Altman Z-Score formula for PUBLIC companies
+      // Z = 1.2(X1) + 1.4(X2) + 3.3(X3) + 0.6(X4) + 1.0(X5)
+      const zScore = (1.2 * X1) + (1.4 * X2) + (3.3 * X3) + (0.6 * X4) + (1.0 * X5);
+
+      // Sanity check - if Z-Score is unreasonably high, there's likely a data issue
+      if (zScore > 10) {
+        console.warn(`${overview.Symbol}: Unusually high Z-Score (${zScore.toFixed(2)}) - possible data quality issue`);
+        
+        // Try alternative calculation for private companies (Z'-Score)
+        // This uses book value of equity instead of market value
+        const bookValueEquity = totalAssets - totalLiabilities;
+        const X4_private = bookValueEquity / totalLiabilities;
+        
+        // Z' = 0.717(X1) + 0.847(X2) + 3.107(X3) + 0.420(X4) + 0.998(X5)
+        const zScorePrivate = (0.717 * X1) + (0.847 * X2) + (3.107 * X3) + (0.420 * X4_private) + (0.998 * X5);
+        
+        if (zScorePrivate < 10) {
+          // Use the private company formula if it gives more reasonable results
+          return this.interpretZScore(zScorePrivate, true);
+        }
+      }
+
+      return this.interpretZScore(zScore, false);
+      
+    } catch (error) {
+      console.error('Error calculating Altman Z-Score:', error);
+      return { score: 'N/A', interpretation: 'Calculation error' };
     }
-  }, [symbol]);
-
-  if (loading) {
-    return (
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-700 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
   }
 
-  const formatCurrency = (value: number) => {
-    if (!value || isNaN(value)) return 'N/A';
-    const billions = value / 1000000000;
-    if (Math.abs(billions) >= 1) {
-      return `$${billions.toFixed(2)}B`;
+  // Helper function to interpret Z-Score
+  interpretZScore(score: number, isPrivateCompany: boolean = false) {
+    // VALIDATION: Check for extreme/unrealistic values
+    if (score < -10 || score > 20 || isNaN(score)) {
+      return {
+        score: 'N/A',
+        interpretation: 'Data quality issue - unable to calculate',
+        components: {
+          warning: 'Extreme values detected - check financial data'
+        }
+      };
     }
-    const millions = value / 1000000;
-    return `$${millions.toFixed(2)}M`;
-  };
+    
+    let interpretation = '';
+    
+    if (isPrivateCompany) {
+      // Private company thresholds
+      if (score > 2.9) {
+        interpretation = 'Safe Zone - Low bankruptcy risk';
+      } else if (score > 1.23) {
+        interpretation = 'Grey Zone - Moderate bankruptcy risk';
+      } else {
+        interpretation = 'Distress Zone - High bankruptcy risk';
+      }
+    } else {
+      // Public company thresholds
+      if (score > 2.99) {
+        interpretation = 'Safe Zone - Low bankruptcy risk';
+      } else if (score > 1.81) {
+        interpretation = 'Grey Zone - Moderate bankruptcy risk';
+      } else {
+        interpretation = 'Distress Zone - High bankruptcy risk';
+      }
+    }
 
-  // Parse the Altman Z-Score value for the gauge
-  const altmanZValue = metrics?.altmanZ?.score === 'N/A' ? 'N/A' : parseFloat(metrics?.altmanZ?.score || 0);
+    return {
+      score: score.toFixed(2),
+      interpretation,
+      components: {
+        warning: score > 10 ? 'Score may be unreliable due to data quality' : null
+      }
+    };
+  }
 
-  return (
-    <div className="space-y-6 mb-6">
-      {/* Main Metrics Dashboard */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-white">
-            Advanced Financial Health Metrics
-          </h3>
-          <div className="text-sm text-gray-400">
-            Industry: {metrics?.industry || 'N/A'}
-          </div>
-        </div>
+  // Calculate Piotroski F-Score (9 points total)
+  calculatePiotroskiScore(income: any, balance: any, cashFlow: any) {
+    try {
+      let score = 0;
+      const details = [];
 
-        {/* Key Gauges Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-gray-800 rounded-lg p-4">
-            <ImprovedGaugeChart 
-              value={altmanZValue}
-              title="Altman Z-Score"
-            />
-            <div className="text-center mt-2 text-sm text-gray-400">
-              Bankruptcy Risk Assessment
-            </div>
-          </div>
-          
-          <div className="bg-gray-800 rounded-lg p-4">
-            <div className="text-center">
-              <div className="text-6xl font-bold text-white mb-2">
-                {metrics?.piotroskiScore?.score || 0}/9
-              </div>
-              <div className="text-sm text-gray-400 mb-3">Piotroski F-Score</div>
-              <div className="flex justify-center gap-1">
-                {[...Array(9)].map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-8 h-2 rounded ${
-                      i < (metrics?.piotroskiScore?.score || 0)
-                        ? 'bg-green-500'
-                        : 'bg-gray-600'
-                    }`}
-                  />
-                ))}
-              </div>
-              <div className="text-sm text-gray-400 mt-2">
-                Fundamental Strength
-              </div>
-            </div>
-          </div>
-        </div>
+      // Get current and previous year data
+      const currentIncome = income?.annualReports?.[0] || {};
+      const previousIncome = income?.annualReports?.[1] || {};
+      const currentBalance = balance?.annualReports?.[0] || {};
+      const previousBalance = balance?.annualReports?.[1] || {};
+      const currentCashFlow = cashFlow?.annualReports?.[0] || {};
 
-        {/* Detailed Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <ImprovedMetricCard
-            title="Free Cash Flow"
-            value={formatCurrency(metrics?.freeCashFlow)}
-            interpretation={metrics?.freeCashFlow > 0 ? 'Positive' : 'Negative'}
-          />
-          
-          <ImprovedMetricCard
-            title="FCF Yield"
-            value={metrics?.fcfYield === 'N/A' ? 'N/A' : `${metrics.fcfYield}%`}
-            interpretation={parseFloat(metrics?.fcfYield) > 5 ? 'Strong' : 'Moderate'}
-          />
-          
-          <ImprovedMetricCard
-            title="ROIC"
-            value={metrics?.roic === 'N/A' ? 'N/A' : `${metrics.roic}%`}
-            benchmark="15%"
-            showProgress={true}
-            maxValue={30}
-          />
-          
-          <ImprovedMetricCard
-            title="Current Ratio"
-            value={metrics?.currentRatio || 'N/A'}
-            benchmark="2.0"
-            showProgress={true}
-            maxValue={3}
-          />
-          
-          <ImprovedMetricCard
-            title="Quick Ratio"
-            value={metrics?.quickRatio || 'N/A'}
-            benchmark="1.0"
-            showProgress={true}
-            maxValue={2}
-          />
-          
-          <ImprovedMetricCard
-            title="Debt/Equity"
-            value={metrics?.debtToEquity || 'N/A'}
-            benchmark="< 1.0"
-            interpretation={
-              metrics?.debtToEquity === 'Negative Equity' ? 'Negative Equity' :
-              parseFloat(metrics?.debtToEquity) < 1 ? 'Low Leverage' : 'High Leverage'
-            }
-          />
-        </div>
-      </div>
+      // 1. Positive Net Income (1 point)
+      const netIncome = parseFloat(currentIncome.netIncome || 0);
+      if (netIncome > 0) {
+        score++;
+        details.push('✓ Positive net income');
+      }
 
-      {/* Industry Comparison */}
-      {industryAvg && metrics && (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-          <h3 className="text-xl font-bold text-white mb-4">
-            Industry Comparison
-          </h3>
-          <div className="space-y-4">
-            {Object.keys(industryAvg).map(key => {
-              const companyValue = 
-                key === 'altmanZ' ? (metrics?.altmanZ?.score === 'N/A' ? 0 : parseFloat(metrics?.altmanZ?.score || 0)) :
-                key === 'piotroskiScore' ? metrics?.piotroskiScore?.score || 0 :
-                key === 'currentRatio' ? (metrics?.currentRatio === 'N/A' ? 0 : parseFloat(metrics?.currentRatio || 0)) :
-                key === 'debtToEquity' ? (metrics?.debtToEquity === 'N/A' || metrics?.debtToEquity === 'Negative Equity' ? 0 : parseFloat(metrics?.debtToEquity || 0)) :
-                key === 'roic' ? (metrics?.roic === 'N/A' ? 0 : parseFloat(metrics?.roic || 0)) : 0;
-              
-              const industryValue = industryAvg[key];
-              const isValidComparison = companyValue !== 0 && metrics?.[key] !== 'N/A' && metrics?.[key] !== 'Negative Equity';
-              const performance = isValidComparison ? ((companyValue - industryValue) / industryValue * 100).toFixed(1) : 'N/A';
-              
-              return (
-                <div key={key} className="flex items-center justify-between p-3 bg-gray-800 rounded">
-                  <span className="text-gray-400 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </span>
-                  <div className="flex items-center gap-4">
-                    <span className={`${isValidComparison ? 'text-white' : 'text-gray-500'}`}>
-                      {isValidComparison ? companyValue.toFixed(2) : 'N/A'}
-                    </span>
-                    <span className="text-gray-500">vs</span>
-                    <span className="text-gray-400">{industryValue}</span>
-                    <span className={`font-semibold ${
-                      performance === 'N/A' ? 'text-gray-500' :
-                      parseFloat(performance) > 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {performance === 'N/A' ? 'N/A' : `${parseFloat(performance) > 0 ? '+' : ''}${performance}%`}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+      // 2. Positive ROA (1 point)
+      const totalAssets = parseFloat(currentBalance.totalAssets || 0);
+      const roa = totalAssets > 0 ? netIncome / totalAssets : 0;
+      if (roa > 0) {
+        score++;
+        details.push('✓ Positive ROA');
+      }
+
+      // 3. Positive Operating Cash Flow (1 point)
+      const operatingCashFlow = parseFloat(currentCashFlow.operatingCashflow || 0);
+      if (operatingCashFlow > 0) {
+        score++;
+        details.push('✓ Positive operating cash flow');
+      }
+
+      // 4. Cash Flow > Net Income (quality of earnings) (1 point)
+      if (operatingCashFlow > netIncome) {
+        score++;
+        details.push('✓ High quality earnings');
+      }
+
+      // 5. Lower Long-term Debt ratio (1 point)
+      const currentLongTermDebt = parseFloat(currentBalance.longTermDebt || 0);
+      const previousLongTermDebt = parseFloat(previousBalance.longTermDebt || 0);
+      const currentTotalAssets = parseFloat(currentBalance.totalAssets || 1);
+      const previousTotalAssets = parseFloat(previousBalance.totalAssets || 1);
+      
+      const currentDebtRatio = currentLongTermDebt / currentTotalAssets;
+      const previousDebtRatio = previousLongTermDebt / previousTotalAssets;
+      
+      if (currentDebtRatio < previousDebtRatio) {
+        score++;
+        details.push('✓ Decreasing debt ratio');
+      }
+
+      // 6. Higher Current Ratio (1 point)
+      const currentRatio = this.calculateCurrentRatio(balance);
+      const previousCurrentRatio = this.calculateCurrentRatioPrevious(balance);
+      if (parseFloat(currentRatio) > parseFloat(previousCurrentRatio)) {
+        score++;
+        details.push('✓ Improving liquidity');
+      }
+
+      // 7. No New Shares Issued (1 point)
+      const currentShares = parseFloat(currentBalance.commonStockSharesOutstanding || 0);
+      const previousShares = parseFloat(previousBalance.commonStockSharesOutstanding || 0);
+      if (currentShares <= previousShares) {
+        score++;
+        details.push('✓ No dilution');
+      }
+
+      // 8. Higher Gross Margin (1 point)
+      const currentGrossProfit = parseFloat(currentIncome.grossProfit || 0);
+      const currentRevenue = parseFloat(currentIncome.totalRevenue || 1);
+      const previousGrossProfit = parseFloat(previousIncome.grossProfit || 0);
+      const previousRevenue = parseFloat(previousIncome.totalRevenue || 1);
+      
+      const currentGrossMargin = currentGrossProfit / currentRevenue;
+      const previousGrossMargin = previousGrossProfit / previousRevenue;
+      
+      if (currentGrossMargin > previousGrossMargin) {
+        score++;
+        details.push('✓ Improving gross margin');
+      }
+
+      // 9. Higher Asset Turnover (1 point)
+      const currentAssetTurnover = currentRevenue / currentTotalAssets;
+      const previousAssetTurnover = previousRevenue / previousTotalAssets;
+      
+      if (currentAssetTurnover > previousAssetTurnover) {
+        score++;
+        details.push('✓ Improving asset efficiency');
+      }
+
+      return {
+        score,
+        details,
+        interpretation: score >= 7 ? 'Strong' : score >= 5 ? 'Moderate' : 'Weak'
+      };
+
+    } catch (error) {
+      console.error('Error calculating Piotroski Score:', error);
+      return { score: 0, details: [], interpretation: 'N/A' };
+    }
+  }
+
+  // Free Cash Flow calculation
+  calculateFreeCashFlow(cashFlow: any) {
+    try {
+      const latestCashFlow = cashFlow?.annualReports?.[0] || {};
+      const operatingCashFlow = parseFloat(latestCashFlow.operatingCashflow || 0);
+      const capitalExpenditures = Math.abs(parseFloat(latestCashFlow.capitalExpenditures || 0));
+      return operatingCashFlow - capitalExpenditures;
+    } catch (error) {
+      console.error('Error calculating FCF:', error);
+      return 0;
+    }
+  }
+
+  // FCF Yield calculation
+  calculateFCFYield(overview: any, cashFlow: any) {
+    try {
+      const fcf = this.calculateFreeCashFlow(cashFlow);
+      const marketCap = parseFloat(overview?.MarketCapitalization || 0);
+      if (marketCap === 0) return 'N/A';
+      return ((fcf / marketCap) * 100).toFixed(2);
+    } catch (error) {
+      console.error('Error calculating FCF Yield:', error);
+      return 'N/A';
+    }
+  }
+
+  // Current Ratio calculation
+  calculateCurrentRatio(balance: any) {
+    try {
+      const latestBalance = balance?.annualReports?.[0] || {};
+      const currentAssets = parseFloat(latestBalance.totalCurrentAssets || 0);
+      const currentLiabilities = parseFloat(latestBalance.totalCurrentLiabilities || 0);
+      if (currentLiabilities === 0) return 'N/A';
+      return (currentAssets / currentLiabilities).toFixed(2);
+    } catch (error) {
+      console.error('Error calculating Current Ratio:', error);
+      return 'N/A';
+    }
+  }
+
+  // Previous year Current Ratio for comparison
+  calculateCurrentRatioPrevious(balance: any) {
+    try {
+      const previousBalance = balance?.annualReports?.[1] || {};
+      const currentAssets = parseFloat(previousBalance.totalCurrentAssets || 0);
+      const currentLiabilities = parseFloat(previousBalance.totalCurrentLiabilities || 0);
+      if (currentLiabilities === 0) return '0';
+      return (currentAssets / currentLiabilities).toFixed(2);
+    } catch (error) {
+      return '0';
+    }
+  }
+
+  // Quick Ratio calculation
+  calculateQuickRatio(balance: any) {
+    try {
+      const latestBalance = balance?.annualReports?.[0] || {};
+      const currentAssets = parseFloat(latestBalance.totalCurrentAssets || 0);
+      const inventory = parseFloat(latestBalance.inventory || 0);
+      const currentLiabilities = parseFloat(latestBalance.totalCurrentLiabilities || 0);
+      if (currentLiabilities === 0) return 'N/A';
+      return ((currentAssets - inventory) / currentLiabilities).toFixed(2);
+    } catch (error) {
+      console.error('Error calculating Quick Ratio:', error);
+      return 'N/A';
+    }
+  }
+
+  // Debt to Equity calculation
+  calculateDebtToEquity(balance: any) {
+    try {
+      const latestBalance = balance?.annualReports?.[0] || {};
+      const totalLiabilities = parseFloat(latestBalance.totalLiabilities || 0);
+      const totalEquity = parseFloat(latestBalance.totalShareholderEquity || 0);
+      
+      // Handle edge cases
+      if (totalEquity === 0) return 'N/A';
+      
+      // Handle negative equity (company is technically insolvent)
+      if (totalEquity < 0) {
+        return 'Negative Equity';
+      }
+      
+      const debtToEquity = totalLiabilities / totalEquity;
+      
+      // Sanity check for extreme values
+      if (Math.abs(debtToEquity) > 100) {
+        return 'N/A'; // Likely data quality issue
+      }
+      
+      return debtToEquity.toFixed(2);
+    } catch (error) {
+      console.error('Error calculating Debt to Equity:', error);
+      return 'N/A';
+    }
+  }
+
+  // Return on Invested Capital (ROIC)
+  calculateROIC(income: any, balance: any) {
+    try {
+      const latestIncome = income?.annualReports?.[0] || {};
+      const latestBalance = balance?.annualReports?.[0] || {};
+      
+      const ebit = parseFloat(latestIncome.ebit || latestIncome.operatingIncome || 0);
+      const incomeBeforeTax = parseFloat(latestIncome.incomeBeforeTax || 0);
+      const incomeTaxExpense = parseFloat(latestIncome.incomeTaxExpense || 0);
+      
+      // Calculate tax rate more safely
+      let taxRate = 0;
+      if (incomeBeforeTax !== 0 && incomeBeforeTax > 0) {
+        taxRate = Math.max(0, Math.min(1, incomeTaxExpense / incomeBeforeTax));
+      }
+      
+      const nopat = ebit * (1 - taxRate); // Net Operating Profit After Tax
+      
+      const totalEquity = parseFloat(latestBalance.totalShareholderEquity || 0);
+      const longTermDebt = parseFloat(latestBalance.longTermDebt || 0);
+      const shortTermDebt = parseFloat(latestBalance.shortTermDebt || 0);
+      const cash = parseFloat(latestBalance.cashAndCashEquivalentsAtCarryingValue || 0);
+      
+      const investedCapital = totalEquity + longTermDebt + shortTermDebt - cash;
+      
+      // Handle edge cases
+      if (investedCapital <= 0) {
+        console.log('Invested capital is negative or zero');
+        return 'N/A';
+      }
+      
+      const roic = (nopat / investedCapital) * 100;
+      
+      // Sanity check - ROIC above 200% or below -200% is likely a data issue
+      if (Math.abs(roic) > 200) {
+        console.warn(`ROIC calculation resulted in extreme value: ${roic}%`);
+        return 'N/A';
+      }
+      
+      return roic.toFixed(2);
+    } catch (error) {
+      console.error('Error calculating ROIC:', error);
+      return 'N/A';
+    }
+  }
+}
+
+export default new MetricsCalculator();
