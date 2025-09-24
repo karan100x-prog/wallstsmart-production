@@ -472,8 +472,8 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
             {/* Show estimated retail ownership if data is available */}
             {ownership.total > 0 && ownership.total <= 100 && (
               <div className="flex justify-between">
-                <span className="text-gray-400 text-sm">Est. Retail Ownership</span>
-                <span className="text-lg font-semibold text-gray-500">
+                <span className="text-yellow-400 text-sm">Est. Retail Ownership</span>
+                <span className="text-lg font-semibold text-yellow-500">
                   ~{ownership.retail.toFixed(2)}%
                 </span>
               </div>
