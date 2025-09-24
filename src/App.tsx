@@ -40,7 +40,7 @@ function Navigation() {
               <Link to="/macro" className="hover:text-green-500 transition whitespace-nowrap"> </Link>
               <Link to="/screener" className="hover:text-green-500 transition whitespace-nowrap"> </Link>
               <Link to="/portfolio" className="hover:text-green-500 transition whitespace-nowrap">Portfolio</Link>
-              <Link to="/smart-flow" className="hover:text-green-500 transition whitespace-nowrap">Smart Flow</Link>
+              <Link to="/smart-flow" className="hover:text-green-500 transition whitespace-nowrap"> </Link>
               
               {currentUser ? (
                 <div className="flex items-center gap-4">
