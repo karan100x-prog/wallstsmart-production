@@ -214,6 +214,54 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
 
   return (
     <div className="space-y-6 mb-6">
+      {/* Industry Comparison - Moved to top */}
+      {industryAvg && metrics && (
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+          <h3 className="text-xl font-bold text-white mb-4">
+            Industry Comparison
+          </h3>
+          <div className="space-y-4">
+            {Object.keys(industryAvg).map(key => {
+              const companyValue = 
+                key === 'altmanZ' ? (metrics?.altmanZ?.score === 'N/A' ? 0 : parseFloat(metrics?.altmanZ?.score || 0)) :
+                key === 'piotroskiScore' ? metrics?.piotroskiScore?.score || 0 :
+                key === 'currentRatio' ? (metrics?.currentRatio === 'N/A' ? 0 : parseFloat(metrics?.currentRatio || 0)) :
+                key === 'debtToEquity' ? (metrics?.debtToEquity === 'N/A' || metrics?.debtToEquity === 'Negative Equity' ? 0 : parseFloat(metrics?.debtToEquity || 0)) :
+                key === 'roic' ? (metrics?.roic === 'N/A' ? 0 : parseFloat(metrics?.roic || 0)) : 0;
+              
+              const industryValue = industryAvg[key];
+              const isValidComparison = companyValue !== 0 && 
+                                       metrics?.[key] !== 'N/A' && 
+                                       metrics?.[key] !== 'Negative Equity' &&
+                                       (key !== 'altmanZ' || metrics?.altmanZ?.score !== 'N/A');
+              
+              const performance = isValidComparison ? ((companyValue - industryValue) / industryValue * 100).toFixed(1) : 'N/A';
+              
+              return (
+                <div key={key} className="flex items-center justify-between p-3 bg-gray-800 rounded">
+                  <span className="text-gray-400 capitalize">
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </span>
+                  <div className="flex items-center gap-4">
+                    <span className={`${isValidComparison ? 'text-white' : 'text-gray-500'}`}>
+                      {isValidComparison ? companyValue.toFixed(2) : 'N/A'}
+                    </span>
+                    <span className="text-gray-500">vs</span>
+                    <span className="text-gray-400">{industryValue}</span>
+                    <span className={`font-semibold ${
+                      performance === 'N/A' ? 'text-gray-500' :
+                      parseFloat(performance) > 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {performance === 'N/A' ? 'N/A' : `${parseFloat(performance) > 0 ? '+' : ''}${performance}%`}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Main Metrics Dashboard */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
         <div className="flex justify-between items-center mb-6">
@@ -309,54 +357,6 @@ export const StockHealthMetrics: React.FC<HealthMetricsProps> = ({ symbol }) => 
           />
         </div>
       </div>
-
-      {/* Industry Comparison */}
-      {industryAvg && metrics && (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-          <h3 className="text-xl font-bold text-white mb-4">
-            Industry Comparison
-          </h3>
-          <div className="space-y-4">
-            {Object.keys(industryAvg).map(key => {
-              const companyValue = 
-                key === 'altmanZ' ? (metrics?.altmanZ?.score === 'N/A' ? 0 : parseFloat(metrics?.altmanZ?.score || 0)) :
-                key === 'piotroskiScore' ? metrics?.piotroskiScore?.score || 0 :
-                key === 'currentRatio' ? (metrics?.currentRatio === 'N/A' ? 0 : parseFloat(metrics?.currentRatio || 0)) :
-                key === 'debtToEquity' ? (metrics?.debtToEquity === 'N/A' || metrics?.debtToEquity === 'Negative Equity' ? 0 : parseFloat(metrics?.debtToEquity || 0)) :
-                key === 'roic' ? (metrics?.roic === 'N/A' ? 0 : parseFloat(metrics?.roic || 0)) : 0;
-              
-              const industryValue = industryAvg[key];
-              const isValidComparison = companyValue !== 0 && 
-                                       metrics?.[key] !== 'N/A' && 
-                                       metrics?.[key] !== 'Negative Equity' &&
-                                       (key !== 'altmanZ' || metrics?.altmanZ?.score !== 'N/A');
-              
-              const performance = isValidComparison ? ((companyValue - industryValue) / industryValue * 100).toFixed(1) : 'N/A';
-              
-              return (
-                <div key={key} className="flex items-center justify-between p-3 bg-gray-800 rounded">
-                  <span className="text-gray-400 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </span>
-                  <div className="flex items-center gap-4">
-                    <span className={`${isValidComparison ? 'text-white' : 'text-gray-500'}`}>
-                      {isValidComparison ? companyValue.toFixed(2) : 'N/A'}
-                    </span>
-                    <span className="text-gray-500">vs</span>
-                    <span className="text-gray-400">{industryValue}</span>
-                    <span className={`font-semibold ${
-                      performance === 'N/A' ? 'text-gray-500' :
-                      parseFloat(performance) > 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {performance === 'N/A' ? 'N/A' : `${parseFloat(performance) > 0 ? '+' : ''}${performance}%`}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
