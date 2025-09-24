@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Activity, Calendar, DollarSign, User, AlertCircle, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Calendar, DollarSign, User, AlertCircle, RefreshCw, Clock } from 'lucide-react';
 
 interface Transaction {
   name: string;
@@ -20,10 +20,47 @@ interface InsiderTransactionsProps {
   symbol: string;
 }
 
-// Simple cache implementation
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// Cache implementation with localStorage fallback
+const CACHE_DURATION = 60 * 60 * 1000; // 60 minutes
+const MEMORY_CACHE = new Map<string, { data: any; timestamp: number }>();
 const pendingRequests = new Map<string, Promise<any>>();
+
+// localStorage cache functions
+const getFromLocalStorage = (key: string) => {
+  try {
+    const item = localStorage.getItem(key);
+    if (!item) return null;
+    
+    const parsed = JSON.parse(item);
+    const now = Date.now();
+    
+    // Check if cache is still valid
+    if (now - parsed.timestamp < CACHE_DURATION) {
+      console.log(`📦 [InsiderTransactions] Found valid localStorage cache for ${key}`);
+      return parsed;
+    } else {
+      console.log(`🗑️ [InsiderTransactions] localStorage cache expired for ${key}`);
+      localStorage.removeItem(key);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error reading from localStorage:', error);
+    return null;
+  }
+};
+
+const saveToLocalStorage = (key: string, data: any) => {
+  try {
+    const item = {
+      data,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(item));
+    console.log(`💾 [InsiderTransactions] Saved to localStorage: ${key}`);
+  } catch (error) {
+    console.error('Error saving to localStorage:', error);
+  }
+};
 
 const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -31,6 +68,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
   const [error, setError] = useState<string | null>(null);
   const [buys, setBuys] = useState(0);
   const [sells, setSells] = useState(0);
+  const [cacheTime, setCacheTime] = useState<number | null>(null);
 
   useEffect(() => {
     fetchInsiderTransactions();
@@ -42,41 +80,69 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     
     const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
     const cacheKey = `insider_${symbol}`;
+    const localStorageKey = `wallstsmart_insider_${symbol}`;
     
     try {
-      // Check cache first
-      const cached = cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log(`📦 [InsiderTransactions] Using cached data for ${symbol}`);
-        processData(cached.data);
+      // Check memory cache first
+      const memoryCache = MEMORY_CACHE.get(cacheKey);
+      if (memoryCache && Date.now() - memoryCache.timestamp < CACHE_DURATION) {
+        console.log(`📦 [InsiderTransactions] Using memory cache for ${symbol}`);
+        processData(memoryCache.data, memoryCache.timestamp);
         setLoading(false);
         return;
       }
 
-      // Check if request is already pending for this symbol
+      // Check localStorage cache
+      const localCache = getFromLocalStorage(localStorageKey);
+      if (localCache) {
+        console.log(`📦 [InsiderTransactions] Using localStorage cache for ${symbol}`);
+        // Also save to memory cache
+        MEMORY_CACHE.set(cacheKey, localCache);
+        processData(localCache.data, localCache.timestamp);
+        setLoading(false);
+        return;
+      }
+
+      // Check if request is already pending
       if (pendingRequests.has(cacheKey)) {
         console.log(`⏳ [InsiderTransactions] Waiting for pending request for ${symbol}`);
         const data = await pendingRequests.get(cacheKey);
-        processData(data);
+        processData(data, Date.now());
         setLoading(false);
         return;
       }
 
-      // Make new request
+      // Make new API request
       const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
       
-      console.log(`📡 [InsiderTransactions] Fetching fresh data for ${symbol}`);
+      console.log(`📡 [InsiderTransactions] Making API call for ${symbol}`);
       
-      // Create promise and store it
       const requestPromise = fetch(url)
         .then(response => {
           if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           return response.json();
         })
         .then(data => {
-          // Cache the successful response
-          cache.set(cacheKey, { data, timestamp: Date.now() });
           pendingRequests.delete(cacheKey);
+          
+          // Check if we got valid data
+          if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
+            const timestamp = Date.now();
+            // Save to both caches
+            MEMORY_CACHE.set(cacheKey, { data, timestamp });
+            saveToLocalStorage(localStorageKey, data);
+            return data;
+          } else if (data['Note'] || data['Information']) {
+            // API limit hit - try to use any stale cache
+            console.warn('⚠️ [InsiderTransactions] API limit hit, looking for stale cache');
+            const staleCache = localStorage.getItem(localStorageKey);
+            if (staleCache) {
+              const parsed = JSON.parse(staleCache);
+              console.log('📦 [InsiderTransactions] Using stale cache due to API limit');
+              return parsed.data;
+            }
+            throw new Error('API limit reached and no cached data available');
+          }
           return data;
         })
         .catch(err => {
@@ -87,32 +153,39 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
       pendingRequests.set(cacheKey, requestPromise);
       const data = await requestPromise;
       
-      // Process the data
-      processData(data);
+      processData(data, Date.now());
       
     } catch (err) {
       console.error('❌ [InsiderTransactions] Error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch insider transactions');
-      setTransactions([]);
+      
+      // Try to use stale cache as last resort
+      const staleCache = localStorage.getItem(localStorageKey);
+      if (staleCache) {
+        try {
+          const parsed = JSON.parse(staleCache);
+          console.log('📦 [InsiderTransactions] Using stale cache as fallback');
+          processData(parsed.data, parsed.timestamp);
+          setError('Using cached data (API temporarily unavailable)');
+        } catch {
+          setError(err instanceof Error ? err.message : 'Failed to fetch insider transactions');
+          setTransactions([]);
+        }
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch insider transactions');
+        setTransactions([]);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const processData = (data: any) => {
-    // Check for API errors
-    if (data['Information']) {
-      console.warn('⚠️ [InsiderTransactions] API Information:', data['Information']);
-      setError('API limit reached. Data will refresh in a few minutes.');
-      setTransactions([]);
-      return;
-    }
+  const processData = (data: any, timestamp: number) => {
+    setCacheTime(timestamp);
     
-    if (data['Note']) {
-      console.warn('⚠️ [InsiderTransactions] API Note:', data['Note']);
-      setError('API call frequency limit. Please wait a moment.');
-      setTransactions([]);
-      return;
+    // Check for API errors
+    if (data['Information'] || data['Note']) {
+      console.warn('⚠️ [InsiderTransactions] API limit in response');
+      // Don't set error, just process any existing data
     }
     
     if (data['Error Message']) {
@@ -150,10 +223,15 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
   };
 
   const handleRefresh = () => {
-    // Clear cache for this symbol and refetch
+    // Clear all caches for this symbol
     const cacheKey = `insider_${symbol}`;
-    cache.delete(cacheKey);
-    console.log(`🔄 [InsiderTransactions] Cache cleared for ${symbol}, refreshing...`);
+    const localStorageKey = `wallstsmart_insider_${symbol}`;
+    
+    MEMORY_CACHE.delete(cacheKey);
+    localStorage.removeItem(localStorageKey);
+    pendingRequests.delete(cacheKey);
+    
+    console.log(`🔄 [InsiderTransactions] All caches cleared for ${symbol}, refreshing...`);
     fetchInsiderTransactions();
   };
 
@@ -185,6 +263,17 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     }).format(Math.abs(num));
   };
 
+  const getCacheAge = () => {
+    if (!cacheTime) return null;
+    const ageMinutes = Math.floor((Date.now() - cacheTime) / 60000);
+    if (ageMinutes < 1) return 'Just now';
+    if (ageMinutes === 1) return '1 minute ago';
+    if (ageMinutes < 60) return `${ageMinutes} minutes ago`;
+    const ageHours = Math.floor(ageMinutes / 60);
+    if (ageHours === 1) return '1 hour ago';
+    return `${ageHours} hours ago`;
+  };
+
   if (loading) {
     return (
       <div className="bg-gray-900 rounded-lg p-6">
@@ -199,7 +288,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     );
   }
 
-  if (error) {
+  if (error && transactions.length === 0) {
     return (
       <div className="bg-gray-900 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
@@ -261,14 +350,30 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
             <span className="text-sm text-gray-500">({transactions.length} recent)</span>
           )}
         </h2>
-        <button 
-          onClick={handleRefresh}
-          className="text-blue-400 hover:text-blue-300 p-1"
-          title="Refresh data"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {cacheTime && (
+            <span className="text-xs text-gray-500 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {getCacheAge()}
+            </span>
+          )}
+          <button 
+            onClick={handleRefresh}
+            className="text-blue-400 hover:text-blue-300 p-1"
+            title="Refresh data"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
+
+      {/* Show warning if using cached data due to API limit */}
+      {error && (
+        <div className="mb-4 p-2 bg-yellow-900/20 border border-yellow-600/30 rounded text-yellow-400 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          {error}
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -372,7 +477,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
       {/* Cache Info */}
       <div className="mt-4 text-center">
         <p className="text-gray-500 text-xs">
-          Data cached for 5 minutes • Click refresh to update
+          Data cached for 60 minutes • Click refresh to force update
         </p>
       </div>
     </div>
