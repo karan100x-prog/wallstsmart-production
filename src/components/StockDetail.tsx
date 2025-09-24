@@ -523,6 +523,9 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         </div>
       </div>
 
+      {/* Insider Transactions - NEW SECTION */}
+      <InsiderTransactions symbol={symbol} />
+
       {/* Latest News Section */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
         <div className="flex items-center justify-between mb-6">
