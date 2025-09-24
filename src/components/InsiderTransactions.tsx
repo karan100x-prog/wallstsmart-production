@@ -25,6 +25,57 @@ const CACHE_DURATION = 60 * 60 * 1000; // 60 minutes
 const MEMORY_CACHE = new Map<string, { data: any; timestamp: number }>();
 const pendingRequests = new Map<string, Promise<any>>();
 
+// API call queue to prevent rate limiting
+class APIQueue {
+  private queue: Array<() => Promise<any>> = [];
+  private processing = false;
+  private lastCallTime = 0;
+  private minDelay = 1000; // Minimum 1 second between calls
+
+  async add<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await fn();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      this.process();
+    });
+  }
+
+  private async process() {
+    if (this.processing || this.queue.length === 0) return;
+    
+    this.processing = true;
+    
+    const now = Date.now();
+    const timeSinceLastCall = now - this.lastCallTime;
+    
+    if (timeSinceLastCall < this.minDelay) {
+      const delay = this.minDelay - timeSinceLastCall;
+      console.log(`⏱️ [APIQueue] Waiting ${delay}ms before next call`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    const task = this.queue.shift();
+    if (task) {
+      this.lastCallTime = Date.now();
+      await task();
+    }
+    
+    this.processing = false;
+    
+    if (this.queue.length > 0) {
+      setTimeout(() => this.process(), 100);
+    }
+  }
+}
+
+const apiQueue = new APIQueue();
+
 // localStorage cache functions
 const getFromLocalStorage = (key: string) => {
   try {
@@ -40,8 +91,8 @@ const getFromLocalStorage = (key: string) => {
       return parsed;
     } else {
       console.log(`🗑️ [InsiderTransactions] localStorage cache expired for ${key}`);
-      localStorage.removeItem(key);
-      return null;
+      // Don't remove expired cache - we might need it as fallback
+      return { ...parsed, expired: true };
     }
   } catch (error) {
     console.error('Error reading from localStorage:', error);
@@ -62,6 +113,68 @@ const saveToLocalStorage = (key: string, data: any) => {
   }
 };
 
+// Mock data for testing when API is down
+const getMockData = (symbol: string) => ({
+  data: [
+    {
+      name: "Tim Cook",
+      title: "Chief Executive Officer",
+      transaction_date: "2025-01-15",
+      ticker: symbol,
+      executive: "Tim Cook",
+      executive_title: "CEO",
+      security_type: "Common Stock",
+      transaction_type: "Sale",
+      acquisition_or_disposal: "D",
+      shares: 50000,
+      price: 235.50,
+      value: 11775000
+    },
+    {
+      name: "Luca Maestri",
+      title: "Chief Financial Officer",
+      transaction_date: "2025-01-10",
+      ticker: symbol,
+      executive: "Luca Maestri",
+      executive_title: "CFO",
+      security_type: "Common Stock",
+      transaction_type: "Purchase",
+      acquisition_or_disposal: "A",
+      shares: 10000,
+      price: 230.25,
+      value: 2302500
+    },
+    {
+      name: "Katherine Adams",
+      title: "General Counsel",
+      transaction_date: "2025-01-08",
+      ticker: symbol,
+      executive: "Katherine Adams",
+      executive_title: "General Counsel",
+      security_type: "Common Stock",
+      transaction_type: "Sale",
+      acquisition_or_disposal: "D",
+      shares: 5000,
+      price: 232.00,
+      value: 1160000
+    },
+    {
+      name: "Deirdre O'Brien",
+      title: "SVP Retail",
+      transaction_date: "2025-01-05",
+      ticker: symbol,
+      executive: "Deirdre O'Brien",
+      executive_title: "SVP Retail",
+      security_type: "Common Stock",
+      transaction_type: "Purchase",
+      acquisition_or_disposal: "A",
+      shares: 2500,
+      price: 228.75,
+      value: 571875
+    }
+  ]
+});
+
 const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +182,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
   const [buys, setBuys] = useState(0);
   const [sells, setSells] = useState(0);
   const [cacheTime, setCacheTime] = useState<number | null>(null);
+  const [isUsingMockData, setIsUsingMockData] = useState(false);
 
   useEffect(() => {
     fetchInsiderTransactions();
@@ -77,6 +191,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
   const fetchInsiderTransactions = async () => {
     setLoading(true);
     setError(null);
+    setIsUsingMockData(false);
     
     const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
     const cacheKey = `insider_${symbol}`;
@@ -92,11 +207,10 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
         return;
       }
 
-      // Check localStorage cache
+      // Check localStorage cache (including expired ones)
       const localCache = getFromLocalStorage(localStorageKey);
-      if (localCache) {
+      if (localCache && !localCache.expired) {
         console.log(`📦 [InsiderTransactions] Using localStorage cache for ${symbol}`);
-        // Also save to memory cache
         MEMORY_CACHE.set(cacheKey, localCache);
         processData(localCache.data, localCache.timestamp);
         setLoading(false);
@@ -112,43 +226,49 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
         return;
       }
 
-      // Make new API request
+      // Make new API request with queue
       const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
       
-      console.log(`📡 [InsiderTransactions] Making API call for ${symbol}`);
+      console.log(`📡 [InsiderTransactions] Queuing API call for ${symbol}`);
       
-      const requestPromise = fetch(url)
-        .then(response => {
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-          return response.json();
-        })
-        .then(data => {
-          pendingRequests.delete(cacheKey);
+      const requestPromise = apiQueue.add(async () => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+      }).then(data => {
+        pendingRequests.delete(cacheKey);
+        
+        // Check for API limit errors
+        if (data['Note'] || data['Information']) {
+          console.warn('⚠️ [InsiderTransactions] API limit hit');
           
-          // Check if we got valid data
-          if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
-            const timestamp = Date.now();
-            // Save to both caches
-            MEMORY_CACHE.set(cacheKey, { data, timestamp });
-            saveToLocalStorage(localStorageKey, data);
-            return data;
-          } else if (data['Note'] || data['Information']) {
-            // API limit hit - try to use any stale cache
-            console.warn('⚠️ [InsiderTransactions] API limit hit, looking for stale cache');
-            const staleCache = localStorage.getItem(localStorageKey);
-            if (staleCache) {
-              const parsed = JSON.parse(staleCache);
-              console.log('📦 [InsiderTransactions] Using stale cache due to API limit');
-              return parsed.data;
-            }
-            throw new Error('API limit reached and no cached data available');
+          // Try expired cache
+          if (localCache && localCache.expired) {
+            console.log('📦 [InsiderTransactions] Using expired cache due to API limit');
+            setError('Using older cached data (API limit reached)');
+            return localCache.data;
           }
+          
+          // Use mock data as last resort for demo purposes
+          console.log('🎭 [InsiderTransactions] Using mock data for demo');
+          setIsUsingMockData(true);
+          setError('Demo mode: Using sample data (API limit reached)');
+          return getMockData(symbol);
+        }
+        
+        // Valid data received
+        if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
+          const timestamp = Date.now();
+          MEMORY_CACHE.set(cacheKey, { data, timestamp });
+          saveToLocalStorage(localStorageKey, data);
           return data;
-        })
-        .catch(err => {
-          pendingRequests.delete(cacheKey);
-          throw err;
-        });
+        }
+        
+        return data;
+      }).catch(err => {
+        pendingRequests.delete(cacheKey);
+        throw err;
+      });
 
       pendingRequests.set(cacheKey, requestPromise);
       const data = await requestPromise;
@@ -158,21 +278,19 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     } catch (err) {
       console.error('❌ [InsiderTransactions] Error:', err);
       
-      // Try to use stale cache as last resort
-      const staleCache = localStorage.getItem(localStorageKey);
-      if (staleCache) {
-        try {
-          const parsed = JSON.parse(staleCache);
-          console.log('📦 [InsiderTransactions] Using stale cache as fallback');
-          processData(parsed.data, parsed.timestamp);
-          setError('Using cached data (API temporarily unavailable)');
-        } catch {
-          setError(err instanceof Error ? err.message : 'Failed to fetch insider transactions');
-          setTransactions([]);
-        }
+      // Try any cached data
+      const localCache = getFromLocalStorage(localStorageKey);
+      if (localCache) {
+        console.log('📦 [InsiderTransactions] Using any cached data as fallback');
+        processData(localCache.data, localCache.timestamp);
+        setError('Using cached data (API temporarily unavailable)');
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to fetch insider transactions');
-        setTransactions([]);
+        // Use mock data for demo
+        console.log('🎭 [InsiderTransactions] Using mock data as final fallback');
+        const mockData = getMockData(symbol);
+        processData(mockData, Date.now());
+        setIsUsingMockData(true);
+        setError('Demo mode: Using sample data');
       }
     } finally {
       setLoading(false);
@@ -181,19 +299,6 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
 
   const processData = (data: any, timestamp: number) => {
     setCacheTime(timestamp);
-    
-    // Check for API errors
-    if (data['Information'] || data['Note']) {
-      console.warn('⚠️ [InsiderTransactions] API limit in response');
-      // Don't set error, just process any existing data
-    }
-    
-    if (data['Error Message']) {
-      console.error('❌ [InsiderTransactions] API Error:', data['Error Message']);
-      setError('Invalid symbol or API error');
-      setTransactions([]);
-      return;
-    }
     
     // Process successful data
     if (data && data.data && Array.isArray(data.data)) {
@@ -288,37 +393,6 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     );
   }
 
-  if (error && transactions.length === 0) {
-    return (
-      <div className="bg-gray-900 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-400" />
-            Insider Transactions
-          </h2>
-          <button 
-            onClick={handleRefresh}
-            className="text-blue-400 hover:text-blue-300 p-1"
-            title="Refresh data"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="text-red-400 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5" />
-          {error}
-        </div>
-        <button 
-          onClick={handleRefresh}
-          className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Try Again
-        </button>
-      </div>
-    );
-  }
-
   if (!transactions || transactions.length === 0) {
     return (
       <div className="bg-gray-900 rounded-lg p-6">
@@ -336,6 +410,12 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
           </button>
         </div>
         <p className="text-gray-400">No insider transactions available for {symbol}</p>
+        {error && (
+          <div className="mt-4 text-red-400 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" />
+            {error}
+          </div>
+        )}
       </div>
     );
   }
@@ -351,7 +431,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
           )}
         </h2>
         <div className="flex items-center gap-2">
-          {cacheTime && (
+          {cacheTime && !isUsingMockData && (
             <span className="text-xs text-gray-500 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {getCacheAge()}
@@ -367,9 +447,13 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
         </div>
       </div>
 
-      {/* Show warning if using cached data due to API limit */}
+      {/* Show warning if using cached/mock data */}
       {error && (
-        <div className="mb-4 p-2 bg-yellow-900/20 border border-yellow-600/30 rounded text-yellow-400 text-sm flex items-center gap-2">
+        <div className={`mb-4 p-2 rounded text-sm flex items-center gap-2 ${
+          isUsingMockData 
+            ? 'bg-purple-900/20 border border-purple-600/30 text-purple-400' 
+            : 'bg-yellow-900/20 border border-yellow-600/30 text-yellow-400'
+        }`}>
           <AlertCircle className="w-4 h-4" />
           {error}
         </div>
@@ -477,7 +561,9 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
       {/* Cache Info */}
       <div className="mt-4 text-center">
         <p className="text-gray-500 text-xs">
-          Data cached for 60 minutes • Click refresh to force update
+          {isUsingMockData 
+            ? 'Demo data shown • Real data will load when API is available' 
+            : 'Data cached for 60 minutes • Click refresh to force update'}
         </p>
       </div>
     </div>
