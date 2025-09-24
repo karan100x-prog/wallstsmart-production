@@ -25,6 +25,9 @@ const CACHE_DURATION = 60 * 60 * 1000; // 60 minutes
 const MEMORY_CACHE = new Map<string, { data: any; timestamp: number }>();
 const pendingRequests = new Map<string, Promise<any>>();
 
+// TEST API KEY - Replace with environment variable in production
+const TEST_API_KEY = 'QGY1MY56CZZ8TVJO';
+
 // API call queue to prevent rate limiting
 class APIQueue {
   private queue: Array<() => Promise<any>> = [];
@@ -193,7 +196,10 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     setError(null);
     setIsUsingMockData(false);
     
-    const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
+    // Using TEST API key
+    const API_KEY = TEST_API_KEY;
+    console.log('🔑 Using TEST API key for demo');
+    
     const cacheKey = `insider_${symbol}`;
     const localStorageKey = `wallstsmart_insider_${symbol}`;
     
@@ -229,7 +235,8 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
       // Make new API request with queue
       const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
       
-      console.log(`📡 [InsiderTransactions] Queuing API call for ${symbol}`);
+      console.log(`📡 [InsiderTransactions] Making API call for ${symbol}`);
+      console.log(`📡 URL: ${url}`);
       
       const requestPromise = apiQueue.add(async () => {
         const response = await fetch(url);
@@ -238,9 +245,11 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
       }).then(data => {
         pendingRequests.delete(cacheKey);
         
+        console.log(`📦 [InsiderTransactions] API Response:`, data);
+        
         // Check for API limit errors
         if (data['Note'] || data['Information']) {
-          console.warn('⚠️ [InsiderTransactions] API limit hit');
+          console.warn('⚠️ [InsiderTransactions] API limit hit:', data['Note'] || data['Information']);
           
           // Try expired cache
           if (localCache && localCache.expired) {
@@ -258,6 +267,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
         
         // Valid data received
         if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
+          console.log(`✅ [InsiderTransactions] Got ${data.data.length} real transactions!`);
           const timestamp = Date.now();
           MEMORY_CACHE.set(cacheKey, { data, timestamp });
           saveToLocalStorage(localStorageKey, data);
@@ -327,7 +337,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     // Clear all caches for this symbol
     const cacheKey = `insider_${symbol}`;
     const localStorageKey = `wallstsmart_insider_${symbol}`;
@@ -336,8 +346,53 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     localStorage.removeItem(localStorageKey);
     pendingRequests.delete(cacheKey);
     
-    console.log(`🔄 [InsiderTransactions] All caches cleared for ${symbol}, refreshing...`);
-    fetchInsiderTransactions();
+    console.log(`🔄 [InsiderTransactions] All caches cleared for ${symbol}, forcing direct API call...`);
+    
+    // Force a direct API call bypassing queue
+    setLoading(true);
+    setError(null);
+    setIsUsingMockData(false);
+    
+    try {
+      // Using TEST API key
+      const API_KEY = TEST_API_KEY;
+      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
+      
+      console.log(`🔴 [FORCED REFRESH] Direct API call with TEST key`);
+      console.log(`🔴 [FORCED REFRESH] URL: ${url}`);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log(`🔴 [FORCED REFRESH] Response:`, data);
+      
+      if (data && data.data && Array.isArray(data.data)) {
+        console.log(`✅ [FORCED REFRESH] Got ${data.data.length} real transactions!`);
+        // Save successful data
+        const timestamp = Date.now();
+        MEMORY_CACHE.set(cacheKey, { data, timestamp });
+        saveToLocalStorage(localStorageKey, data);
+        processData(data, timestamp);
+        setIsUsingMockData(false);
+        setError(null);
+      } else if (data['Note'] || data['Information']) {
+        console.log(`🔴 [FORCED REFRESH] API still limited:`, data['Note'] || data['Information']);
+        setError('API still limited. Using demo data.');
+        setIsUsingMockData(true);
+        const mockData = getMockData(symbol);
+        processData(mockData, Date.now());
+      } else {
+        processData(data, Date.now());
+      }
+    } catch (err) {
+      console.error(`🔴 [FORCED REFRESH] Error:`, err);
+      setError('Failed to refresh. Using demo data.');
+      setIsUsingMockData(true);
+      const mockData = getMockData(symbol);
+      processData(mockData, Date.now());
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatDate = (dateStr: string) => {
