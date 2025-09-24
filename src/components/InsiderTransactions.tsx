@@ -42,9 +42,8 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
       const data = await response.json();
 
       if (data.data && Array.isArray(data.data)) {
-        // Process transactions
         const processedTransactions = data.data
-          .slice(0, 20) // Get latest 20 transactions
+          .slice(0, 20)
           .map((tx: any) => ({
             name: tx.name || 'Unknown',
             title: tx.title || 'N/A',
@@ -58,7 +57,6 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
 
         setTransactions(processedTransactions);
 
-        // Calculate summary statistics
         const buys = processedTransactions.filter((tx: Transaction) => 
           tx.transaction_type.toLowerCase().includes('buy') || 
           tx.transaction_type.toLowerCase().includes('purchase') ||
@@ -75,7 +73,6 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
         const totalSellValue = sells.reduce((sum: number, tx: Transaction) => sum + tx.value, 0);
         const netActivity = totalBuyValue - totalSellValue;
 
-        // Determine sentiment
         let sentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
         if (netActivity > 1000000) sentiment = 'bullish';
         else if (netActivity < -1000000) sentiment = 'bearish';
@@ -175,7 +172,6 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
         </div>
       </div>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-gray-800 rounded-lg p-3">
           <div className="text-xs text-gray-400 mb-1">Total Buys</div>
@@ -209,7 +205,6 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
         </div>
       </div>
 
-      {/* Transactions Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="text-xs text-gray-400 border-b border-gray-700">
@@ -255,7 +250,6 @@ const InsiderTransactions: React.FC<InsiderTransactionProps> = ({ symbol }) => {
         </table>
       </div>
 
-      {/* Footer Note */}
       <div className="mt-4 text-xs text-gray-500 italic">
         * Insider transactions from SEC Form 4 filings. Data may be delayed.
       </div>
