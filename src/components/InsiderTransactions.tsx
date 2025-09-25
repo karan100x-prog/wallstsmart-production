@@ -313,6 +313,10 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
       console.log(`✅ [InsiderTransactions] Processing ${data.data.length} transactions for ${symbol}`);
       
       const processedTransactions = data.data.slice(0, 20);
+      
+      // Fetch historical prices if missing
+      fetchHistoricalPrices(processedTransactions);
+      
       setTransactions(processedTransactions);
       
       // Count buys and sells
@@ -332,6 +336,60 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     } else {
       console.log('❌ [InsiderTransactions] No valid data found');
       setTransactions([]);
+    }
+  };
+
+  const fetchHistoricalPrices = async (transactionsList: Transaction[]) => {
+    // Check if we need to fetch prices
+    const needsPrices = transactionsList.some(t => !t.price && t.shares);
+    if (!needsPrices) return;
+
+    try {
+      // Get daily prices for this stock
+      const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=NMSRS0ZDIOWF3CLL`;
+      
+      const response = await fetch(url);
+      const priceData = await response.json();
+      
+      if (priceData['Time Series (Daily)']) {
+        const timeSeries = priceData['Time Series (Daily)'];
+        
+        // Update transactions with closing prices
+        const updatedTransactions = transactionsList.map(transaction => {
+          if (!transaction.price && transaction.transaction_date) {
+            // Format date to match API format (YYYY-MM-DD)
+            const dateStr = new Date(transaction.transaction_date).toISOString().split('T')[0];
+            
+            // Look for price on that date or nearest available date
+            let price = null;
+            let checkDate = new Date(dateStr);
+            let attempts = 0;
+            
+            // Try to find price within 5 days
+            while (!price && attempts < 5) {
+              const checkDateStr = checkDate.toISOString().split('T')[0];
+              if (timeSeries[checkDateStr]) {
+                price = parseFloat(timeSeries[checkDateStr]['4. close']);
+                break;
+              }
+              // Go back one day
+              checkDate.setDate(checkDate.getDate() - 1);
+              attempts++;
+            }
+            
+            if (price) {
+              return { ...transaction, price, value: transaction.shares * price };
+            }
+          }
+          return transaction;
+        });
+        
+        setTransactions(updatedTransactions);
+        console.log('📈 [InsiderTransactions] Updated transactions with historical prices');
+      }
+    } catch (error) {
+      console.error('❌ [InsiderTransactions] Error fetching historical prices:', error);
+      // Continue showing transactions without prices
     }
   };
 
