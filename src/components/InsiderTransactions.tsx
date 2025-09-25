@@ -25,8 +25,8 @@ const CACHE_DURATION = 60 * 60 * 1000; // 60 minutes
 const MEMORY_CACHE = new Map<string, { data: any; timestamp: number }>();
 const pendingRequests = new Map<string, Promise<any>>();
 
-// TEST API KEY - Replace with environment variable in production
-const TEST_API_KEY = 'QGY1MY56CZZ8TVJO';
+// Premium API key - hardcoded as per Alpha Vantage support recommendation
+const PREMIUM_API_KEY = 'NMSRS0ZDIOWF3CLL';
 
 // API call queue to prevent rate limiting
 class APIQueue {
@@ -196,9 +196,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     setError(null);
     setIsUsingMockData(false);
     
-    // Using TEST API key
-    const API_KEY = TEST_API_KEY;
-    console.log('🔑 Using TEST API key for demo');
+    console.log('🔑 Using Premium API key');
     
     const cacheKey = `insider_${symbol}`;
     const localStorageKey = `wallstsmart_insider_${symbol}`;
@@ -232,8 +230,8 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
         return;
       }
 
-      // Make new API request with queue
-      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
+      // Make new API request with queue - hardcode key directly as recommended
+      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=NMSRS0ZDIOWF3CLL`;
       
       console.log(`📡 [InsiderTransactions] Making API call for ${symbol}`);
       console.log(`📡 URL: ${url}`);
@@ -354,11 +352,10 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     setIsUsingMockData(false);
     
     try {
-      // Using TEST API key
-      const API_KEY = TEST_API_KEY;
-      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
+      // Hardcode Premium API key directly in URL as recommended
+      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=NMSRS0ZDIOWF3CLL`;
       
-      console.log(`🔴 [FORCED REFRESH] Direct API call with TEST key`);
+      console.log(`🔴 [FORCED REFRESH] Direct API call with Premium key`);
       console.log(`🔴 [FORCED REFRESH] URL: ${url}`);
       
       const response = await fetch(url);
