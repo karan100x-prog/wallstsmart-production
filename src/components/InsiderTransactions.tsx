@@ -25,7 +25,7 @@ const CACHE_DURATION = 60 * 60 * 1000; // 60 minutes
 const MEMORY_CACHE = new Map<string, { data: any; timestamp: number }>();
 const pendingRequests = new Map<string, Promise<any>>();
 
-// Premium API key - from environment variable
+// Premium API key - hardcoded as per Alpha Vantage support recommendation
 const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
 
 // API call queue to prevent rate limiting
@@ -230,8 +230,8 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
         return;
       }
 
-      // Make new API request with queue - using environment variable
-      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
+      // Make new API request with queue - hardcode key directly as recommended
+      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=NMSRS0ZDIOWF3CLL`;
       
       console.log(`📡 [InsiderTransactions] Making API call for ${symbol}`);
       console.log(`📡 URL: ${url}`);
@@ -345,8 +345,8 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     if (!needsPrices) return;
 
     try {
-      // Get daily prices for this stock - using environment variable
-      const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${API_KEY}`;
+      // Get daily prices for this stock
+      const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=NMSRS0ZDIOWF3CLL`;
       
       const response = await fetch(url);
       const priceData = await response.json();
@@ -410,8 +410,8 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
     setIsUsingMockData(false);
     
     try {
-      // Using environment variable for API key
-      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=${API_KEY}`;
+      // Hardcode Premium API key directly in URL as recommended
+      const url = `https://www.alphavantage.co/query?function=INSIDER_TRANSACTIONS&symbol=${symbol}&apikey=NMSRS0ZDIOWF3CLL`;
       
       console.log(`🔴 [FORCED REFRESH] Direct API call with Premium key`);
       console.log(`🔴 [FORCED REFRESH] URL: ${url}`);
