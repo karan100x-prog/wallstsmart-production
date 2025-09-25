@@ -673,7 +673,7 @@ const InsiderTransactions: React.FC<InsiderTransactionsProps> = ({ symbol }) => 
         <p className="text-gray-500 text-xs">
           {isUsingMockData 
             ? 'Demo data shown • Real data will load when API is available' 
-            : 'Data cached for 60 minutes • Click refresh to force update'}
+            : 'Data cached for 60 minutes'}
         </p>
       </div>
     </div>
