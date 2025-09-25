@@ -26,7 +26,7 @@ const MEMORY_CACHE = new Map<string, { data: any; timestamp: number }>();
 const pendingRequests = new Map<string, Promise<any>>();
 
 // Premium API key - hardcoded as per Alpha Vantage support recommendation
-const PREMIUM_API_KEY = 'NMSRS0ZDIOWF3CLL';
+const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
 
 // API call queue to prevent rate limiting
 class APIQueue {
