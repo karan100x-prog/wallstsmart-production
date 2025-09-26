@@ -640,7 +640,8 @@ export default function Portfolio() {
 
             {activeView === 'sectors' && (
               <div className="space-y-6">
-                <h2 className="text-2xl font-bold mb-4">Sector Allocation</h2>
+                <h2 className="
+                  text-2xl font-bold mb-4">Sector Allocation</h2>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Sector Distribution */}
@@ -737,7 +738,12 @@ export default function Portfolio() {
                 {watchlist.map((item) => (
                   <div key={item.id} className="bg-gray-900 rounded-lg p-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-xl font-bold">{item.symbol}</span>
+                      <div>
+                        <span className="text-xl font-bold">{item.symbol}</span>
+                        {item.companyName && (
+                          <p className="text-sm text-gray-400">{item.companyName}</p>
+                        )}
+                      </div>
                       <button
                         onClick={() => removeFromWatchlist(item.id)}
                         className="text-red-500 hover:text-red-400"
