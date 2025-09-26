@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, Star } from 'lucide-react';
 import { getQuote, getCompanyOverview } from '../services/alphaVantage';
 import StockChartAdvanced from './StockChartAdvanced';
 import { StockHealthMetrics } from './StockHealthMetrics';
 import RevenueAnalysis from './RevenueAnalysis';
 import InsiderTransactions from './InsiderTransactions';
+import { useAuth } from '../contexts/AuthContext';
+import { db } from '../lib/firebase';
+import { collection, addDoc, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 interface StockDetailProps {
   symbol: string;
@@ -16,11 +19,62 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
   const [loading, setLoading] = useState(true);
   const [newsData, setNewsData] = useState<any[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
+  
+  // Watchlist feature states
+  const { currentUser } = useAuth();
+  const [watchlist, setWatchlist] = useState<any[]>([]);
 
   useEffect(() => {
     loadStockData();
     loadNewsData();
-  }, [symbol]);
+    if (currentUser) {
+      fetchWatchlist();
+    }
+  }, [symbol, currentUser]);
+
+  // Watchlist functions
+  const fetchWatchlist = async () => {
+    if (!currentUser) return;
+    try {
+      const q = query(collection(db, 'watchlist'), where('userId', '==', currentUser.uid));
+      const querySnapshot = await getDocs(q);
+      const watchlistData: any[] = [];
+      querySnapshot.forEach((doc) => {
+        watchlistData.push({ id: doc.id, ...doc.data() });
+      });
+      setWatchlist(watchlistData);
+    } catch (error) {
+      console.error('Error fetching watchlist:', error);
+    }
+  };
+
+  const isInWatchlist = (symbol: string) => {
+    return watchlist.some(item => item.symbol === symbol);
+  };
+
+  const toggleWatchlist = async (symbol: string) => {
+    if (!currentUser) {
+      alert('Please sign in to use watchlist');
+      return;
+    }
+
+    const existing = watchlist.find(item => item.symbol === symbol);
+    
+    if (existing) {
+      // Remove from watchlist
+      await deleteDoc(doc(db, 'watchlist', existing.id));
+    } else {
+      // Add to watchlist
+      await addDoc(collection(db, 'watchlist'), {
+        userId: currentUser.uid,
+        symbol: symbol,
+        companyName: company?.Name || symbol,
+        addedAt: new Date().toISOString()
+      });
+    }
+    
+    fetchWatchlist(); // Refresh
+  };
 
   const loadStockData = async () => {
     setLoading(true);
@@ -216,12 +270,26 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
 
   return (
     <div>
-      {/* Header */}
+      {/* Updated Header with Favorite Star */}
       <div className="mb-8">
         <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">{symbol}</h1>
-            <p className="text-xl text-gray-400">{company?.Name || 'Loading...'}</p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">{symbol}</h1>
+              <p className="text-xl text-gray-400">{company?.Name || 'Loading...'}</p>
+            </div>
+            <button
+              onClick={() => toggleWatchlist(symbol)}
+              className={`p-2 rounded-lg transition-all duration-200 hover:bg-gray-800 ${
+                isInWatchlist(symbol) ? 'text-yellow-500' : 'text-gray-500 hover:text-yellow-400'
+              }`}
+              title={isInWatchlist(symbol) ? 'Remove from Watchlist' : 'Add to Watchlist'}
+            >
+              <Star 
+                className="h-7 w-7" 
+                fill={isInWatchlist(symbol) ? 'currentColor' : 'none'}
+              />
+            </button>
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold">${price.toFixed(2)}</div>
