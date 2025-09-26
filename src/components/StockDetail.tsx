@@ -8,6 +8,10 @@ import InsiderTransactions from './InsiderTransactions';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { Star } from 'lucide-react';
+
+
+
 
 interface StockDetailProps {
   symbol: string;
