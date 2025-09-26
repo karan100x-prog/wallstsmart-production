@@ -56,30 +56,45 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
     return watchlist.some(item => item.symbol === symbol);
   };
 
-  const toggleWatchlist = async (symbol: string) => {
-    if (!currentUser) {
-      alert('Please sign in to use watchlist');
-      return;
-    }
 
+  const toggleWatchlist = async (symbol: string) => {
+  if (!currentUser) {
+    alert('Please sign in to use watchlist');
+    return;
+  }
+
+  try {
     const existing = watchlist.find(item => item.symbol === symbol);
     
     if (existing) {
       // Remove from watchlist
       await deleteDoc(doc(db, 'watchlist', existing.id));
+      console.log('Removed from watchlist:', symbol);
     } else {
       // Add to watchlist
-      await addDoc(collection(db, 'watchlist'), {
+      const docRef = await addDoc(collection(db, 'watchlist'), {
         userId: currentUser.uid,
         symbol: symbol,
         companyName: company?.Name || symbol,
         addedAt: new Date().toISOString()
       });
+      console.log('Added to watchlist:', symbol, 'with ID:', docRef.id);
     }
     
-    fetchWatchlist(); // Refresh
-  };
+    // Refresh watchlist
+    await fetchWatchlist();
+  } catch (error) {
+    console.error('Error toggling watchlist:', error);
+    alert('Failed to update watchlist. Please try again.');
+  }
+};
 
+
+
+
+
+
+  
   const loadStockData = async () => {
     setLoading(true);
     try {
