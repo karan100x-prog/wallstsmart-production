@@ -324,10 +324,10 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         <StockChartAdvanced symbol={symbol} />
       </div>
 
-      {/* Advanced Health Metrics */}
+      {/* Advanced Health Metrics - MOVED UP */}
       <StockHealthMetrics symbol={symbol} />
 
-      {/* Revenue Analysis & Projections */}
+      {/* Revenue Analysis & Projections - MOVED UP */}
       <RevenueAnalysis symbol={symbol} />
 
       {/* SIDE BY SIDE: Valuation Metrics & Analyst Targets */}
@@ -511,7 +511,7 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         </div>
       )}
 
-      {/* SIDE BY SIDE: Trading Metrics & Ownership & Short Interest */}
+      {/* SIDE BY SIDE: Trading Metrics & Ownership & Short Interest - MOVED DOWN */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         
         {/* LEFT SIDE: Trading Metrics */}
