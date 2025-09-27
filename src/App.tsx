@@ -207,6 +207,7 @@ function App() {
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/macro" element={<MacroDashboard />} />
             <Route path="/smart-flow" element={<SmartFlow />} />
+            <Route path="/privacy" element={<Privacy />} />
           </Routes>
           <Analytics />
         </div>
