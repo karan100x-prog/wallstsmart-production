@@ -10,6 +10,7 @@ import Login from './components/Login';
 import MacroDashboard from './components/MacroDashboard';
 import SmartFlow from './components/SmartFlow';
 import { Analytics } from '@vercel/analytics/react';
+import Privacy from './pages/Privacy';
 
 function Navigation() {
   const navigate = useNavigate();
