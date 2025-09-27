@@ -83,7 +83,7 @@ const Privacy = () => {
             <h2 className="text-xl font-semibold text-white mb-3">Third-Party Services</h2>
             <ul className="space-y-2 text-gray-400">
               <li><span className="text-gray-200 font-medium">Firebase:</span> Authentication & database</li>
-              <li><span className="text-gray-200 font-medium">Alpha Vantage:</span> Market data (no personal data shared)</li>
+              <li><span className="text-gray-200 font-medium">Market data api:</span> No personal data shared</li>
               <li><span className="text-gray-200 font-medium">Vercel:</span> Hosting</li>
               <li><span className="text-gray-200 font-medium">Stripe:</span> Payment processing (premium accounts)</li>
             </ul>
@@ -136,7 +136,7 @@ const Privacy = () => {
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">Changes</h2>
             <p className="text-gray-300">
-              We'll notify you of any significant changes to this policy via email.
+              We'll udpate of any significant changes on this page.
             </p>
           </section>
 
