@@ -1,3 +1,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html {
+  font-size: 14px; /* Reduced from default 16px - reduces all rem-based sizes by ~2 points */
+}
+
+/* Optional: If you want to ensure consistent scaling */
+@media (min-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 14px;
+  }
+}
