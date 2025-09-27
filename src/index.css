@@ -9,11 +9,11 @@ html {
 
 /* Override only text size utilities */
 @layer utilities {
-  .text-xs { font-size: 10px; }     /* was 12px */
-  .text-sm { font-size: 12px; }     /* was 14px */
-  .text-base { font-size: 14px; }   /* was 16px */
-  .text-lg { font-size: 16px; }     /* was 18px */
-  .text-xl { font-size: 18px; }     /* was 20px */
+  .text-xs { font-size: 12px; }     /* was 12px */
+  .text-sm { font-size: 14px; }     /* was 14px */
+  .text-base { font-size: 16px; }   /* was 16px */
+  .text-lg { font-size: 18px; }     /* was 18px */
+  .text-xl { font-size: 20px; }     /* was 20px */
   .text-2xl { font-size: 22px; }    /* was 24px */
   .text-3xl { font-size: 28px; }    /* was 30px */
   .text-4xl { font-size: 34px; }    /* was 36px */
