@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, DollarSign, Activity } from 'lucide-react';
 
+
+//import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
+//import { DollarSign } from 'lucide-react';
+
 interface RevenueAnalysisProps {
   symbol: string;
 }
@@ -17,7 +21,6 @@ const RevenueAnalysis: React.FC<RevenueAnalysisProps> = ({ symbol }) => {
   const [viewMode, setViewMode] = useState<'FY' | 'QTR'>('FY');
   const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [projectedGrowthRate, setProjectedGrowthRate] = useState<number>(0);
 
   useEffect(() => {
     loadRevenueData();
@@ -47,117 +50,15 @@ const RevenueAnalysis: React.FC<RevenueAnalysisProps> = ({ symbol }) => {
     }
   };
 
-  // Model #1: Historical Growth Rate with Weighted Average
-  const calculateHistoricalGrowthRate = (data: RevenueData[]): number => {
-    // Need at least 2 data points to calculate growth
-    if (data.length < 2) {
-      console.log('Insufficient data for growth calculation, using default 5%');
-      return 0.05; // fallback to 5%
-    }
-    
-    // Calculate year-over-year (or quarter-over-quarter) growth rates
-    const growthRates: number[] = [];
-    for (let i = 1; i < data.length; i++) {
-      if (data[i-1].revenue > 0) { // Avoid division by zero
-        const growth = (data[i].revenue - data[i-1].revenue) / data[i-1].revenue;
-        growthRates.push(growth);
-        console.log(`Period ${data[i].period}: ${(growth * 100).toFixed(2)}% growth`);
-      }
-    }
-    
-    // If no valid growth rates, fallback
-    if (growthRates.length === 0) {
-      return 0.05;
-    }
-    
-    // Calculate weighted average (more recent periods get higher weight)
-    const weights = growthRates.map((_, i) => i + 1);
-    const weightSum = weights.reduce((a, b) => a + b, 0);
-    
-    const weightedGrowth = growthRates.reduce((sum, rate, i) => 
-      sum + (rate * weights[i] / weightSum), 0
-    );
-    
-    console.log(`Weighted average growth: ${(weightedGrowth * 100).toFixed(2)}%`);
-    
-    // Cap growth between -20% and +50% for realistic projections
-    const cappedGrowth = Math.max(-0.2, Math.min(0.5, weightedGrowth));
-    
-    if (cappedGrowth !== weightedGrowth) {
-      console.log(`Growth capped to: ${(cappedGrowth * 100).toFixed(2)}%`);
-    }
-    
-    return cappedGrowth;
-  };
-
-  // Enhanced projection generator using historical growth model
-  const generateProjections = (
-    historicalData: RevenueData[],
-    periods: number,
-    type: 'annual' | 'quarterly'
-  ): RevenueData[] => {
-    if (historicalData.length < 1) return [];
-
-    // Calculate the weighted historical growth rate
-    const growthRate = calculateHistoricalGrowthRate(historicalData);
-    setProjectedGrowthRate(growthRate); // Store for display
-    
-    const projections: RevenueData[] = [];
-    let lastRevenue = historicalData[historicalData.length - 1].revenue;
-    const lastPeriod = historicalData[historicalData.length - 1].period;
-
-    // Generate projections using calculated growth rate
-    for (let i = 1; i <= periods; i++) {
-      const projectedRevenue = lastRevenue * (1 + growthRate);
-      
-      // Format the period label
-      let periodLabel = '';
-      if (type === 'annual') {
-        const baseYear = parseInt(lastPeriod.substring(0, 4));
-        periodLabel = `${baseYear + i}e`;
-      } else {
-        // For quarterly, extract quarter and year
-        const lastYear = parseInt(lastPeriod.substring(0, 4));
-        const lastQuarter = historicalData.length % 4 || 4;
-        const nextQuarter = ((lastQuarter + i - 1) % 4) + 1;
-        const yearOffset = Math.floor((lastQuarter + i - 1) / 4);
-        periodLabel = `${lastYear + yearOffset}-Q${nextQuarter}e`;
-      }
-      
-      projections.push({
-        period: periodLabel,
-        revenue: projectedRevenue,
-        isProjected: true,
-        growthRate: growthRate * 100 // Store as percentage
-      });
-      
-      lastRevenue = projectedRevenue;
-    }
-    
-    return projections;
-  };
-
   const processAnnualData = (reports: any[]): RevenueData[] => {
     const historicalData = reports
       .slice(0, 8) // last 8 years only
       .reverse()
-      .map((report, index, array) => {
-        const revenue = parseFloat(report.totalRevenue) || 0;
-        let growthRate = undefined;
-        
-        // Calculate growth rate for historical data
-        if (index > 0 && array[index - 1].totalRevenue > 0) {
-          const prevRevenue = parseFloat(array[index - 1].totalRevenue);
-          growthRate = ((revenue - prevRevenue) / prevRevenue) * 100;
-        }
-        
-        return {
-          period: report.fiscalDateEnding.substring(0, 4),
-          revenue: revenue,
-          isProjected: false,
-          growthRate: growthRate
-        };
-      });
+      .map(report => ({
+        period: report.fiscalDateEnding.substring(0, 4),
+        revenue: parseFloat(report.totalRevenue) || 0,
+        isProjected: false,
+      }));
 
     const projections = generateProjections(historicalData, 2, 'annual');
     return [...historicalData, ...projections];
@@ -167,26 +68,39 @@ const RevenueAnalysis: React.FC<RevenueAnalysisProps> = ({ symbol }) => {
     const historicalData = reports
       .slice(0, 8) // last 8 quarters only
       .reverse()
-      .map((report, index, array) => {
-        const revenue = parseFloat(report.totalRevenue) || 0;
-        let growthRate = undefined;
-        
-        // Calculate growth rate for historical data
-        if (index > 0 && array[index - 1].totalRevenue > 0) {
-          const prevRevenue = parseFloat(array[index - 1].totalRevenue);
-          growthRate = ((revenue - prevRevenue) / prevRevenue) * 100;
-        }
-        
-        return {
-          period: report.fiscalDateEnding.substring(0, 7),
-          revenue: revenue,
-          isProjected: false,
-          growthRate: growthRate
-        };
-      });
+      .map(report => ({
+        period: report.fiscalDateEnding.substring(0, 7),
+        revenue: parseFloat(report.totalRevenue) || 0,
+        isProjected: false,
+      }));
 
     const projections = generateProjections(historicalData, 2, 'quarterly');
     return [...historicalData, ...projections];
+  };
+
+  const generateProjections = (
+    historicalData: RevenueData[],
+    periods: number,
+    type: 'annual' | 'quarterly'
+  ): RevenueData[] => {
+    if (historicalData.length < 2) return [];
+
+    const projections: RevenueData[] = [];
+    let lastRevenue = historicalData[historicalData.length - 1].revenue;
+    const lastPeriod = historicalData[historicalData.length - 1].period;
+
+    for (let i = 1; i <= periods; i++) {
+      const projectedRevenue = lastRevenue * 1.05; // simple +5% growth
+      projections.push({
+        period: type === 'annual'
+          ? `${parseInt(lastPeriod) + i}e`
+          : `Q${i} ${new Date().getFullYear()}e`,
+        revenue: projectedRevenue,
+        isProjected: true,
+      });
+      lastRevenue = projectedRevenue;
+    }
+    return projections;
   };
 
   const formatRevenue = (value: number) => {
@@ -209,7 +123,7 @@ const RevenueAnalysis: React.FC<RevenueAnalysisProps> = ({ symbol }) => {
           </p>
         )}
         {data.isProjected && (
-          <p className="text-blue-400 text-xs mt-1">Projected (Historical Growth Model)</p>
+          <p className="text-blue-400 text-xs mt-1">Projected</p>
         )}
       </div>
     );
@@ -297,27 +211,11 @@ const RevenueAnalysis: React.FC<RevenueAnalysisProps> = ({ symbol }) => {
         </ResponsiveContainer>
       </div>
 
-      {/* Enhanced Projection Disclaimer with calculated growth rate */}
+      {/* Projection Disclaimer */}
       <div className="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-400">
-              <span className="text-blue-400 font-semibold">Projection Model:</span> Weighted Historical Growth
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Future bars (light blue) use weighted average of historical growth rates, 
-              with recent periods weighted more heavily.
-            </p>
-          </div>
-          {projectedGrowthRate !== 0 && (
-            <div className="text-right">
-              <p className="text-xs text-gray-400">Projected Growth Rate</p>
-              <p className={`text-lg font-bold ${projectedGrowthRate >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {projectedGrowthRate >= 0 ? '+' : ''}{(projectedGrowthRate * 100).toFixed(1)}%
-              </p>
-            </div>
-          )}
-        </div>
+        <p className="text-xs text-gray-400">
+          <span className="text-blue-400 font-semibold">Note:</span> Future bars (light blue) are projections and based on simplified modeling.
+        </p>
       </div>
     </div>
   );
