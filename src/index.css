@@ -2,19 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Only reduce font sizes, not spacing or widths */
 html {
-  font-size: 14px; /* Reduced from default 16px - reduces all rem-based sizes by ~2 points */
+  font-size: 16px; /* Keep base at 16px for spacing calculations */
 }
 
-/* Optional: If you want to ensure consistent scaling */
-@media (min-width: 640px) {
-  html {
-    font-size: 14px;
-  }
-}
-
-@media (min-width: 1024px) {
-  html {
-    font-size: 14px;
-  }
+/* Override only text size utilities */
+@layer utilities {
+  .text-xs { font-size: 10px; }     /* was 12px */
+  .text-sm { font-size: 12px; }     /* was 14px */
+  .text-base { font-size: 14px; }   /* was 16px */
+  .text-lg { font-size: 16px; }     /* was 18px */
+  .text-xl { font-size: 18px; }     /* was 20px */
+  .text-2xl { font-size: 22px; }    /* was 24px */
+  .text-3xl { font-size: 28px; }    /* was 30px */
+  .text-4xl { font-size: 34px; }    /* was 36px */
+  .text-5xl { font-size: 46px; }    /* was 48px */
+  .text-6xl { font-size: 58px; }    /* was 60px */
 }
