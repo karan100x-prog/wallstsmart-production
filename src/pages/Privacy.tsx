@@ -18,7 +18,7 @@ const Privacy = () => {
             </p>
             <p className="text-gray-300">
               Your portfolio data stays private, and your experience stays clean. 
-              We make money through optional premium features, not by selling your attention or information to advertisers.
+              We make money through optional premium features (not available yet), not by selling your attention or information to advertisers.
             </p>
           </section>
 
