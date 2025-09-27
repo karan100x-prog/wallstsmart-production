@@ -324,12 +324,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         <StockChartAdvanced symbol={symbol} />
       </div>
 
-      {/* Advanced Health Metrics - MOVED UP */}
-      <StockHealthMetrics symbol={symbol} />
-
-      {/* Revenue Analysis & Projections - MOVED UP */}
-      <RevenueAnalysis symbol={symbol} />
-
       {/* SIDE BY SIDE: Valuation Metrics & Analyst Targets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         
@@ -482,6 +476,14 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         </div>
       </div>
 
+      {/* Revenue Analysis & Projections - MOVED UP */}
+      <RevenueAnalysis symbol={symbol} />
+      
+      {/* Advanced Health Metrics - MOVED UP */}
+      <StockHealthMetrics symbol={symbol} />
+
+     
+      
       {/* Dividend Information */}
       {company?.DividendYield && parseFloat(company?.DividendYield) > 0 && (
         <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-6">
