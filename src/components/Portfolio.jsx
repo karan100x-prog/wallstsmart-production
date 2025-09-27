@@ -4,9 +4,84 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, getDocs, deleteDoc, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { 
   Plus, Trash2, TrendingUp, TrendingDown, RefreshCw, Star, Search, AlertCircle,
-  PieChart, BarChart3, X
+  PieChart, BarChart3, X, Clock
 } from 'lucide-react';
 import axios from 'axios';
+
+// ============= CACHING CONFIGURATION =============
+// Adjust these values to control caching duration
+const CACHE_DURATION = {
+  PORTFOLIO: 24 * 60 * 60 * 1000,  // 24 hours for portfolio
+  WATCHLIST: 15 * 60 * 1000,       // 15 minutes for watchlist
+  COMPANY_INFO: 7 * 24 * 60 * 60 * 1000  // 7 days for company overview (rarely changes)
+};
+
+// Cache helper functions
+const getCachedData = (key, cacheType = 'PORTFOLIO') => {
+  try {
+    const cached = localStorage.getItem(`wallstsmart_${key}`);
+    if (!cached) return null;
+    
+    const { data, timestamp } = JSON.parse(cached);
+    const age = Date.now() - timestamp;
+    const maxAge = CACHE_DURATION[cacheType];
+    
+    if (age > maxAge) {
+      localStorage.removeItem(`wallstsmart_${key}`);
+      return null;
+    }
+    
+    return {
+      data,
+      age: Math.floor(age / 1000), // age in seconds
+      isStale: age > maxAge * 0.9, // Consider stale at 90% of max age
+      lastUpdated: new Date(timestamp)
+    };
+  } catch (error) {
+    console.error('Cache read error:', error);
+    return null;
+  }
+};
+
+const setCachedData = (key, data) => {
+  try {
+    localStorage.setItem(`wallstsmart_${key}`, JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+  } catch (error) {
+    console.error('Cache write error:', error);
+    // If localStorage is full, clear old cache entries
+    clearOldCache();
+  }
+};
+
+const clearOldCache = () => {
+  const keys = Object.keys(localStorage);
+  keys.forEach(key => {
+    if (key.startsWith('wallstsmart_')) {
+      try {
+        const item = JSON.parse(localStorage.getItem(key));
+        if (Date.now() - item.timestamp > 7 * 24 * 60 * 60 * 1000) {
+          localStorage.removeItem(key);
+        }
+      } catch {
+        localStorage.removeItem(key);
+      }
+    }
+  });
+};
+
+// Format time ago helper
+const formatTimeAgo = (date) => {
+  const seconds = Math.floor((Date.now() - date) / 1000);
+  
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+  return `${Math.floor(seconds / 86400)} days ago`;
+};
+// ============= END CACHING CONFIGURATION =============
 
 // Sector definitions for categorization
 const SECTORS = {
@@ -79,6 +154,12 @@ export default function Portfolio() {
   const [sortBy, setSortBy] = useState('symbol'); // 'symbol', 'change', 'volume', 'marketCap'
   const [filterSector, setFilterSector] = useState('all');
   
+  // Caching states
+  const [lastPortfolioUpdate, setLastPortfolioUpdate] = useState(null);
+  const [lastWatchlistUpdate, setLastWatchlistUpdate] = useState(null);
+  const [canRefreshPortfolio, setCanRefreshPortfolio] = useState(true);
+  const [canRefreshWatchlist, setCanRefreshWatchlist] = useState(true);
+  
   // Validation states
   const [symbolValidation, setSymbolValidation] = useState({
     isValidating: false,
@@ -92,6 +173,11 @@ export default function Portfolio() {
 
   const ALPHA_VANTAGE_KEY = 'NMSRS0ZDIOWF3CLL';
 
+  // Clear old cache on component mount
+  useEffect(() => {
+    clearOldCache();
+  }, []);
+
   useEffect(() => {
     if (currentUser) {
       fetchHoldings();
@@ -101,15 +187,21 @@ export default function Portfolio() {
 
   useEffect(() => {
     if (holdings.length > 0 && activeTab === 'portfolio') {
-      fetchLivePrices();
-      const interval = setInterval(fetchLivePrices, 60000);
-      return () => clearInterval(interval);
+      fetchLivePrices(); // Only fetch once, use cache if available
+      // Removed aggressive 60-second interval
     }
   }, [holdings, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'watchlist' && watchlist.length > 0) {
-      fetchWatchlistData();
+      fetchWatchlistData(); // Will use cache if data is less than 15 minutes old
+      
+      // Optional: Set up 15-minute interval for watchlist only
+      const interval = setInterval(() => {
+        fetchWatchlistData();
+      }, CACHE_DURATION.WATCHLIST);
+      
+      return () => clearInterval(interval);
     }
   }, [activeTab, watchlist]);
 
@@ -284,45 +376,138 @@ export default function Portfolio() {
     }
   };
 
-  const fetchLivePrices = async () => {
+  // Enhanced fetchLivePrices with caching
+  const fetchLivePrices = async (forceRefresh = false) => {
+    // Check if we can refresh based on timing
+    if (!forceRefresh) {
+      const cacheKey = `portfolio_quotes_${currentUser.uid}`;
+      const cached = getCachedData(cacheKey, 'PORTFOLIO');
+      
+      if (cached && cached.data) {
+        setLiveQuotes(cached.data);
+        setLastPortfolioUpdate(cached.lastUpdated);
+        setPricesLoading(false);
+        
+        // If data is less than 24 hours old, don't fetch new data
+        if (cached.age < CACHE_DURATION.PORTFOLIO / 1000) {
+          console.log(`Using cached portfolio data (${formatTimeAgo(cached.lastUpdated)})`);
+          return;
+        }
+      }
+    }
+
     setPricesLoading(true);
     const quotes = {};
     
-    for (const holding of holdings) {
-      try {
-        const response = await axios.get(
-          `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${holding.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
-        );
-        
-        if (response.data['Global Quote']) {
-          const quote = response.data['Global Quote'];
-          quotes[holding.symbol] = {
-            price: parseFloat(quote['05. price']),
-            change: parseFloat(quote['09. change']),
-            changePercent: quote['10. change percent'],
-            high: parseFloat(quote['03. high']),
-            low: parseFloat(quote['04. low']),
-            volume: quote['06. volume']
-          };
+    try {
+      // Check if we're within rate limits
+      const lastFetchTime = localStorage.getItem('wallstsmart_last_portfolio_fetch');
+      if (lastFetchTime && !forceRefresh) {
+        const timeSinceLastFetch = Date.now() - parseInt(lastFetchTime);
+        if (timeSinceLastFetch < 60000) { // Prevent fetching more than once per minute
+          console.log('Rate limit protection: Too soon to fetch portfolio data');
+          setPricesLoading(false);
+          return;
         }
-        
-        await new Promise(resolve => setTimeout(resolve, 800));
-      } catch (error) {
-        console.error(`Error fetching price for ${holding.symbol}:`, error);
       }
+
+      localStorage.setItem('wallstsmart_last_portfolio_fetch', Date.now().toString());
+      
+      for (const holding of holdings) {
+        // First check individual stock cache
+        const stockCacheKey = `quote_${holding.symbol}`;
+        const cachedStock = getCachedData(stockCacheKey, 'PORTFOLIO');
+        
+        if (cachedStock && cachedStock.age < CACHE_DURATION.PORTFOLIO / 1000 && !forceRefresh) {
+          quotes[holding.symbol] = cachedStock.data;
+          continue;
+        }
+
+        try {
+          const response = await axios.get(
+            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${holding.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
+          );
+          
+          if (response.data['Global Quote']) {
+            const quote = response.data['Global Quote'];
+            const quoteData = {
+              price: parseFloat(quote['05. price']),
+              change: parseFloat(quote['09. change']),
+              changePercent: quote['10. change percent'],
+              high: parseFloat(quote['03. high']),
+              low: parseFloat(quote['04. low']),
+              volume: quote['06. volume']
+            };
+            
+            quotes[holding.symbol] = quoteData;
+            // Cache individual stock quote
+            setCachedData(stockCacheKey, quoteData);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 800));
+        } catch (error) {
+          console.error(`Error fetching price for ${holding.symbol}:`, error);
+        }
+      }
+      
+      // Cache the entire portfolio quotes
+      setCachedData(`portfolio_quotes_${currentUser.uid}`, quotes);
+      setLiveQuotes(quotes);
+      setLastPortfolioUpdate(new Date());
+      
+    } catch (error) {
+      console.error('Error in fetchLivePrices:', error);
+    } finally {
+      setPricesLoading(false);
     }
-    
-    setLiveQuotes(quotes);
-    setPricesLoading(false);
   };
 
-  // New function for enhanced watchlist data
-  const fetchWatchlistData = async () => {
+  // Enhanced fetchWatchlistData with 15-minute caching
+  const fetchWatchlistData = async (forceRefresh = false) => {
+    // Check cache first
+    if (!forceRefresh) {
+      const cacheKey = `watchlist_data_${currentUser.uid}`;
+      const cached = getCachedData(cacheKey, 'WATCHLIST');
+      
+      if (cached && cached.data) {
+        setWatchlistData(cached.data);
+        setLastWatchlistUpdate(cached.lastUpdated);
+        setWatchlistLoading(false);
+        
+        // If data is less than 15 minutes old, don't fetch new data
+        if (cached.age < CACHE_DURATION.WATCHLIST / 1000) {
+          console.log(`Using cached watchlist data (${formatTimeAgo(cached.lastUpdated)})`);
+          return;
+        }
+      }
+    }
+
+    // Check rate limiting
+    const lastFetchTime = localStorage.getItem('wallstsmart_last_watchlist_fetch');
+    if (lastFetchTime && !forceRefresh) {
+      const timeSinceLastFetch = Date.now() - parseInt(lastFetchTime);
+      if (timeSinceLastFetch < 30000) { // Prevent fetching more than once per 30 seconds
+        console.log('Rate limit protection: Too soon to fetch watchlist data');
+        return;
+      }
+    }
+
     setWatchlistLoading(true);
+    localStorage.setItem('wallstsmart_last_watchlist_fetch', Date.now().toString());
+    
     const data = {};
     
     for (const item of watchlist) {
       try {
+        // Check individual cache
+        const stockCacheKey = `watchlist_${item.symbol}`;
+        const cachedStock = getCachedData(stockCacheKey, 'WATCHLIST');
+        
+        if (cachedStock && cachedStock.age < CACHE_DURATION.WATCHLIST / 1000 && !forceRefresh) {
+          data[item.symbol] = cachedStock.data;
+          continue;
+        }
+
         // Get quote data
         const quoteResponse = await axios.get(
           `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
@@ -330,7 +515,7 @@ export default function Portfolio() {
         
         if (quoteResponse.data['Global Quote']) {
           const quote = quoteResponse.data['Global Quote'];
-          data[item.symbol] = {
+          const stockData = {
             price: parseFloat(quote['05. price']),
             change: parseFloat(quote['09. change']),
             changePercent: quote['10. change percent'],
@@ -339,28 +524,44 @@ export default function Portfolio() {
             volume: parseInt(quote['06. volume']),
             previousClose: parseFloat(quote['08. previous close'])
           };
-        }
-        
-        // Get overview data for additional metrics
-        await new Promise(resolve => setTimeout(resolve, 800)); // Rate limit
-        const overviewResponse = await axios.get(
-          `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${item.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
-        );
-        
-        if (overviewResponse.data.Symbol) {
-          const overview = overviewResponse.data;
-          data[item.symbol] = {
-            ...data[item.symbol],
-            companyName: overview.Name,
-            marketCap: parseFloat(overview.MarketCapitalization),
-            peRatio: parseFloat(overview.PERatio),
-            week52High: parseFloat(overview['52WeekHigh']),
-            week52Low: parseFloat(overview['52WeekLow']),
-            targetPrice: parseFloat(overview.AnalystTargetPrice),
-            sector: overview.Sector || 'Other',
-            beta: parseFloat(overview.Beta),
-            dividendYield: parseFloat(overview.DividendYield)
-          };
+
+          // Check if we have cached company info
+          const overviewCacheKey = `overview_${item.symbol}`;
+          const cachedOverview = getCachedData(overviewCacheKey, 'COMPANY_INFO');
+          
+          if (cachedOverview && !forceRefresh) {
+            data[item.symbol] = { ...stockData, ...cachedOverview.data };
+          } else {
+            // Fetch overview data only if not cached
+            await new Promise(resolve => setTimeout(resolve, 800));
+            const overviewResponse = await axios.get(
+              `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${item.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
+            );
+            
+            if (overviewResponse.data.Symbol) {
+              const overview = overviewResponse.data;
+              const overviewData = {
+                companyName: overview.Name,
+                marketCap: parseFloat(overview.MarketCapitalization),
+                peRatio: parseFloat(overview.PERatio),
+                week52High: parseFloat(overview['52WeekHigh']),
+                week52Low: parseFloat(overview['52WeekLow']),
+                targetPrice: parseFloat(overview.AnalystTargetPrice),
+                sector: overview.Sector || 'Other',
+                beta: parseFloat(overview.Beta),
+                dividendYield: parseFloat(overview.DividendYield)
+              };
+              
+              // Cache overview data for 7 days
+              setCachedData(overviewCacheKey, overviewData);
+              data[item.symbol] = { ...stockData, ...overviewData };
+            } else {
+              data[item.symbol] = stockData;
+            }
+          }
+
+          // Cache individual watchlist item
+          setCachedData(stockCacheKey, data[item.symbol]);
         }
         
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -369,8 +570,36 @@ export default function Portfolio() {
       }
     }
     
+    // Cache entire watchlist data
+    setCachedData(`watchlist_data_${currentUser.uid}`, data);
     setWatchlistData(data);
+    setLastWatchlistUpdate(new Date());
     setWatchlistLoading(false);
+  };
+
+  // Manual refresh handlers with cooldown
+  const handlePortfolioRefresh = async () => {
+    if (!canRefreshPortfolio) return;
+    
+    setCanRefreshPortfolio(false);
+    await fetchLivePrices(true); // Force refresh
+    
+    // Re-enable refresh after 1 minute
+    setTimeout(() => {
+      setCanRefreshPortfolio(true);
+    }, 60000);
+  };
+
+  const handleWatchlistRefresh = async () => {
+    if (!canRefreshWatchlist) return;
+    
+    setCanRefreshWatchlist(false);
+    await fetchWatchlistData(true); // Force refresh
+    
+    // Re-enable refresh after 30 seconds
+    setTimeout(() => {
+      setCanRefreshWatchlist(true);
+    }, 30000);
   };
 
   // Helper functions for watchlist metrics
@@ -581,7 +810,13 @@ export default function Portfolio() {
             {/* Portfolio Header with View Toggle */}
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-3xl font-bold">My Portfolio</h1>
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-center">
+                {lastPortfolioUpdate && (
+                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Updated {formatTimeAgo(lastPortfolioUpdate)}
+                  </span>
+                )}
                 <div className="flex bg-gray-800 rounded-lg p-1">
                   <button
                     onClick={() => setActiveView('holdings')}
@@ -601,12 +836,12 @@ export default function Portfolio() {
                   </button>
                 </div>
                 <button
-                  onClick={fetchLivePrices}
-                  disabled={pricesLoading}
+                  onClick={handlePortfolioRefresh}
+                  disabled={pricesLoading || !canRefreshPortfolio}
                   className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50"
                 >
                   <RefreshCw className={`h-5 w-5 ${pricesLoading ? 'animate-spin' : ''}`} />
-                  Refresh
+                  {canRefreshPortfolio ? 'Refresh' : 'Wait...'}
                 </button>
                 <button
                   onClick={() => setShowAddModal(true)}
@@ -830,7 +1065,13 @@ export default function Portfolio() {
           <div>
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-3xl font-bold">My Watchlist</h1>
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-center">
+                {lastWatchlistUpdate && (
+                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Updated {formatTimeAgo(lastWatchlistUpdate)}
+                  </span>
+                )}
                 {/* Sort Dropdown */}
                 <select
                   value={sortBy}
@@ -845,12 +1086,12 @@ export default function Portfolio() {
                 
                 {/* Refresh Button */}
                 <button
-                  onClick={fetchWatchlistData}
-                  disabled={watchlistLoading}
+                  onClick={handleWatchlistRefresh}
+                  disabled={watchlistLoading || !canRefreshWatchlist}
                   className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50"
                 >
                   <RefreshCw className={`h-5 w-5 ${watchlistLoading ? 'animate-spin' : ''}`} />
-                  Refresh
+                  {canRefreshWatchlist ? 'Refresh' : 'Wait...'}
                 </button>
               </div>
             </div>
@@ -1061,7 +1302,7 @@ export default function Portfolio() {
           </div>
         )}
 
-        {/* Enhanced Add Holding Modal */}
+        {/* Enhanced Add Holding Modal - Unchanged */}
         {showAddModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md">
@@ -1203,7 +1444,7 @@ export default function Portfolio() {
                     type="button"
                     onClick={() => {
                       setShowAddModal(false);
-                      setNewHolding({ symbol: '', quantity: '', avgPrice: '', sector: '' });
+                      setNewHolding({ symbol: '', quantity: '', avgPrice: '', sector: '', industry: '' });
                       setSymbolValidation({
                         isValidating: false,
                         isValid: false,
