@@ -4,84 +4,9 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, getDocs, deleteDoc, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { 
   Plus, Trash2, TrendingUp, TrendingDown, RefreshCw, Star, Search, AlertCircle,
-  PieChart, BarChart3, X, Clock
+  PieChart, BarChart3, X
 } from 'lucide-react';
 import axios from 'axios';
-
-// ============= CACHING CONFIGURATION =============
-// Adjust these values to control caching duration
-const CACHE_DURATION = {
-  PORTFOLIO: 24 * 60 * 60 * 1000,  // 24 hours for portfolio
-  WATCHLIST: 15 * 60 * 1000,       // 15 minutes for watchlist
-  COMPANY_INFO: 7 * 24 * 60 * 60 * 1000  // 7 days for company overview (rarely changes)
-};
-
-// Cache helper functions
-const getCachedData = (key, cacheType = 'PORTFOLIO') => {
-  try {
-    const cached = localStorage.getItem(`wallstsmart_${key}`);
-    if (!cached) return null;
-    
-    const { data, timestamp } = JSON.parse(cached);
-    const age = Date.now() - timestamp;
-    const maxAge = CACHE_DURATION[cacheType];
-    
-    if (age > maxAge) {
-      localStorage.removeItem(`wallstsmart_${key}`);
-      return null;
-    }
-    
-    return {
-      data,
-      age: Math.floor(age / 1000), // age in seconds
-      isStale: age > maxAge * 0.9, // Consider stale at 90% of max age
-      lastUpdated: new Date(timestamp)
-    };
-  } catch (error) {
-    console.error('Cache read error:', error);
-    return null;
-  }
-};
-
-const setCachedData = (key, data) => {
-  try {
-    localStorage.setItem(`wallstsmart_${key}`, JSON.stringify({
-      data,
-      timestamp: Date.now()
-    }));
-  } catch (error) {
-    console.error('Cache write error:', error);
-    // If localStorage is full, clear old cache entries
-    clearOldCache();
-  }
-};
-
-const clearOldCache = () => {
-  const keys = Object.keys(localStorage);
-  keys.forEach(key => {
-    if (key.startsWith('wallstsmart_')) {
-      try {
-        const item = JSON.parse(localStorage.getItem(key));
-        if (Date.now() - item.timestamp > 7 * 24 * 60 * 60 * 1000) {
-          localStorage.removeItem(key);
-        }
-      } catch {
-        localStorage.removeItem(key);
-      }
-    }
-  });
-};
-
-// Format time ago helper
-const formatTimeAgo = (date) => {
-  const seconds = Math.floor((Date.now() - date) / 1000);
-  
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
-  return `${Math.floor(seconds / 86400)} days ago`;
-};
-// ============= END CACHING CONFIGURATION =============
 
 // Sector definitions for categorization
 const SECTORS = {
@@ -148,18 +73,6 @@ export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('portfolio');
   const [activeView, setActiveView] = useState('holdings'); // 'holdings', 'sectors'
   
-  // New states for enhanced watchlist
-  const [watchlistData, setWatchlistData] = useState({});
-  const [watchlistLoading, setWatchlistLoading] = useState(false);
-  const [sortBy, setSortBy] = useState('symbol'); // 'symbol', 'change', 'volume', 'marketCap'
-  const [filterSector, setFilterSector] = useState('all');
-  
-  // Caching states
-  const [lastPortfolioUpdate, setLastPortfolioUpdate] = useState(null);
-  const [lastWatchlistUpdate, setLastWatchlistUpdate] = useState(null);
-  const [canRefreshPortfolio, setCanRefreshPortfolio] = useState(true);
-  const [canRefreshWatchlist, setCanRefreshWatchlist] = useState(true);
-  
   // Validation states
   const [symbolValidation, setSymbolValidation] = useState({
     isValidating: false,
@@ -173,11 +86,6 @@ export default function Portfolio() {
 
   const ALPHA_VANTAGE_KEY = 'NMSRS0ZDIOWF3CLL';
 
-  // Clear old cache on component mount
-  useEffect(() => {
-    clearOldCache();
-  }, []);
-
   useEffect(() => {
     if (currentUser) {
       fetchHoldings();
@@ -187,23 +95,11 @@ export default function Portfolio() {
 
   useEffect(() => {
     if (holdings.length > 0 && activeTab === 'portfolio') {
-      fetchLivePrices(); // Only fetch once, use cache if available
-      // Removed aggressive 60-second interval
-    }
-  }, [holdings, activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'watchlist' && watchlist.length > 0) {
-      fetchWatchlistData(); // Will use cache if data is less than 15 minutes old
-      
-      // Optional: Set up 15-minute interval for watchlist only
-      const interval = setInterval(() => {
-        fetchWatchlistData();
-      }, CACHE_DURATION.WATCHLIST);
-      
+      fetchLivePrices();
+      const interval = setInterval(fetchLivePrices, 60000);
       return () => clearInterval(interval);
     }
-  }, [activeTab, watchlist]);
+  }, [holdings, activeTab]);
 
   useEffect(() => {
     const delaySearch = setTimeout(() => {
@@ -376,258 +272,36 @@ export default function Portfolio() {
     }
   };
 
-  // Enhanced fetchLivePrices with caching
-  const fetchLivePrices = async (forceRefresh = false) => {
-    // Check if we can refresh based on timing
-    if (!forceRefresh) {
-      const cacheKey = `portfolio_quotes_${currentUser.uid}`;
-      const cached = getCachedData(cacheKey, 'PORTFOLIO');
-      
-      if (cached && cached.data) {
-        setLiveQuotes(cached.data);
-        setLastPortfolioUpdate(cached.lastUpdated);
-        setPricesLoading(false);
-        
-        // If data is less than 24 hours old, don't fetch new data
-        if (cached.age < CACHE_DURATION.PORTFOLIO / 1000) {
-          console.log(`Using cached portfolio data (${formatTimeAgo(cached.lastUpdated)})`);
-          return;
-        }
-      }
-    }
-
+  const fetchLivePrices = async () => {
     setPricesLoading(true);
     const quotes = {};
     
-    try {
-      // Check if we're within rate limits
-      const lastFetchTime = localStorage.getItem('wallstsmart_last_portfolio_fetch');
-      if (lastFetchTime && !forceRefresh) {
-        const timeSinceLastFetch = Date.now() - parseInt(lastFetchTime);
-        if (timeSinceLastFetch < 60000) { // Prevent fetching more than once per minute
-          console.log('Rate limit protection: Too soon to fetch portfolio data');
-          setPricesLoading(false);
-          return;
-        }
-      }
-
-      localStorage.setItem('wallstsmart_last_portfolio_fetch', Date.now().toString());
-      
-      for (const holding of holdings) {
-        // First check individual stock cache
-        const stockCacheKey = `quote_${holding.symbol}`;
-        const cachedStock = getCachedData(stockCacheKey, 'PORTFOLIO');
-        
-        if (cachedStock && cachedStock.age < CACHE_DURATION.PORTFOLIO / 1000 && !forceRefresh) {
-          quotes[holding.symbol] = cachedStock.data;
-          continue;
-        }
-
-        try {
-          const response = await axios.get(
-            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${holding.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
-          );
-          
-          if (response.data['Global Quote']) {
-            const quote = response.data['Global Quote'];
-            const quoteData = {
-              price: parseFloat(quote['05. price']),
-              change: parseFloat(quote['09. change']),
-              changePercent: quote['10. change percent'],
-              high: parseFloat(quote['03. high']),
-              low: parseFloat(quote['04. low']),
-              volume: quote['06. volume']
-            };
-            
-            quotes[holding.symbol] = quoteData;
-            // Cache individual stock quote
-            setCachedData(stockCacheKey, quoteData);
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 800));
-        } catch (error) {
-          console.error(`Error fetching price for ${holding.symbol}:`, error);
-        }
-      }
-      
-      // Cache the entire portfolio quotes
-      setCachedData(`portfolio_quotes_${currentUser.uid}`, quotes);
-      setLiveQuotes(quotes);
-      setLastPortfolioUpdate(new Date());
-      
-    } catch (error) {
-      console.error('Error in fetchLivePrices:', error);
-    } finally {
-      setPricesLoading(false);
-    }
-  };
-
-  // Enhanced fetchWatchlistData with 15-minute caching
-  const fetchWatchlistData = async (forceRefresh = false) => {
-    // Check cache first
-    if (!forceRefresh) {
-      const cacheKey = `watchlist_data_${currentUser.uid}`;
-      const cached = getCachedData(cacheKey, 'WATCHLIST');
-      
-      if (cached && cached.data) {
-        setWatchlistData(cached.data);
-        setLastWatchlistUpdate(cached.lastUpdated);
-        setWatchlistLoading(false);
-        
-        // If data is less than 15 minutes old, don't fetch new data
-        if (cached.age < CACHE_DURATION.WATCHLIST / 1000) {
-          console.log(`Using cached watchlist data (${formatTimeAgo(cached.lastUpdated)})`);
-          return;
-        }
-      }
-    }
-
-    // Check rate limiting
-    const lastFetchTime = localStorage.getItem('wallstsmart_last_watchlist_fetch');
-    if (lastFetchTime && !forceRefresh) {
-      const timeSinceLastFetch = Date.now() - parseInt(lastFetchTime);
-      if (timeSinceLastFetch < 30000) { // Prevent fetching more than once per 30 seconds
-        console.log('Rate limit protection: Too soon to fetch watchlist data');
-        return;
-      }
-    }
-
-    setWatchlistLoading(true);
-    localStorage.setItem('wallstsmart_last_watchlist_fetch', Date.now().toString());
-    
-    const data = {};
-    
-    for (const item of watchlist) {
+    for (const holding of holdings) {
       try {
-        // Check individual cache
-        const stockCacheKey = `watchlist_${item.symbol}`;
-        const cachedStock = getCachedData(stockCacheKey, 'WATCHLIST');
-        
-        if (cachedStock && cachedStock.age < CACHE_DURATION.WATCHLIST / 1000 && !forceRefresh) {
-          data[item.symbol] = cachedStock.data;
-          continue;
-        }
-
-        // Get quote data
-        const quoteResponse = await axios.get(
-          `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
+        const response = await axios.get(
+          `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${holding.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
         );
         
-        if (quoteResponse.data['Global Quote']) {
-          const quote = quoteResponse.data['Global Quote'];
-          const stockData = {
+        if (response.data['Global Quote']) {
+          const quote = response.data['Global Quote'];
+          quotes[holding.symbol] = {
             price: parseFloat(quote['05. price']),
             change: parseFloat(quote['09. change']),
             changePercent: quote['10. change percent'],
             high: parseFloat(quote['03. high']),
             low: parseFloat(quote['04. low']),
-            volume: parseInt(quote['06. volume']),
-            previousClose: parseFloat(quote['08. previous close'])
+            volume: quote['06. volume']
           };
-
-          // Check if we have cached company info
-          const overviewCacheKey = `overview_${item.symbol}`;
-          const cachedOverview = getCachedData(overviewCacheKey, 'COMPANY_INFO');
-          
-          if (cachedOverview && !forceRefresh) {
-            data[item.symbol] = { ...stockData, ...cachedOverview.data };
-          } else {
-            // Fetch overview data only if not cached
-            await new Promise(resolve => setTimeout(resolve, 800));
-            const overviewResponse = await axios.get(
-              `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${item.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
-            );
-            
-            if (overviewResponse.data.Symbol) {
-              const overview = overviewResponse.data;
-              const overviewData = {
-                companyName: overview.Name,
-                marketCap: parseFloat(overview.MarketCapitalization),
-                peRatio: parseFloat(overview.PERatio),
-                week52High: parseFloat(overview['52WeekHigh']),
-                week52Low: parseFloat(overview['52WeekLow']),
-                targetPrice: parseFloat(overview.AnalystTargetPrice),
-                sector: overview.Sector || 'Other',
-                beta: parseFloat(overview.Beta),
-                dividendYield: parseFloat(overview.DividendYield)
-              };
-              
-              // Cache overview data for 7 days
-              setCachedData(overviewCacheKey, overviewData);
-              data[item.symbol] = { ...stockData, ...overviewData };
-            } else {
-              data[item.symbol] = stockData;
-            }
-          }
-
-          // Cache individual watchlist item
-          setCachedData(stockCacheKey, data[item.symbol]);
         }
         
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 800));
       } catch (error) {
-        console.error(`Error fetching data for ${item.symbol}:`, error);
+        console.error(`Error fetching price for ${holding.symbol}:`, error);
       }
     }
     
-    // Cache entire watchlist data
-    setCachedData(`watchlist_data_${currentUser.uid}`, data);
-    setWatchlistData(data);
-    setLastWatchlistUpdate(new Date());
-    setWatchlistLoading(false);
-  };
-
-  // Manual refresh handlers with cooldown
-  const handlePortfolioRefresh = async () => {
-    if (!canRefreshPortfolio) return;
-    
-    setCanRefreshPortfolio(false);
-    await fetchLivePrices(true); // Force refresh
-    
-    // Re-enable refresh after 1 minute
-    setTimeout(() => {
-      setCanRefreshPortfolio(true);
-    }, 60000);
-  };
-
-  const handleWatchlistRefresh = async () => {
-    if (!canRefreshWatchlist) return;
-    
-    setCanRefreshWatchlist(false);
-    await fetchWatchlistData(true); // Force refresh
-    
-    // Re-enable refresh after 30 seconds
-    setTimeout(() => {
-      setCanRefreshWatchlist(true);
-    }, 30000);
-  };
-
-  // Helper functions for watchlist metrics
-  const formatMarketCap = (value) => {
-    if (!value) return 'N/A';
-    if (value >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
-    if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
-    if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
-    return `${(value / 1e3).toFixed(2)}K`;
-  };
-
-  const getDistanceFromHigh = (currentPrice, high52Week) => {
-    if (!currentPrice || !high52Week) return null;
-    return ((currentPrice - high52Week) / high52Week * 100).toFixed(2);
-  };
-
-  const getUpside = (currentPrice, targetPrice) => {
-    if (!currentPrice || !targetPrice) return null;
-    return ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
-  };
-
-  const getAnalystSentiment = (upside) => {
-    if (!upside) return { rating: 'N/A', color: 'text-gray-400' };
-    const upsideNum = parseFloat(upside);
-    if (upsideNum > 20) return { rating: 'Strong Buy', color: 'text-green-500' };
-    if (upsideNum > 10) return { rating: 'Buy', color: 'text-green-400' };
-    if (upsideNum > -5) return { rating: 'Hold', color: 'text-yellow-500' };
-    return { rating: 'Sell', color: 'text-red-500' };
+    setLiveQuotes(quotes);
+    setPricesLoading(false);
   };
 
   const addHolding = async (e) => {
@@ -676,43 +350,33 @@ export default function Portfolio() {
   };
 
   const addToWatchlist = async (symbol) => {
-  try {
-    const exists = watchlist.some(item => item.symbol === symbol);
-    if (exists) {
-      alert('Already in watchlist!');
-      return;
+    try {
+      const exists = watchlist.some(item => item.symbol === symbol);
+      if (exists) {
+        alert('Already in watchlist!');
+        return;
+      }
+
+      await addDoc(collection(db, 'watchlist'), {
+        userId: currentUser.uid,
+        symbol: symbol,
+        addedAt: new Date().toISOString()
+      });
+      
+      fetchWatchlist();
+    } catch (error) {
+      console.error('Error adding to watchlist:', error);
     }
+  };
 
-    await addDoc(collection(db, 'watchlist'), {
-      userId: currentUser.uid,
-      symbol: symbol,
-      addedAt: new Date().toISOString()
-    });
-    
-    // Clear watchlist cache to force fresh data fetch
-    localStorage.removeItem(`wallstsmart_watchlist_data_${currentUser.uid}`);
-    
-    fetchWatchlist();
-  } catch (error) {
-    console.error('Error adding to watchlist:', error);
-  }
-};
-
-// Same for removeFromWatchlist
-const removeFromWatchlist = async (watchlistId) => {
-  try {
-    await deleteDoc(doc(db, 'watchlist', watchlistId));
-    
-    // Clear watchlist cache
-    localStorage.removeItem(`wallstsmart_watchlist_data_${currentUser.uid}`);
-    
-    fetchWatchlist();
-  } catch (error) {
-    console.error('Error removing from watchlist:', error);
-  }
-};
-
-  
+  const removeFromWatchlist = async (watchlistId) => {
+    try {
+      await deleteDoc(doc(db, 'watchlist', watchlistId));
+      fetchWatchlist();
+    } catch (error) {
+      console.error('Error removing from watchlist:', error);
+    }
+  };
 
   const deleteHolding = async (holdingId) => {
     if (window.confirm('Are you sure you want to remove this holding?')) {
@@ -820,13 +484,7 @@ const removeFromWatchlist = async (watchlistId) => {
             {/* Portfolio Header with View Toggle */}
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-3xl font-bold">My Portfolio</h1>
-              <div className="flex gap-4 items-center">
-                {lastPortfolioUpdate && (
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Updated {formatTimeAgo(lastPortfolioUpdate)}
-                  </span>
-                )}
+              <div className="flex gap-4">
                 <div className="flex bg-gray-800 rounded-lg p-1">
                   <button
                     onClick={() => setActiveView('holdings')}
@@ -846,12 +504,12 @@ const removeFromWatchlist = async (watchlistId) => {
                   </button>
                 </div>
                 <button
-                  onClick={handlePortfolioRefresh}
-                  disabled={pricesLoading || !canRefreshPortfolio}
+                  onClick={fetchLivePrices}
+                  disabled={pricesLoading}
                   className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50"
                 >
                   <RefreshCw className={`h-5 w-5 ${pricesLoading ? 'animate-spin' : ''}`} />
-                  {canRefreshPortfolio ? 'Refresh' : 'Wait...'}
+                  Refresh
                 </button>
                 <button
                   onClick={() => setShowAddModal(true)}
@@ -1071,236 +729,32 @@ const removeFromWatchlist = async (watchlistId) => {
             )}
           </>
         ) : (
-          /* Enhanced Watchlist Tab */
+          /* Watchlist Tab */
           <div>
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold">My Watchlist</h1>
-              <div className="flex gap-4 items-center">
-                {lastWatchlistUpdate && (
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Updated {formatTimeAgo(lastWatchlistUpdate)}
-                  </span>
-                )}
-                {/* Sort Dropdown */}
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-gray-800 text-white px-4 py-2 rounded-lg"
-                >
-                  <option value="symbol">Symbol</option>
-                  <option value="change">% Change</option>
-                  <option value="volume">Volume</option>
-                  <option value="marketCap">Market Cap</option>
-                </select>
-                
-                {/* Refresh Button */}
-                <button
-                  onClick={handleWatchlistRefresh}
-                  disabled={watchlistLoading || !canRefreshWatchlist}
-                  className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-5 w-5 ${watchlistLoading ? 'animate-spin' : ''}`} />
-                  {canRefreshWatchlist ? 'Refresh' : 'Wait...'}
-                </button>
-              </div>
-            </div>
-
-            {/* Watchlist Summary Stats */}
-            {watchlist.length > 0 && Object.keys(watchlistData).length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <p className="text-gray-400 text-sm">Total Watched</p>
-                  <p className="text-2xl font-bold">{watchlist.length}</p>
-                </div>
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <p className="text-gray-400 text-sm">Today's Best</p>
-                  <div>
-                    {(() => {
-                      const best = Object.entries(watchlistData)
-                        .sort((a, b) => b[1].change - a[1].change)[0];
-                      return best && best[1].change > 0 ? (
-                        <div>
-                          <span className="text-lg font-bold text-green-500">{best[0]}</span>
-                          <span className="text-sm text-green-400 ml-2">+{best[1].changePercent}</span>
-                        </div>
-                      ) : <span className="text-gray-500">-</span>;
-                    })()}
-                  </div>
-                </div>
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <p className="text-gray-400 text-sm">Today's Worst</p>
-                  <div>
-                    {(() => {
-                      const worst = Object.entries(watchlistData)
-                        .sort((a, b) => a[1].change - b[1].change)[0];
-                      return worst && worst[1].change < 0 ? (
-                        <div>
-                          <span className="text-lg font-bold text-red-500">{worst[0]}</span>
-                          <span className="text-sm text-red-400 ml-2">{worst[1].changePercent}</span>
-                        </div>
-                      ) : <span className="text-gray-500">-</span>;
-                    })()}
-                  </div>
-                </div>
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <p className="text-gray-400 text-sm">Avg Change</p>
-                  <div>
-                    {(() => {
-                      const changes = Object.values(watchlistData).map(d => d.change || 0);
-                      const avg = changes.reduce((a, b) => a + b, 0) / changes.length;
-                      const avgPercent = Object.values(watchlistData)
-                        .map(d => parseFloat(d.changePercent?.replace('%', '') || 0))
-                        .reduce((a, b) => a + b, 0) / changes.length;
-                      return (
-                        <span className={`text-xl font-bold ${avg >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {avg >= 0 ? '+' : ''}{avgPercent.toFixed(2)}%
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Enhanced Watchlist Cards */}
+            <h1 className="text-3xl font-bold mb-8">My Watchlist</h1>
             {watchlist.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {watchlist
-                  .sort((a, b) => {
-                    const dataA = watchlistData[a.symbol];
-                    const dataB = watchlistData[b.symbol];
-                    if (!dataA || !dataB) return 0;
-                    
-                    switch (sortBy) {
-                      case 'change':
-                        return dataB.change - dataA.change;
-                      case 'volume':
-                        return (dataB.volume || 0) - (dataA.volume || 0);
-                      case 'marketCap':
-                        return (dataB.marketCap || 0) - (dataA.marketCap || 0);
-                      default:
-                        return a.symbol.localeCompare(b.symbol);
-                    }
-                  })
-                  .map((item) => {
-                    const data = watchlistData[item.symbol];
-                    const percentFromHigh = data ? getDistanceFromHigh(data.price, data.week52High) : null;
-                    const upside = data ? getUpside(data.price, data.targetPrice) : null;
-                    const sentiment = getAnalystSentiment(upside);
-                    
-                    return (
-                      <div key={item.id} className="bg-gray-900 rounded-lg p-4 hover:bg-gray-800 transition-all border border-gray-800 hover:border-gray-600">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h3 className="text-xl font-bold">{item.symbol}</h3>
-                            <p className="text-xs text-gray-400">
-                              {data?.companyName || item.companyName || 'Loading...'}
-                            </p>
-                            {data?.sector && (
-                              <span className="text-xs px-2 py-1 bg-gray-800 rounded mt-1 inline-block">
-                                {data.sector}
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => removeFromWatchlist(item.id)}
-                            className="text-red-500 hover:text-red-400"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                        
-                        {data ? (
-                          <>
-                            {/* Price and Change */}
-                            <div className="flex justify-between items-center mb-3">
-                              <span className="text-2xl font-bold">${data.price?.toFixed(2)}</span>
-                              <span className={`px-2 py-1 rounded text-sm font-semibold ${
-                                data.change >= 0 
-                                  ? 'bg-green-500/20 text-green-500' 
-                                  : 'bg-red-500/20 text-red-500'
-                              }`}>
-                                {data.change >= 0 ? '↑' : '↓'} {data.changePercent}
-                              </span>
-                            </div>
-                            
-                            {/* Key Metrics Grid */}
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div className="bg-gray-800/50 rounded p-2">
-                                <span className="text-gray-500 block">Volume</span>
-                                <p className="text-white font-semibold">
-                                  {data.volume ? (data.volume / 1e6).toFixed(2) + 'M' : 'N/A'}
-                                </p>
-                              </div>
-                              <div className="bg-gray-800/50 rounded p-2">
-                                <span className="text-gray-500 block">Market Cap</span>
-                                <p className="text-white font-semibold">
-                                  {formatMarketCap(data.marketCap)}
-                                </p>
-                              </div>
-                              <div className="bg-gray-800/50 rounded p-2">
-                                <span className="text-gray-500 block">P/E Ratio</span>
-                                <p className="text-white font-semibold">
-                                  {data.peRatio?.toFixed(2) || 'N/A'}
-                                </p>
-                              </div>
-                              <div className="bg-gray-800/50 rounded p-2">
-                                <span className="text-gray-500 block">52W Range</span>
-                                <p className={`font-semibold ${
-                                  percentFromHigh && percentFromHigh > -10 ? 'text-green-400' : 'text-white'
-                                }`}>
-                                  {percentFromHigh ? `${percentFromHigh}%` : 'N/A'}
-                                </p>
-                              </div>
-                            </div>
-                            
-                            {/* Analyst Target */}
-                            {data.targetPrice && (
-                              <div className="mt-3 pt-3 border-t border-gray-800">
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <span className="text-gray-500 text-xs">Target</span>
-                                    <p className="text-green-400 font-semibold">
-                                      ${data.targetPrice.toFixed(2)}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-gray-500 text-xs">Upside</span>
-                                    <p className={`font-semibold ${
-                                      upside && parseFloat(upside) > 0 ? 'text-green-400' : 'text-red-400'
-                                    }`}>
-                                      {upside ? `${upside}%` : 'N/A'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className={`text-xs px-2 py-1 rounded mt-2 text-center ${sentiment.color} bg-gray-800`}>
-                                  {sentiment.rating}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Additional Info */}
-                            <div className="flex justify-between mt-3 text-xs text-gray-400">
-                              <span>Beta: {data.beta?.toFixed(2) || 'N/A'}</span>
-                              {data.dividendYield > 0 && (
-                                <span>Div: {(data.dividendYield * 100).toFixed(2)}%</span>
-                              )}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="animate-pulse">
-                            <div className="h-8 bg-gray-700 rounded mb-3"></div>
-                            <div className="h-20 bg-gray-700 rounded"></div>
-                          </div>
+                {watchlist.map((item) => (
+                  <div key={item.id} className="bg-gray-900 rounded-lg p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-xl font-bold">{item.symbol}</span>
+                        {item.companyName && (
+                          <p className="text-sm text-gray-400">{item.companyName}</p>
                         )}
-                        
-                        <p className="text-xs text-gray-500 mt-3">
-                          Added {new Date(item.addedAt).toLocaleDateString()}
-                        </p>
                       </div>
-                    );
-                  })}
+                      <button
+                        onClick={() => removeFromWatchlist(item.id)}
+                        className="text-red-500 hover:text-red-400"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-400 mt-2">
+                      Added {new Date(item.addedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="bg-gray-900 rounded-lg p-10 text-center">
@@ -1312,7 +766,7 @@ const removeFromWatchlist = async (watchlistId) => {
           </div>
         )}
 
-        {/* Enhanced Add Holding Modal - Unchanged */}
+        {/* Enhanced Add Holding Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md">
@@ -1454,7 +908,7 @@ const removeFromWatchlist = async (watchlistId) => {
                     type="button"
                     onClick={() => {
                       setShowAddModal(false);
-                      setNewHolding({ symbol: '', quantity: '', avgPrice: '', sector: '', industry: '' });
+                      setNewHolding({ symbol: '', quantity: '', avgPrice: '', sector: '' });
                       setSymbolValidation({
                         isValidating: false,
                         isValid: false,
