@@ -302,27 +302,27 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       const isGreen = data.close >= data.open;
       
       return (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm shadow-xl">
+        <div className="bg-gray-900 border border-gray-700 rounded p-2 text-xs shadow-xl">
           <p className="text-gray-400 font-medium">{data.fullDate}</p>
-          <div className="mt-1 space-y-1">
+          <div className="mt-1 space-y-0.5">
             <p className="text-white">
               <span className="text-gray-500">O:</span> ${data.open?.toFixed(2) || '0.00'}
-              <span className="text-gray-500 ml-2">H:</span> ${data.high?.toFixed(2) || '0.00'}
+              <span className="text-gray-500 ml-1">H:</span> ${data.high?.toFixed(2) || '0.00'}
             </p>
             <p className="text-white">
               <span className="text-gray-500">L:</span> ${data.low?.toFixed(2) || '0.00'}
-              <span className="text-gray-500 ml-2">C:</span> ${data.close?.toFixed(2) || '0.00'}
+              <span className="text-gray-500 ml-1">C:</span> ${data.close?.toFixed(2) || '0.00'}
             </p>
             <div className={`font-semibold ${isGreen ? 'text-green-400' : 'text-red-400'}`}>
               {isGreen ? '▲' : '▼'} {data.priceChange > 0 ? '+' : ''}{data.priceChange?.toFixed(2)} ({data.priceChangePercent?.toFixed(2)}%)
             </div>
             {showVolume && data.volume && (
-              <p className={isGreen ? 'text-green-400' : 'text-red-400'}>
+              <p className={`text-xs ${isGreen ? 'text-green-400' : 'text-red-400'}`}>
                 Vol: {formatVolume(data.volume)}
               </p>
             )}
             {data.isAdjusted && (
-              <p className="text-yellow-400 text-xs mt-1">Split-adjusted</p>
+              <p className="text-yellow-400 text-xs mt-0.5">Split-adjusted</p>
             )}
           </div>
         </div>
