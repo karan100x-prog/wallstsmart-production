@@ -676,24 +676,43 @@ export default function Portfolio() {
   };
 
   const addToWatchlist = async (symbol) => {
-    try {
-      const exists = watchlist.some(item => item.symbol === symbol);
-      if (exists) {
-        alert('Already in watchlist!');
-        return;
-      }
-
-      await addDoc(collection(db, 'watchlist'), {
-        userId: currentUser.uid,
-        symbol: symbol,
-        addedAt: new Date().toISOString()
-      });
-      
-      fetchWatchlist();
-    } catch (error) {
-      console.error('Error adding to watchlist:', error);
+  try {
+    const exists = watchlist.some(item => item.symbol === symbol);
+    if (exists) {
+      alert('Already in watchlist!');
+      return;
     }
-  };
+
+    await addDoc(collection(db, 'watchlist'), {
+      userId: currentUser.uid,
+      symbol: symbol,
+      addedAt: new Date().toISOString()
+    });
+    
+    // Clear watchlist cache to force fresh data fetch
+    localStorage.removeItem(`wallstsmart_watchlist_data_${currentUser.uid}`);
+    
+    fetchWatchlist();
+  } catch (error) {
+    console.error('Error adding to watchlist:', error);
+  }
+};
+
+// Same for removeFromWatchlist
+const removeFromWatchlist = async (watchlistId) => {
+  try {
+    await deleteDoc(doc(db, 'watchlist', watchlistId));
+    
+    // Clear watchlist cache
+    localStorage.removeItem(`wallstsmart_watchlist_data_${currentUser.uid}`);
+    
+    fetchWatchlist();
+  } catch (error) {
+    console.error('Error removing from watchlist:', error);
+  }
+};
+
+  
 
   const removeFromWatchlist = async (watchlistId) => {
     try {
