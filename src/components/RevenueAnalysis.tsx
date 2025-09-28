@@ -200,109 +200,59 @@ const RevenueAnalysis: React.FC<RevenueAnalysisProps> = ({ symbol }) => {
 
     const data = payload[0].payload;
     return (
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 rounded-xl border border-purple-500/30 shadow-2xl backdrop-blur-lg">
-        <p className="text-white font-bold text-sm">{data.period}</p>
-        <p className="text-emerald-400 font-semibold text-lg mt-1">
-          {formatRevenue(data.revenue)}
-        </p>
+      <div className="bg-gray-800 p-3 rounded border border-gray-700">
+        <p className="text-white font-semibold">{data.period}</p>
+        <p className="text-green-400">Revenue: {formatRevenue(data.revenue)}</p>
         {data.growthRate !== undefined && (
-          <p className={`font-medium mt-1 ${data.growthRate >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {data.growthRate >= 0 ? '📈' : '📉'} {data.growthRate.toFixed(1)}%
+          <p className={data.growthRate >= 0 ? 'text-green-300' : 'text-red-300'}>
+            Growth: {data.growthRate.toFixed(1)}%
           </p>
         )}
         {data.isProjected && (
-          <div className="mt-2 pt-2 border-t border-purple-500/30">
-            <p className="text-cyan-400 text-xs font-medium animate-pulse">
-              🔮 AI Projected
-            </p>
-          </div>
+          <p className="text-blue-400 text-xs mt-1">Projected (Historical Growth Model)</p>
         )}
       </div>
     );
   };
 
-  // Custom bar shape with enhanced rounded corners and gradient
-  const CustomBar = (props: any) => {
-    const { x, y, width, height, payload } = props;
-    
-    // Different gradient colors for historical vs projected
-    const gradientId = payload.isProjected ? 'projectedGradient' : 'historicalGradient';
-    
-    return (
-      <g>
-        <defs>
-          <linearGradient id="historicalGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10F988" stopOpacity={1}/>
-            <stop offset="100%" stopColor="#10B981" stopOpacity={0.8}/>
-          </linearGradient>
-          <linearGradient id="projectedGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#A78BFA" stopOpacity={1}/>
-            <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.8}/>
-          </linearGradient>
-        </defs>
-        <rect
-          x={x}
-          y={y}
-          width={width}
-          height={height}
-          fill={`url(#${gradientId})`}
-          rx={12}
-          ry={12}
-          filter="url(#glow)"
-        />
-        <defs>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-      </g>
-    );
-  };
-
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl border border-gray-700/50 p-8 mb-6 shadow-2xl">
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gradient-to-r from-purple-600/20 to-cyan-600/20 rounded-full w-1/3 mb-6"></div>
-          <div className="h-96 bg-gradient-to-r from-purple-600/10 to-cyan-600/10 rounded-2xl"></div>
+          <div className="h-8 bg-gray-700 rounded w-1/3 mb-4"></div>
+          <div className="h-96 bg-gray-700 rounded"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl border border-gray-700/50 p-8 mb-6 shadow-2xl backdrop-blur-lg">
+    <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-xl">
-            <DollarSign className="h-6 w-6 text-emerald-400" />
-          </div>
-          Revenue Analytics
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+          <DollarSign className="h-5 w-5 text-green-500" />
+          Revenue Analysis & Projections
         </h3>
         
-        {/* Toggle Switch - Modern Pill Style */}
-        <div className="flex items-center gap-1 bg-gray-900/50 rounded-full p-1.5 border border-gray-700/50 backdrop-blur-sm">
+        {/* Toggle Switch */}
+        <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1">
           <button
             onClick={() => setViewMode('FY')}
-            className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 ${
+            className={`px-4 py-2 rounded transition ${
               viewMode === 'FY'
-                ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/25'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                ? 'bg-green-600 text-white'
+                : 'text-gray-400 hover:text-white'
             }`}
           >
-            Yearly
+            Annual (FY)
           </button>
           <button
             onClick={() => setViewMode('QTR')}
-            className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 ${
+            className={`px-4 py-2 rounded transition ${
               viewMode === 'QTR'
-                ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/25'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                ? 'bg-green-600 text-white'
+                : 'text-gray-400 hover:text-white'
             }`}
           >
             Quarterly
@@ -310,59 +260,59 @@ const RevenueAnalysis: React.FC<RevenueAnalysisProps> = ({ symbol }) => {
         </div>
       </div>
 
-      {/* Chart with gradient background */}
-      <div className="h-96 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-2xl p-4 border border-gray-700/30">
+      {/* Chart */}
+      <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={revenueData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+          <ComposedChart data={revenueData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
             <XAxis 
               dataKey="period" 
               stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 500 }}
+              tick={{ fill: '#9CA3AF', fontSize: 12 }}
               angle={-45}
               textAnchor="end"
               height={60}
             />
             <YAxis 
               stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontWeight: 500 }}
+              tick={{ fill: '#9CA3AF' }}
               tickFormatter={formatRevenue}
             />
             <Tooltip content={<CustomTooltip />} />
+            <Legend />
             
-            {/* Revenue Bars with custom shape */}
+            {/* Revenue Bars */}
             <Bar 
               dataKey="revenue" 
               name="Revenue"
-              shape={CustomBar}
+              fill="#10B981"
+              opacity={0.9}
+              shape={(props: any) => {
+                const { x, y, width, height, payload } = props;
+                const color = payload.isProjected ? '#60A5FA' : '#10B981'; // light blue for projections
+                return <rect x={x} y={y} width={width} height={height} fill={color} rx={4} ry={4} />;
+              }}
             />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Modern Projection Info Card */}
-      <div className="mt-6 p-5 bg-gradient-to-r from-purple-900/20 via-cyan-900/20 to-emerald-900/20 rounded-2xl border border-purple-500/30 backdrop-blur-sm">
+      {/* Enhanced Projection Disclaimer with calculated growth rate */}
+      <div className="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
-                🤖 AI Projection Model
-              </span>
-              <span className="px-2 py-1 bg-purple-500/20 rounded-full text-xs text-purple-300 font-semibold animate-pulse">
-                LIVE
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 max-w-md">
-              Future projections (purple bars) powered by weighted historical growth analysis 
-              with recent performance prioritized for accuracy.
+            <p className="text-xs text-gray-400">
+              <span className="text-blue-400 font-semibold">Projection Model:</span> Weighted Historical Growth
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              Future bars (light blue) use weighted average of historical growth rates, 
+              with recent periods weighted more heavily.
             </p>
           </div>
           {projectedGrowthRate !== 0 && (
-            <div className="text-right bg-gray-900/50 rounded-xl p-3 border border-gray-700/50">
-              <p className="text-xs text-gray-500 font-medium mb-1">Projected Growth</p>
-              <p className={`text-2xl font-black ${projectedGrowthRate >= 0 
-                ? 'text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400' 
-                : 'text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-pink-400'}`}>
+            <div className="text-right">
+              <p className="text-xs text-gray-400">Projected Growth Rate</p>
+              <p className={`text-lg font-bold ${projectedGrowthRate >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {projectedGrowthRate >= 0 ? '+' : ''}{(projectedGrowthRate * 100).toFixed(1)}%
               </p>
             </div>
