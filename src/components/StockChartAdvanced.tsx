@@ -419,6 +419,10 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                     border: '1px solid #374151',
                     borderRadius: '0.5rem'
                   }}
+                  position={{ y: -10 }}
+                  cursor={{ stroke: '#6B7280', strokeWidth: 1, strokeDasharray: '5 5' }}
+                  offset={20}
+                  allowEscapeViewBox={{ x: false, y: true }}
                 />
                 
                 {/* Volume Bars with red/green colors based on price action */}
