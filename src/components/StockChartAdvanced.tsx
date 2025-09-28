@@ -334,7 +334,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   // Custom bar component to handle individual colors
   const CustomBar = (props: any) => {
     const { fill, x, y, width, height } = props;
-    return <rect x={x} y={y} width={width} height={height} fill={fill} opacity={0.6} />;
+    return <rect x={x} y={y} width={width} height={height} fill={fill} opacity={0.8} />;
   };
 
   const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
@@ -471,11 +471,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
               {showVolume && (
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-500 opacity-60"></div>
+                    <div className="w-3 h-3 bg-green-500 opacity-80"></div>
                     <span>Up Days</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-red-500 opacity-60"></div>
+                    <div className="w-3 h-3 bg-red-500 opacity-80"></div>
                     <span>Down Days</span>
                   </div>
                 </div>
