@@ -334,7 +334,7 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   // Custom bar component to handle individual colors
   const CustomBar = (props: any) => {
     const { fill, x, y, width, height } = props;
-    return <rect x={x} y={y} width={width} height={height} fill={fill} opacity={0.4} />;
+    return <rect x={x} y={y} width={width} height={height} fill={fill} opacity={0.6} />;
   };
 
   const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
