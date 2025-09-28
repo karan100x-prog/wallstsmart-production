@@ -447,8 +447,8 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             </ResponsiveContainer>
           </div>
 
-          {/* Volume Toggle with legend */}
-          <div className="flex justify-between items-center mt-4">
+          {/* Volume Toggle with legend - Center aligned */}
+          <div className="flex justify-center items-center mt-4">
             <div className="flex items-center gap-4">
               <label className="flex items-center cursor-pointer">
                 <input
