@@ -8,7 +8,8 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Legend 
+  Legend,
+  Cell
 } from 'recharts';
 import { getDailyPrices, getWeeklyPrices, getMonthlyPrices } from '../services/alphaVantage';
 
@@ -84,15 +85,28 @@ function adjustPricesForSplits(data: any[], symbol: string): any[] {
       }
     }
 
+    const openPrice = parseFloat(item.open) || 0;
     const closePrice = parseFloat(item.close) || 0;
+    const highPrice = parseFloat(item.high) || 0;
+    const lowPrice = parseFloat(item.low) || 0;
     const volume = parseFloat(item.volume) || 0;
-    const adjustedPrice = closePrice / adjustmentFactor;
+    
+    const adjustedOpen = openPrice / adjustmentFactor;
+    const adjustedClose = closePrice / adjustmentFactor;
+    const adjustedHigh = highPrice / adjustmentFactor;
+    const adjustedLow = lowPrice / adjustmentFactor;
     const adjustedVolume = volume * adjustmentFactor;
 
     return {
       ...item,
+      open: openPrice,
       close: closePrice,
-      adjustedClose: adjustedPrice,
+      high: highPrice,
+      low: lowPrice,
+      adjustedOpen: adjustedOpen,
+      adjustedClose: adjustedClose,
+      adjustedHigh: adjustedHigh,
+      adjustedLow: adjustedLow,
       volume: volume,
       adjustedVolume: adjustedVolume,
       adjustmentFactor: adjustmentFactor,
@@ -175,18 +189,37 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
       
       data = adjustPricesForSplits(data, symbol);
       
-      const formattedData = data.reverse().map((item, index, array) => ({
-        date: formatDateSmart(item.date, range, index, array),
-        price: item.adjustedClose || item.close,
-        volume: item.adjustedVolume || item.volume || 0,
-        originalPrice: item.close,
-        isAdjusted: item.isAdjusted || false,
-        fullDate: new Date(item.date).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric', 
-          year: 'numeric' 
-        })
-      }));
+      const formattedData = data.reverse().map((item, index, array) => {
+        // Use adjusted prices if available, otherwise use regular prices
+        const openPrice = item.adjustedOpen || item.open;
+        const closePrice = item.adjustedClose || item.close;
+        const highPrice = item.adjustedHigh || item.high;
+        const lowPrice = item.adjustedLow || item.low;
+        
+        // Determine if it's a green (bullish) or red (bearish) day
+        const isGreen = closePrice >= openPrice;
+        
+        return {
+          date: formatDateSmart(item.date, range, index, array),
+          price: closePrice,
+          open: openPrice,
+          close: closePrice,
+          high: highPrice,
+          low: lowPrice,
+          volume: item.adjustedVolume || item.volume || 0,
+          originalPrice: item.close,
+          isAdjusted: item.isAdjusted || false,
+          // Add volume color based on price action
+          volumeColor: isGreen ? '#10B981' : '#EF4444', // Green for up days, red for down days
+          priceChange: closePrice - openPrice,
+          priceChangePercent: openPrice > 0 ? ((closePrice - openPrice) / openPrice * 100) : 0,
+          fullDate: new Date(item.date).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+          })
+        };
+      });
       
       setChartData(formattedData);
     } catch (error) {
@@ -196,18 +229,29 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
           data = await getDailyPrices(symbol);
           data = data.slice(0, 5);
           data = adjustPricesForSplits(data, symbol);
-          const formattedData = data.reverse().map((item, index, array) => ({
-            date: formatDateSmart(item.date, range, index, array),
-            price: item.adjustedClose || item.close,
-            volume: item.adjustedVolume || item.volume || 0,
-            originalPrice: item.close,
-            isAdjusted: item.isAdjusted || false,
-            fullDate: new Date(item.date).toLocaleDateString('en-US', { 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
-            })
-          }));
+          const formattedData = data.reverse().map((item, index, array) => {
+            const openPrice = item.adjustedOpen || item.open;
+            const closePrice = item.adjustedClose || item.close;
+            const isGreen = closePrice >= openPrice;
+            
+            return {
+              date: formatDateSmart(item.date, range, index, array),
+              price: closePrice,
+              open: openPrice,
+              close: closePrice,
+              volume: item.adjustedVolume || item.volume || 0,
+              originalPrice: item.close,
+              isAdjusted: item.isAdjusted || false,
+              volumeColor: isGreen ? '#10B981' : '#EF4444',
+              priceChange: closePrice - openPrice,
+              priceChangePercent: openPrice > 0 ? ((closePrice - openPrice) / openPrice * 100) : 0,
+              fullDate: new Date(item.date).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric' 
+              })
+            };
+          });
           setChartData(formattedData);
         } catch (fallbackError) {
           console.error('Fallback failed:', fallbackError);
@@ -255,24 +299,42 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload[0]) {
       const data = payload[0].payload;
+      const isGreen = data.close >= data.open;
+      
       return (
-        <div className="bg-gray-900 border border-gray-700 rounded p-2 text-sm">
-          <p className="text-gray-400">{data.fullDate}</p>
-          <p className="text-green-400 font-semibold">
-            ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : '0.00'}
-          </p>
-          {showVolume && data.volume && (
-            <p className="text-blue-400">
-              Vol: {formatVolume(data.volume)}
+        <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm shadow-xl">
+          <p className="text-gray-400 font-medium">{data.fullDate}</p>
+          <div className="mt-1 space-y-1">
+            <p className="text-white">
+              <span className="text-gray-500">O:</span> ${data.open?.toFixed(2) || '0.00'}
+              <span className="text-gray-500 ml-2">H:</span> ${data.high?.toFixed(2) || '0.00'}
             </p>
-          )}
-          {data.isAdjusted && (
-            <p className="text-yellow-400 text-xs mt-1">Split-adjusted</p>
-          )}
+            <p className="text-white">
+              <span className="text-gray-500">L:</span> ${data.low?.toFixed(2) || '0.00'}
+              <span className="text-gray-500 ml-2">C:</span> ${data.close?.toFixed(2) || '0.00'}
+            </p>
+            <div className={`font-semibold ${isGreen ? 'text-green-400' : 'text-red-400'}`}>
+              {isGreen ? '▲' : '▼'} {data.priceChange > 0 ? '+' : ''}{data.priceChange?.toFixed(2)} ({data.priceChangePercent?.toFixed(2)}%)
+            </div>
+            {showVolume && data.volume && (
+              <p className={isGreen ? 'text-green-400' : 'text-red-400'}>
+                Vol: {formatVolume(data.volume)}
+              </p>
+            )}
+            {data.isAdjusted && (
+              <p className="text-yellow-400 text-xs mt-1">Split-adjusted</p>
+            )}
+          </div>
         </div>
       );
     }
     return null;
+  };
+
+  // Custom bar component to handle individual colors
+  const CustomBar = (props: any) => {
+    const { fill, x, y, width, height } = props;
+    return <rect x={x} y={y} width={width} height={height} fill={fill} opacity={0.6} />;
   };
 
   const hasSplits = STOCK_SPLITS[symbol.toUpperCase()] && STOCK_SPLITS[symbol.toUpperCase()].length > 0;
@@ -328,16 +390,16 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   minTickGap={20}
                 />
                 
-                {/* Volume Y-Axis on the LEFT - Always rendered but conditionally styled */}
+                {/* Volume Y-Axis on the LEFT */}
                 <YAxis 
                   yAxisId="volume"
                   orientation="left"
-                  stroke={showVolume ? "#60A5FA" : "transparent"}
-                  tick={{ fill: showVolume ? '#60A5FA' : 'transparent', fontSize: 11 }}
+                  stroke={showVolume ? "#9CA3AF" : "transparent"}
+                  tick={{ fill: showVolume ? '#9CA3AF' : 'transparent', fontSize: 11 }}
                   tickFormatter={formatVolume}
                   domain={[0, 'dataMax * 1.2']}
-                  axisLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
-                  tickLine={{ stroke: showVolume ? "#60A5FA" : "transparent" }}
+                  axisLine={{ stroke: showVolume ? "#6B7280" : "transparent" }}
+                  tickLine={{ stroke: showVolume ? "#6B7280" : "transparent" }}
                 />
                 
                 {/* Price Y-Axis on the RIGHT */}
@@ -359,13 +421,15 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
                   }}
                 />
                 
-                {/* Volume Bars - Only rendered when showVolume is true */}
+                {/* Volume Bars with red/green colors based on price action */}
                 {showVolume && (
                   <Bar 
                     yAxisId="volume"
-                    dataKey="volume" 
-                    fill="#60A5FA"
-                    opacity={0.3}
+                    dataKey="volume"
+                    shape={(props: any) => {
+                      const data = chartData[props.index];
+                      return <CustomBar {...props} fill={data.volumeColor} />;
+                    }}
                   />
                 )}
                 
@@ -383,24 +447,40 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
             </ResponsiveContainer>
           </div>
 
-          {/* Volume Toggle at the bottom */}
-          <div className="flex justify-center mt-4">
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showVolume}
-                onChange={(e) => setShowVolume(e.target.checked)}
-                className="sr-only"
-              />
-              <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                showVolume ? 'bg-green-600' : 'bg-gray-600'
-              }`}>
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  showVolume ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </div>
-              <span className="ml-2 text-sm text-gray-400">Volume</span>
-            </label>
+          {/* Volume Toggle with legend */}
+          <div className="flex justify-between items-center mt-4">
+            <div className="flex items-center gap-4">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showVolume}
+                  onChange={(e) => setShowVolume(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  showVolume ? 'bg-green-600' : 'bg-gray-600'
+                }`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showVolume ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </div>
+                <span className="ml-2 text-sm text-gray-400">Volume</span>
+              </label>
+              
+              {/* Volume color legend */}
+              {showVolume && (
+                <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-green-500 opacity-60"></div>
+                    <span>Up Days</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-red-500 opacity-60"></div>
+                    <span>Down Days</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}
