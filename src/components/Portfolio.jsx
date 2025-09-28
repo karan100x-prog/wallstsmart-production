@@ -714,15 +714,6 @@ const removeFromWatchlist = async (watchlistId) => {
 
   
 
-  const removeFromWatchlist = async (watchlistId) => {
-    try {
-      await deleteDoc(doc(db, 'watchlist', watchlistId));
-      fetchWatchlist();
-    } catch (error) {
-      console.error('Error removing from watchlist:', error);
-    }
-  };
-
   const deleteHolding = async (holdingId) => {
     if (window.confirm('Are you sure you want to remove this holding?')) {
       try {
