@@ -73,6 +73,12 @@ export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('portfolio');
   const [activeView, setActiveView] = useState('holdings'); // 'holdings', 'sectors'
   
+  // New states for enhanced watchlist
+  const [watchlistData, setWatchlistData] = useState({});
+  const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const [sortBy, setSortBy] = useState('symbol'); // 'symbol', 'change', 'volume', 'marketCap'
+  const [filterSector, setFilterSector] = useState('all');
+  
   // Validation states
   const [symbolValidation, setSymbolValidation] = useState({
     isValidating: false,
@@ -100,6 +106,12 @@ export default function Portfolio() {
       return () => clearInterval(interval);
     }
   }, [holdings, activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'watchlist' && watchlist.length > 0) {
+      fetchWatchlistData();
+    }
+  }, [activeTab, watchlist]);
 
   useEffect(() => {
     const delaySearch = setTimeout(() => {
@@ -302,6 +314,91 @@ export default function Portfolio() {
     
     setLiveQuotes(quotes);
     setPricesLoading(false);
+  };
+
+  // New function for enhanced watchlist data
+  const fetchWatchlistData = async () => {
+    setWatchlistLoading(true);
+    const data = {};
+    
+    for (const item of watchlist) {
+      try {
+        // Get quote data
+        const quoteResponse = await axios.get(
+          `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
+        );
+        
+        if (quoteResponse.data['Global Quote']) {
+          const quote = quoteResponse.data['Global Quote'];
+          data[item.symbol] = {
+            price: parseFloat(quote['05. price']),
+            change: parseFloat(quote['09. change']),
+            changePercent: quote['10. change percent'],
+            high: parseFloat(quote['03. high']),
+            low: parseFloat(quote['04. low']),
+            volume: parseInt(quote['06. volume']),
+            previousClose: parseFloat(quote['08. previous close'])
+          };
+        }
+        
+        // Get overview data for additional metrics
+        await new Promise(resolve => setTimeout(resolve, 800)); // Rate limit
+        const overviewResponse = await axios.get(
+          `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${item.symbol}&apikey=${ALPHA_VANTAGE_KEY}`
+        );
+        
+        if (overviewResponse.data.Symbol) {
+          const overview = overviewResponse.data;
+          data[item.symbol] = {
+            ...data[item.symbol],
+            companyName: overview.Name,
+            marketCap: parseFloat(overview.MarketCapitalization),
+            peRatio: parseFloat(overview.PERatio),
+            week52High: parseFloat(overview['52WeekHigh']),
+            week52Low: parseFloat(overview['52WeekLow']),
+            targetPrice: parseFloat(overview.AnalystTargetPrice),
+            sector: overview.Sector || 'Other',
+            beta: parseFloat(overview.Beta),
+            dividendYield: parseFloat(overview.DividendYield)
+          };
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (error) {
+        console.error(`Error fetching data for ${item.symbol}:`, error);
+      }
+    }
+    
+    setWatchlistData(data);
+    setWatchlistLoading(false);
+  };
+
+  // Helper functions for watchlist metrics
+  const formatMarketCap = (value) => {
+    if (!value) return 'N/A';
+    if (value >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
+    if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+    if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+    return `${(value / 1e3).toFixed(2)}K`;
+  };
+
+  const getDistanceFromHigh = (currentPrice, high52Week) => {
+    if (!currentPrice || !high52Week) return null;
+    return ((currentPrice - high52Week) / high52Week * 100).toFixed(2);
+  };
+
+  const getUpside = (currentPrice, targetPrice) => {
+    if (!currentPrice || !targetPrice) return null;
+    return ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
+  };
+
+  const getAnalystSentiment = (upside) => {
+    if (!upside) return { rating: 'N/A', color: 'text-gray-400' };
+    const upsideNum = parseFloat(upside);
+    if (upsideNum > 20) return { rating: 'Strong Buy', color: 'text-green-500' };
+    if (upsideNum > 10) return { rating: 'Buy', color: 'text-green-400' };
+    if (upsideNum > -5) return { rating: 'Hold', color: 'text-yellow-500' };
+    return { rating: 'Sell', color: 'text-red-500' };
   };
 
   const addHolding = async (e) => {
@@ -729,32 +826,230 @@ export default function Portfolio() {
             )}
           </>
         ) : (
-          /* Watchlist Tab */
+          /* Enhanced Watchlist Tab */
           <div>
-            <h1 className="text-3xl font-bold mb-8">My Watchlist</h1>
+            <div className="flex justify-between items-center mb-8">
+              <h1 className="text-3xl font-bold">My Watchlist</h1>
+              <div className="flex gap-4">
+                {/* Sort Dropdown */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-gray-800 text-white px-4 py-2 rounded-lg"
+                >
+                  <option value="symbol">Symbol</option>
+                  <option value="change">% Change</option>
+                  <option value="volume">Volume</option>
+                  <option value="marketCap">Market Cap</option>
+                </select>
+                
+                {/* Refresh Button */}
+                <button
+                  onClick={fetchWatchlistData}
+                  disabled={watchlistLoading}
+                  className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-5 w-5 ${watchlistLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Watchlist Summary Stats */}
+            {watchlist.length > 0 && Object.keys(watchlistData).length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <p className="text-gray-400 text-sm">Total Watched</p>
+                  <p className="text-2xl font-bold">{watchlist.length}</p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <p className="text-gray-400 text-sm">Today's Best</p>
+                  <div>
+                    {(() => {
+                      const best = Object.entries(watchlistData)
+                        .sort((a, b) => b[1].change - a[1].change)[0];
+                      return best && best[1].change > 0 ? (
+                        <div>
+                          <span className="text-lg font-bold text-green-500">{best[0]}</span>
+                          <span className="text-sm text-green-400 ml-2">+{best[1].changePercent}</span>
+                        </div>
+                      ) : <span className="text-gray-500">-</span>;
+                    })()}
+                  </div>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <p className="text-gray-400 text-sm">Today's Worst</p>
+                  <div>
+                    {(() => {
+                      const worst = Object.entries(watchlistData)
+                        .sort((a, b) => a[1].change - b[1].change)[0];
+                      return worst && worst[1].change < 0 ? (
+                        <div>
+                          <span className="text-lg font-bold text-red-500">{worst[0]}</span>
+                          <span className="text-sm text-red-400 ml-2">{worst[1].changePercent}</span>
+                        </div>
+                      ) : <span className="text-gray-500">-</span>;
+                    })()}
+                  </div>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <p className="text-gray-400 text-sm">Avg Change</p>
+                  <div>
+                    {(() => {
+                      const changes = Object.values(watchlistData).map(d => d.change || 0);
+                      const avg = changes.reduce((a, b) => a + b, 0) / changes.length;
+                      const avgPercent = Object.values(watchlistData)
+                        .map(d => parseFloat(d.changePercent?.replace('%', '') || 0))
+                        .reduce((a, b) => a + b, 0) / changes.length;
+                      return (
+                        <span className={`text-xl font-bold ${avg >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {avg >= 0 ? '+' : ''}{avgPercent.toFixed(2)}%
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Enhanced Watchlist Cards */}
             {watchlist.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {watchlist.map((item) => (
-                  <div key={item.id} className="bg-gray-900 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <span className="text-xl font-bold">{item.symbol}</span>
-                        {item.companyName && (
-                          <p className="text-sm text-gray-400">{item.companyName}</p>
+                {watchlist
+                  .sort((a, b) => {
+                    const dataA = watchlistData[a.symbol];
+                    const dataB = watchlistData[b.symbol];
+                    if (!dataA || !dataB) return 0;
+                    
+                    switch (sortBy) {
+                      case 'change':
+                        return dataB.change - dataA.change;
+                      case 'volume':
+                        return (dataB.volume || 0) - (dataA.volume || 0);
+                      case 'marketCap':
+                        return (dataB.marketCap || 0) - (dataA.marketCap || 0);
+                      default:
+                        return a.symbol.localeCompare(b.symbol);
+                    }
+                  })
+                  .map((item) => {
+                    const data = watchlistData[item.symbol];
+                    const percentFromHigh = data ? getDistanceFromHigh(data.price, data.week52High) : null;
+                    const upside = data ? getUpside(data.price, data.targetPrice) : null;
+                    const sentiment = getAnalystSentiment(upside);
+                    
+                    return (
+                      <div key={item.id} className="bg-gray-900 rounded-lg p-4 hover:bg-gray-800 transition-all border border-gray-800 hover:border-gray-600">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="text-xl font-bold">{item.symbol}</h3>
+                            <p className="text-xs text-gray-400">
+                              {data?.companyName || item.companyName || 'Loading...'}
+                            </p>
+                            {data?.sector && (
+                              <span className="text-xs px-2 py-1 bg-gray-800 rounded mt-1 inline-block">
+                                {data.sector}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => removeFromWatchlist(item.id)}
+                            className="text-red-500 hover:text-red-400"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        
+                        {data ? (
+                          <>
+                            {/* Price and Change */}
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="text-2xl font-bold">${data.price?.toFixed(2)}</span>
+                              <span className={`px-2 py-1 rounded text-sm font-semibold ${
+                                data.change >= 0 
+                                  ? 'bg-green-500/20 text-green-500' 
+                                  : 'bg-red-500/20 text-red-500'
+                              }`}>
+                                {data.change >= 0 ? '↑' : '↓'} {data.changePercent}
+                              </span>
+                            </div>
+                            
+                            {/* Key Metrics Grid */}
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="bg-gray-800/50 rounded p-2">
+                                <span className="text-gray-500 block">Volume</span>
+                                <p className="text-white font-semibold">
+                                  {data.volume ? (data.volume / 1e6).toFixed(2) + 'M' : 'N/A'}
+                                </p>
+                              </div>
+                              <div className="bg-gray-800/50 rounded p-2">
+                                <span className="text-gray-500 block">Market Cap</span>
+                                <p className="text-white font-semibold">
+                                  {formatMarketCap(data.marketCap)}
+                                </p>
+                              </div>
+                              <div className="bg-gray-800/50 rounded p-2">
+                                <span className="text-gray-500 block">P/E Ratio</span>
+                                <p className="text-white font-semibold">
+                                  {data.peRatio?.toFixed(2) || 'N/A'}
+                                </p>
+                              </div>
+                              <div className="bg-gray-800/50 rounded p-2">
+                                <span className="text-gray-500 block">52W Range</span>
+                                <p className={`font-semibold ${
+                                  percentFromHigh && percentFromHigh > -10 ? 'text-green-400' : 'text-white'
+                                }`}>
+                                  {percentFromHigh ? `${percentFromHigh}%` : 'N/A'}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* Analyst Target */}
+                            {data.targetPrice && (
+                              <div className="mt-3 pt-3 border-t border-gray-800">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <span className="text-gray-500 text-xs">Target</span>
+                                    <p className="text-green-400 font-semibold">
+                                      ${data.targetPrice.toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-gray-500 text-xs">Upside</span>
+                                    <p className={`font-semibold ${
+                                      upside && parseFloat(upside) > 0 ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      {upside ? `${upside}%` : 'N/A'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className={`text-xs px-2 py-1 rounded mt-2 text-center ${sentiment.color} bg-gray-800`}>
+                                  {sentiment.rating}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Additional Info */}
+                            <div className="flex justify-between mt-3 text-xs text-gray-400">
+                              <span>Beta: {data.beta?.toFixed(2) || 'N/A'}</span>
+                              {data.dividendYield > 0 && (
+                                <span>Div: {(data.dividendYield * 100).toFixed(2)}%</span>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="animate-pulse">
+                            <div className="h-8 bg-gray-700 rounded mb-3"></div>
+                            <div className="h-20 bg-gray-700 rounded"></div>
+                          </div>
                         )}
+                        
+                        <p className="text-xs text-gray-500 mt-3">
+                          Added {new Date(item.addedAt).toLocaleDateString()}
+                        </p>
                       </div>
-                      <button
-                        onClick={() => removeFromWatchlist(item.id)}
-                        className="text-red-500 hover:text-red-400"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-400 mt-2">
-                      Added {new Date(item.addedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
+                    );
+                  })}
               </div>
             ) : (
               <div className="bg-gray-900 rounded-lg p-10 text-center">
