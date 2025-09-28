@@ -471,11 +471,11 @@ const StockChartAdvanced: React.FC<StockChartAdvancedProps> = ({ symbol }) => {
               {showVolume && (
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-500 opacity-40"></div>
+                    <div className="w-3 h-3 bg-green-500 opacity-60"></div>
                     <span>Up Days</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-red-500 opacity-40"></div>
+                    <div className="w-3 h-3 bg-red-500 opacity-60"></div>
                     <span>Down Days</span>
                   </div>
                 </div>
