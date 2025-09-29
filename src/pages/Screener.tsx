@@ -435,7 +435,7 @@ export default function CompleteMarketScreener() {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-                Complete Market Overview
+                THIS PAGE IS UNDER CONSTRUCTION
               </h1>
               <p className="text-gray-400 text-sm mt-1">
                 <span className="text-green-400 font-semibold">{marketStats.totalStocks.toLocaleString()}</span> total stocks • 
