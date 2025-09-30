@@ -92,7 +92,7 @@ const StockSearch: React.FC<{ onSelectStock?: (symbol: string) => void }> = ({ o
         {/* Search Results Dropdown */}
         {searchResults.length > 0 && (
           
-         <div className="absolute z-10 w-full max-w-xl mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-96 overflow-y-auto"> 
+         <div className="absolute z-10 w-full max-w-2xl mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-96 overflow-y-auto"> 
            {searchResults.map((result, index) => (
               <div
                 key={index}
