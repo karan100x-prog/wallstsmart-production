@@ -289,36 +289,28 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
 
   return (
     <div>
-      {/* Updated Header with Favorite Star */}
-      <div className="mb-8">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">{symbol}</h1>
-              <p className="text-xl text-gray-400">{company?.Name || 'Loading...'}</p>
-            </div>
-            <button
-              onClick={() => toggleWatchlist(symbol)}
-              className={`p-2 rounded-lg transition-all duration-200 hover:bg-gray-800 ${
-                isInWatchlist(symbol) ? 'text-yellow-500' : 'text-gray-500 hover:text-yellow-400'
-              }`}
-              title={isInWatchlist(symbol) ? 'Remove from Watchlist' : 'Add to Watchlist'}
-            >
-              <Star 
-                className="h-7 w-7" 
-                fill={isInWatchlist(symbol) ? 'currentColor' : 'none'}
-              />
-            </button>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold">${price.toFixed(2)}</div>
-            <div className={`text-lg flex items-center justify-end gap-1 ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              {change >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
-              {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent})
-            </div>
-          </div>
-        </div>
+      {/* NEW V15 Header - REPLACE OLD HEADER WITH THIS */}
+      {quote && company && (
+        <StockDetailHeader
+          symbol={symbol}
+          companyName={company?.Name || 'Loading...'}
+          exchange={company?.Exchange || 'N/A'}
+          sector={company?.Sector || 'N/A'}
+          industry={company?.Industry || 'N/A'}
+          price={parseFloat(quote?.['05. price'] || '0')}
+          change={parseFloat(quote?.['09. change'] || '0')}
+          changePercent={parseFloat(quote?.['10. change percent']?.replace('%', '') || '0')}
+          isWatchlisted={isInWatchlist(symbol)}
+          onWatchlistToggle={() => toggleWatchlist(symbol)}
+        />
+      )}
+
+      {/* Chart */}
+      <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-8">
+        <StockChartAdvanced symbol={symbol} />
       </div>
+
+      {/* REST OF YOUR EXISTING CODE CONTINUES HERE... */}
 
       {/* Chart */}
       <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-8">
