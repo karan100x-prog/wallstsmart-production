@@ -305,10 +305,6 @@ const StockDetail: React.FC<StockDetailProps> = ({ symbol }) => {
         />
       )}
 
-      {/* Chart */}
-      <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 mb-8">
-        <StockChartAdvanced symbol={symbol} />
-      </div>
 
       {/* REST OF YOUR EXISTING CODE CONTINUES HERE... */}
 
